@@ -1,0 +1,179 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2025-08-18T21:05:00.000Z",
+  "__export_source": "insomnia.desktop.app:v2025",
+  "resources": [
+
+    {
+      "_id": "wrk_governance",
+      "_type": "workspace",
+      "name": "Governance Apps API",
+      "scope": "collection",
+      "description": "CRUD for Applications, Profiles (fields), and Evidence"
+    },
+
+
+    {
+      "_id": "env_base",
+      "_type": "environment",
+      "parentId": "wrk_governance",
+      "name": "Base Environment",
+      "data": {
+        "baseUrl": "http://localhost:8080/api",
+        "app_id": "app_123",
+        "evidence_id": "ev_001"
+      }
+    },
+
+
+    {
+      "_id": "fld_apps",
+      "_type": "request_group",
+      "parentId": "wrk_governance",
+      "name": "Applications"
+    },
+
+
+    {
+      "_id": "req_list_apps",
+      "_type": "request",
+      "parentId": "fld_apps",
+      "name": "List Applications (paginated)",
+      "method": "GET",
+      "url": "{{ baseUrl }}/apps?page=1&page_size=10",
+      "headers": []
+    },
+
+
+    {
+      "_id": "req_get_app",
+      "_type": "request",
+      "parentId": "fld_apps",
+      "name": "Get Application by ID",
+      "method": "GET",
+      "url": "{{ baseUrl }}/apps/{{ app_id }}",
+      "headers": []
+    },
+
+
+    {
+      "_id": "req_create_app",
+      "_type": "request",
+      "parentId": "fld_apps",
+      "name": "Create Application",
+      "method": "POST",
+      "url": "{{ baseUrl }}/apps",
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"name\": \"Payments Hub\",\n  \"parentAppId\": null,\n  \"onboardingStatus\": \"pending\",\n  \"operationalStatus\": \"active\",\n  \"ownerId\": \"u_456\"\n}"
+      }
+    },
+
+
+    {
+      "_id": "req_patch_app",
+      "_type": "request",
+      "parentId": "fld_apps",
+      "name": "Update Application (PATCH)",
+      "method": "PATCH",
+      "url": "{{ baseUrl }}/apps/{{ app_id }}",
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"name\": \"Payments Hub Updated\",\n  \"operationalStatus\": \"maintenance\"\n}"
+      }
+    },
+
+
+    {
+      "_id": "req_delete_app",
+      "_type": "request",
+      "parentId": "fld_apps",
+      "name": "Delete Application (soft)",
+      "method": "DELETE",
+      "url": "{{ baseUrl }}/apps/{{ app_id }}?soft=true",
+      "headers": []
+    },
+
+
+    {
+      "_id": "fld_profile",
+      "_type": "request_group",
+      "parentId": "wrk_governance",
+      "name": "Profile & Evidence"
+    },
+
+
+    {
+      "_id": "req_get_profile",
+      "_type": "request",
+      "parentId": "fld_profile",
+      "name": "Get App Profile (latest)",
+      "method": "GET",
+      "url": "{{ baseUrl }}/apps/{{ app_id }}/profile",
+      "headers": []
+    },
+
+
+    {
+      "_id": "req_patch_profile",
+      "_type": "request",
+      "parentId": "fld_profile",
+      "name": "Patch App Profile (fields upsert)",
+      "method": "PATCH",
+      "url": "{{ baseUrl }}/apps/{{ app_id }}/profile",
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"fields\": [\n    {\"key\": \"app.criticality\", \"value\": \"B\", \"sourceSystem\": \"ODS\", \"sourceRef\": \"BACK-1501\"},\n    {\"key\": \"availability.rating\", \"value\": \"B\", \"sourceSystem\": \"Questionnaire\"}\n  ]\n}"
+      }
+    },
+
+
+    {
+      "_id": "req_list_evidence",
+      "_type": "request",
+      "parentId": "fld_profile",
+      "name": "List Evidence (paginated, optional ?key=)",
+      "method": "GET",
+      "url": "{{ baseUrl }}/apps/{{ app_id }}/evidence?page=1&page_size=10&key=app.criticality",
+      "headers": []
+    },
+
+
+    {
+      "_id": "req_add_evidence",
+      "_type": "request",
+      "parentId": "fld_profile",
+      "name": "Add Evidence (by fieldKey)",
+      "method": "POST",
+      "url": "{{ baseUrl }}/apps/{{ app_id }}/evidence",
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"fieldKey\": \"app.criticality\",\n  \"uri\": \"https://confluence/wiki/doc1\",\n  \"type\": \"architecture\"\n}"
+      }
+    },
+
+
+    {
+      "_id": "req_delete_evidence",
+      "_type": "request",
+      "parentId": "fld_profile",
+      "name": "Delete Evidence",
+      "method": "DELETE",
+      "url": "{{ baseUrl }}/apps/{{ app_id }}/evidence/{{ evidence_id }}",
+      "headers": []
+    }
+  ]
+}

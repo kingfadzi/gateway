@@ -1,61 +1,54 @@
 package com.example.onboarding.controller;
 
-import com.example.onboarding.model.AppMetadataResponse;
-import com.example.onboarding.model.EnvironmentInstance;
-import com.example.onboarding.service.ApplicationMetadataService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.example.onboarding.dto.*;
+import com.example.onboarding.service.ApplicationService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-
 @RestController
-@RequestMapping("/applications")
+@RequestMapping("/api/apps")
 public class ApplicationController {
 
-    private static final Logger logger = LoggerFactory.getLogger(ApplicationController.class);
+    private final ApplicationService svc;
 
-    private final ApplicationMetadataService service;
+    public ApplicationController(ApplicationService svc) {
+        this.svc = svc;
+    }
 
-    public ApplicationController(ApplicationMetadataService service) {
-        this.service = service;
+    @GetMapping
+    public PageResponse<ApplicationDto> list(
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) String owner_id,
+            @RequestParam(required = false) String onboarding_status,
+            @RequestParam(required = false) String operational_status,
+            @RequestParam(required = false) String parent_app_id,
+            @RequestParam(required = false, defaultValue = "-updated_at") String sort,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(name="page_size", defaultValue = "25") int pageSize
+    ) {
+        return svc.list(q, owner_id, onboarding_status, operational_status, parent_app_id, sort, page, pageSize);
     }
 
     @GetMapping("/{appId}")
-    public ResponseEntity<AppMetadataResponse> getApplicationDetails(@PathVariable String appId) {
-        logger.info("Received GET request for /applications/{}", appId);
-
-        try {
-            AppMetadataResponse response = service.getFullAppMetadata(appId);
-            if (response != null) {
-                logger.info("Found metadata for appId={}: {}", appId, response);
-                return ResponseEntity.ok(response);
-            } else {
-                logger.warn("No metadata found for appId={}", appId);
-                return ResponseEntity.notFound().build();
-            }
-        } catch (Exception e) {
-            logger.error("Error while fetching metadata for appId={}", appId, e);
-            return ResponseEntity.internalServerError().build();
-        }
+    public ApplicationDto get(@PathVariable String appId) {
+        return svc.get(appId);
     }
 
-    @GetMapping("/{appId}/environments")
-    public ResponseEntity<List<EnvironmentInstance>> getEnvironmentsForApp(@PathVariable String appId) {
-        logger.info("Received GET request for /applications/{}/environments", appId);
+    @PostMapping
+    public ResponseEntity<ApplicationDto> create(@RequestBody CreateAppRequest req) {
+        ApplicationDto created = svc.create(req);
+        return ResponseEntity.status(201).body(created);
+    }
 
-        try {
-            List<EnvironmentInstance> instances = service.getEnvironmentsForApp(appId);
-            if (instances.isEmpty()) {
-                logger.warn("No environments found for appId={}", appId);
-                return ResponseEntity.notFound().build();
-            }
-            logger.info("Returning {} environment instances for appId={}", instances.size(), appId);
-            return ResponseEntity.ok(instances);
-        } catch (Exception e) {
-            logger.error("Error while fetching environments for appId={}", appId, e);
-            return ResponseEntity.internalServerError().build();
-        }
+    @PatchMapping("/{appId}")
+    public ApplicationDto patch(@PathVariable String appId, @RequestBody UpdateAppRequest req) {
+        return svc.patch(appId, req);
+    }
+
+    @DeleteMapping("/{appId}")
+    public ResponseEntity<Void> delete(@PathVariable String appId,
+                                       @RequestParam(defaultValue = "true") boolean soft) {
+        svc.delete(appId, soft);
+        return ResponseEntity.noContent().build();
     }
 }
