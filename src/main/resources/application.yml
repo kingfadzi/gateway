@@ -1,0 +1,53 @@
+# File: src/main/resources/application.yml
+spring:
+  datasource:
+    url: jdbc:postgresql://helios:5432/lct_data
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+
+  jackson:
+    serialization:
+      indent_output: true
+
+  main:
+    banner-mode: off
+
+  application:
+    name: delivery-unit-backend
+
+server:
+  port: 8080
+
+logging:
+  level:
+    root: INFO
+    org.springframework.web: DEBUG
+    com.example.onboarding: DEBUG
+    org.springframework.jdbc.core: DEBUG
+    org.springframework.jdbc.datasource: DEBUG
+
+cps:
+  jira:
+    base-url: http://helios:8080
+  webhook:
+    disable-auth: true
+    secret: changeme
+  fields:
+    gov-summary: "Governance Summary"
+    gov-status: "Governance Status"
+    notes: "Control Pack Notes"
+  default-pack:
+    id: DG-CAP-001
+    version: 1.0.0
+  forms:
+    base-url: http://mars:5173/forms
+
+opa:
+  url: http://mars:8181/v1/data/change_arb
+  connectTimeoutMs: 2000
+  readTimeoutMs: 4000
+
+
+
+

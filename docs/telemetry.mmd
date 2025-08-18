@@ -1,0 +1,93 @@
+erDiagram
+    STAKEHOLDER {
+        string stakeholder_id PK
+        string display_name
+        string org_unit
+        string role_hint
+        datetime created_at
+    }
+
+    EXTERNAL_REF {
+        string ref_id PK
+        string entity_type
+        string entity_id
+        string system
+        string ref_key
+        datetime created_at
+    }
+
+    GOVERNANCE_TASK {
+        string task_id PK
+        string scope_type
+        string scope_id
+        string requirement_id
+        string claim_id
+        string risk_key
+        string task_type
+        string status
+        string priority
+        string title
+        string details
+        string assignee_id
+        string reporter_id
+        datetime due_date
+        datetime created_at
+        datetime updated_at
+    }
+
+    AUDIT_EVENT {
+        string event_id PK
+        string entity_type
+        string entity_id
+        string action
+        string actor_id
+        datetime at_time
+        json details_json
+    }
+
+    STAGE_EVENT {
+        string stage_event_id PK
+        string release_id
+        string stage
+        string status
+        string actor_id
+        datetime at_time
+    }
+
+    DEPENDENCY {
+        string dependency_id PK
+        string from_id
+        string to_id
+        string relation
+        string criticality
+        datetime created_at
+    }
+
+    RISK_STORY_HISTORY {
+        string history_id PK
+        string risk_key
+        string old_status
+        string new_status
+        string changed_by
+        datetime changed_at
+        string note
+    }
+
+    PROFILE_FIELD_HISTORY {
+        string history_id PK
+        string profile_field_id
+        json   old_value
+        json   new_value
+        string old_confidence
+        string new_confidence
+        string changed_by
+        datetime changed_at
+        string reason
+    }
+
+    GOVERNANCE_TASK }o--|| STAKEHOLDER : assignee
+    GOVERNANCE_TASK }o--|| STAKEHOLDER : reporter
+    AUDIT_EVENT     }o--|| STAKEHOLDER : actor
+    STAGE_EVENT     }o--|| STAKEHOLDER : actor
+    RISK_STORY_HISTORY }o--|| STAKEHOLDER : changed_by
+    PROFILE_FIELD_HISTORY }o--|| STAKEHOLDER : changed_by

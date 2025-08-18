@@ -1,0 +1,15 @@
+services:
+  cps:
+    build:
+      context: .        # folder with Dockerfile and built JAR in target/
+      dockerfile: Dockerfile
+    container_name: cps-service
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: "${SERVER_PORT:-8080}"
+      CPS_WEBHOOK_SECRET: "${CPS_WEBHOOK_SECRET}"
+      CPS_JIRA_BASE_URL: "${CPS_JIRA_BASE_URL}"
+      CPS_JIRA_USERNAME: "${CPS_JIRA_USERNAME}"
+      JIRA_TOKEN: "${JIRA_TOKEN}"
+    ports:
+      - "${SERVER_PORT:-8080}:8080"

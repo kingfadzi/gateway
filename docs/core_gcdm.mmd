@@ -1,0 +1,86 @@
+erDiagram
+    APPLICATION {
+        string app_id PK
+        enum   scope
+        string parent_app_id
+        string name
+        string repo_id
+        string operational_status
+    }
+
+    RELEASE {
+        string release_id PK
+        string scope_type
+        string scope_id
+        string version
+        datetime window_start
+        datetime window_end
+    }
+
+    PROFILE {
+        string profile_id PK
+        string scope_type
+        string scope_id
+        int    version
+        datetime snapshot_at
+    }
+
+    PROFILE_FIELD {
+        string id PK
+        string profile_id
+        string key
+        json   value
+        string confidence
+    }
+
+    EVIDENCE {
+        string evidence_id PK
+        string profile_field_id
+        string uri
+        string type
+        datetime added_at
+    }
+
+    POLICY_REQUIREMENT {
+        string requirement_id PK
+        string domain
+        string policy_id
+        string scope_type
+        string scope_id
+        string release_id
+        string required_evidence_types
+        string severity
+    }
+
+    CONTROL_CLAIM {
+        string claim_id PK
+        string requirement_id
+        string scope_type
+        string scope_id
+        string release_id
+        string method
+        string status
+        datetime submitted_at
+        datetime reviewed_at
+        string comment
+    }
+
+    RISK_STORY {
+        string risk_key PK
+        string domain
+        string status
+        string scope_type
+        string scope_id
+        string release_id
+        datetime sla_due
+    }
+
+    APPLICATION ||--o{ APPLICATION : parent_of
+    APPLICATION ||--o{ RELEASE     : has
+    APPLICATION ||--o{ PROFILE     : has
+    PROFILE     ||--o{ PROFILE_FIELD : has
+    PROFILE_FIELD ||--o{ EVIDENCE    : supports
+    RELEASE ||--o{ POLICY_REQUIREMENT : emits
+    POLICY_REQUIREMENT ||--o{ CONTROL_CLAIM : fulfilled_by
+    RELEASE ||--o{ RISK_STORY : tracked_by
+    POLICY_REQUIREMENT }o--o{ RISK_STORY : referenced_by

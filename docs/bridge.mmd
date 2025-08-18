@@ -1,0 +1,82 @@
+erDiagram
+%% Core stubs (keys only for clarity)
+    APPLICATION {
+        string app_id PK
+    }
+    RELEASE {
+        string release_id PK
+    }
+    POLICY_REQUIREMENT {
+        string requirement_id PK
+    }
+    CONTROL_CLAIM {
+        string claim_id PK
+    }
+    RISK_STORY {
+        string risk_key PK
+    }
+    PROFILE_FIELD {
+        string id PK
+    }
+
+%% Tracking tables (keys only where needed)
+    EXTERNAL_REF {
+        string ref_id PK
+        string entity_type
+        string entity_id
+    }
+    DEPENDENCY {
+        string dependency_id PK
+        string from_id
+        string to_id
+    }
+    GOVERNANCE_TASK {
+        string task_id PK
+        string scope_type
+        string scope_id
+        string requirement_id
+        string claim_id
+        string risk_key
+    }
+    AUDIT_EVENT {
+        string event_id PK
+        string entity_type
+        string entity_id
+    }
+    STAGE_EVENT {
+        string stage_event_id PK
+        string release_id
+    }
+    RISK_STORY_HISTORY {
+        string history_id PK
+        string risk_key
+    }
+    PROFILE_FIELD_HISTORY {
+        string history_id PK
+        string profile_field_id
+    }
+
+%% Explicit bridges
+    EXTERNAL_REF }o--|| APPLICATION : refers_to_app
+    EXTERNAL_REF }o--|| RELEASE     : refers_to_release
+
+    DEPENDENCY }o--|| APPLICATION : from_app
+    DEPENDENCY }o--|| APPLICATION : to_app
+
+    GOVERNANCE_TASK }o--|| APPLICATION : scope_app
+    GOVERNANCE_TASK }o--|| RELEASE     : scope_release
+    GOVERNANCE_TASK }o--|| POLICY_REQUIREMENT : relates_requirement
+    GOVERNANCE_TASK }o--|| CONTROL_CLAIM      : relates_claim
+    GOVERNANCE_TASK }o--|| RISK_STORY         : relates_risk
+
+    AUDIT_EVENT }o--|| APPLICATION : audit_app
+    AUDIT_EVENT }o--|| RELEASE     : audit_release
+    AUDIT_EVENT }o--|| POLICY_REQUIREMENT : audit_requirement
+    AUDIT_EVENT }o--|| CONTROL_CLAIM      : audit_claim
+    AUDIT_EVENT }o--|| RISK_STORY         : audit_risk
+    AUDIT_EVENT }o--|| PROFILE_FIELD      : audit_profile_field
+
+    STAGE_EVENT }o--|| RELEASE : for_release
+
+    RISK_STORY_HISTORY }o--|| RISK_STORY : changes
+    PROFILE_FIELD_HISTORY }o--|| PROFILE_FIELD : changes
