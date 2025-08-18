@@ -6,6 +6,8 @@ erDiagram
         string name
         string repo_id
         string operational_status
+        string onboarding_status   "pending | in_progress | onboarded"
+        string owner_id            "FK → STAKEHOLDER.stakeholder_id (via Bridge)"
     }
 
     RELEASE {
@@ -50,6 +52,8 @@ erDiagram
         string release_id
         string required_evidence_types
         string severity
+        datetime due_date
+        string  policy_version_applied
     }
 
     CONTROL_CLAIM {
@@ -62,6 +66,7 @@ erDiagram
         string status
         datetime submitted_at
         datetime reviewed_at
+        datetime assigned_at
         string comment
     }
 
