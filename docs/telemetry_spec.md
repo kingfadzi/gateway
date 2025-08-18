@@ -3,7 +3,7 @@
 
 ## Purpose
 
-This document defines all telemetry metrics required for Governance Cockpit UI personas. Each metric includes: **definition, derivation (tables/fields), and acceptance check**.
+This document defines all telemetry metrics required for Governance UI personas. Each metric includes: **definition, derivation (tables/fields), and acceptance check**.
 
 ---
 
