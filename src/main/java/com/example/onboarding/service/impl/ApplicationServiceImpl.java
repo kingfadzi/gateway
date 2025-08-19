@@ -37,6 +37,7 @@ public class ApplicationServiceImpl implements ApplicationService {
                     rs.getString("parent_app_id"),
                     rs.getString("name"),
                     rs.getString("app_criticality_assessment"),
+                    rs.getString("business_service_name"), // NEW
                     rs.getString("jira_backlog_id"),
                     rs.getString("lean_control_service_id"),
                     rs.getString("repo_id"),
@@ -65,6 +66,7 @@ public class ApplicationServiceImpl implements ApplicationService {
         StringBuilder where = new StringBuilder(" WHERE 1=1 ");
         Map<String,Object> params = new HashMap<>();
         if (q != null && !q.isBlank()) {
+            // Keep existing behavior (name only). If you want to search by business_service_name too, add: OR LOWER(a.business_service_name) LIKE :q
             where.append(" AND LOWER(a.name) LIKE :q ");
             params.put("q", "%" + q.toLowerCase() + "%");
         }
@@ -131,13 +133,13 @@ public class ApplicationServiceImpl implements ApplicationService {
         String appId = "app_" + UUID.randomUUID().toString().replace("-", "");
         String sql = """
             INSERT INTO application (
-              app_id, parent_app_id, name, app_criticality_assessment,
+              app_id, parent_app_id, name, business_service_name, app_criticality_assessment,
               jira_backlog_id, lean_control_service_id, repo_id,
               operational_status, transaction_cycle, application_type, application_tier,
               architecture_type, install_type, house_position, product_owner, product_owner_brid,
               onboarding_status, owner_id, created_at, updated_at
             ) VALUES (
-              :app_id, :parent, :name, :crit,
+              :app_id, :parent, :name, :bs_name, :crit,
               :jira, :lcs, :repo,
               :ops, :txc, :apptype, :apptier,
               :arch, :inst, :house, :po, :pobrid,
@@ -148,6 +150,7 @@ public class ApplicationServiceImpl implements ApplicationService {
                 .addValue("app_id", appId)
                 .addValue("parent", req.parentAppId())
                 .addValue("name", req.name())
+                .addValue("bs_name", req.businessServiceName()) // NEW
                 .addValue("crit", req.appCriticalityAssessment())
                 .addValue("jira", req.jiraBacklogId())
                 .addValue("lcs", req.leanControlServiceId())
@@ -189,6 +192,7 @@ public class ApplicationServiceImpl implements ApplicationService {
         MapSqlParameterSource p = new MapSqlParameterSource().addValue("id", appId);
         setField(set, p, "parent_app_id", req.parentAppId());
         setField(set, p, "name", req.name());
+        setField(set, p, "business_service_name", req.businessServiceName()); // NEW
         setField(set, p, "app_criticality_assessment", req.appCriticalityAssessment());
         setField(set, p, "jira_backlog_id", req.jiraBacklogId());
         setField(set, p, "lean_control_service_id", req.leanControlServiceId());

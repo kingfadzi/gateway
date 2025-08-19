@@ -4,6 +4,7 @@ public record CreateAppRequest(
         String parentAppId,
         String name,
         String appCriticalityAssessment,
+        String businessServiceName,
         String jiraBacklogId,
         String leanControlServiceId,
         String repoId,

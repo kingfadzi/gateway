@@ -7,6 +7,7 @@ public record ApplicationDto(
         String parentAppId,
         String name,
         String appCriticalityAssessment,
+        String businessServiceName,
         String jiraBacklogId,
         String leanControlServiceId,
         String repoId,

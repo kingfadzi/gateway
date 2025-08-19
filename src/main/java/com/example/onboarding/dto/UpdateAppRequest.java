@@ -6,6 +6,7 @@ public record UpdateAppRequest(
         String parentAppId,
         String name,
         String appCriticalityAssessment,
+        String businessServiceName,
         String jiraBacklogId,
         String leanControlServiceId,
         String repoId,
