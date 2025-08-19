@@ -18,6 +18,11 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
 
+// Added: Jackson imports to normalize jsonb -> native Java types
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.JsonProcessingException;
+
 @Service
 public class ProfileServiceImpl implements ProfileService {
 
@@ -27,10 +32,29 @@ public class ProfileServiceImpl implements ProfileService {
         this.jdbc = jdbc;
     }
 
+    // Added: ObjectMapper to parse jsonb text into native Java values
+    private final ObjectMapper om = new ObjectMapper();
+
     /* -------- time util: convert JDBC Timestamp -> OffsetDateTime(UTC) -------- */
     private static OffsetDateTime odt(ResultSet rs, String col) throws SQLException {
         Timestamp ts = rs.getTimestamp(col);
         return ts == null ? null : ts.toInstant().atOffset(ZoneOffset.UTC);
+    }
+
+    // Added: helper to convert JSON text -> Java scalar/Map/List
+    private Object jsonToJava(String json) {
+        if (json == null) return null;
+        try {
+            JsonNode n = om.readTree(json);
+            if (n.isTextual()) return n.textValue();      // "A2" -> A2
+            if (n.isNumber())  return n.numberValue();
+            if (n.isBoolean()) return n.booleanValue();
+            if (n.isNull())    return null;
+            return om.convertValue(n, Object.class);      // objects/arrays
+        } catch (JsonProcessingException e) {
+            // fallback to raw string if parsing fails
+            return json;
+        }
     }
 
     /* -------- small meta record for profile rows -------- */
@@ -99,15 +123,16 @@ public class ProfileServiceImpl implements ProfileService {
 
     /* -------- field & evidence mappers -------- */
 
+    // CHANGED: value column now read as text (value_json) and converted via jsonToJava(...)
     private record FieldRow(
-            String fieldId, String fieldKey, Object value, String sourceSystem, String sourceRef,
+            String fieldId, String fieldKey, String valueJson, String sourceSystem, String sourceRef,
             int evidenceCount, OffsetDateTime updatedAt) {}
     private static final RowMapper<FieldRow> FIELD_ROW_MAPPER = new RowMapper<>() {
         @Override public FieldRow mapRow(ResultSet rs, int rowNum) throws SQLException {
             return new FieldRow(
                     rs.getString("field_id"),
                     rs.getString("field_key"),
-                    rs.getObject("value"),
+                    rs.getString("value_json"),   // was rs.getObject("value")
                     rs.getString("source_system"),
                     rs.getString("source_ref"),
                     rs.getInt("evidence_count"),
@@ -141,10 +166,11 @@ public class ProfileServiceImpl implements ProfileService {
         String profileId = prof.profileId();
         OffsetDateTime profUpdated = prof.updatedAt();
 
+        // CHANGED: select pf.value::text AS value_json to avoid quoted scalars in API
         String fieldsSql = """
            SELECT pf.id AS field_id,
                   pf.field_key AS field_key,
-                  pf.value,
+                  pf.value::text AS value_json,
                   pf.source_system,
                   pf.source_ref,
                   COALESCE(ev.cnt,0) AS evidence_count,
@@ -162,8 +188,13 @@ public class ProfileServiceImpl implements ProfileService {
         List<FieldRow> rows = jdbc.query(fieldsSql, Map.of("pid", profileId), FIELD_ROW_MAPPER);
         var fields = rows.stream()
                 .map(r -> new ProfileFieldDto(
-                        r.fieldId(), r.fieldKey(), r.value(), r.sourceSystem(), r.sourceRef(),
-                        r.evidenceCount(), r.updatedAt()))
+                        r.fieldId(),
+                        r.fieldKey(),
+                        jsonToJava(r.valueJson()),  // CHANGED: normalize jsonb -> Java
+                        r.sourceSystem(),
+                        r.sourceRef(),
+                        r.evidenceCount(),
+                        r.updatedAt()))
                 .toList();
 
         return new ProfileSnapshotDto(appId, profileId, profUpdated, fields);
