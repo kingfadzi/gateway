@@ -10,7 +10,15 @@ public record UpdateAppRequest(
         String leanControlServiceId,
         String repoId,
         String operationalStatus,
+        String transactionCycle,
+        String applicationType,
+        String applicationTier,
+        String architectureType,
+        String installType,
+        String housePosition,
+        String productOwner,
+        String productOwnerBrid,
         String onboardingStatus,
         String ownerId,
-        OffsetDateTime expectedUpdatedAt // optimistic concurrency
+        OffsetDateTime expectedUpdatedAt
 ) {}

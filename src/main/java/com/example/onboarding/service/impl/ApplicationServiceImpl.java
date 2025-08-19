@@ -41,6 +41,14 @@ public class ApplicationServiceImpl implements ApplicationService {
                     rs.getString("lean_control_service_id"),
                     rs.getString("repo_id"),
                     rs.getString("operational_status"),
+                    rs.getString("transaction_cycle"),
+                    rs.getString("application_type"),
+                    rs.getString("application_tier"),
+                    rs.getString("architecture_type"),
+                    rs.getString("install_type"),
+                    rs.getString("house_position"),
+                    rs.getString("product_owner"),
+                    rs.getString("product_owner_brid"),
                     rs.getString("onboarding_status"),
                     rs.getString("owner_id"),
                     odt(rs, "created_at"),
@@ -125,13 +133,15 @@ public class ApplicationServiceImpl implements ApplicationService {
             INSERT INTO application (
               app_id, parent_app_id, name, app_criticality_assessment,
               jira_backlog_id, lean_control_service_id, repo_id,
-              operational_status, onboarding_status, owner_id,
-              created_at, updated_at
+              operational_status, transaction_cycle, application_type, application_tier,
+              architecture_type, install_type, house_position, product_owner, product_owner_brid,
+              onboarding_status, owner_id, created_at, updated_at
             ) VALUES (
               :app_id, :parent, :name, :crit,
               :jira, :lcs, :repo,
-              :ops, :onb, :owner,
-              now(), now()
+              :ops, :txc, :apptype, :apptier,
+              :arch, :inst, :house, :po, :pobrid,
+              :onb, :owner, now(), now()
             )
         """;
         MapSqlParameterSource p = new MapSqlParameterSource()
@@ -143,6 +153,14 @@ public class ApplicationServiceImpl implements ApplicationService {
                 .addValue("lcs", req.leanControlServiceId())
                 .addValue("repo", req.repoId())
                 .addValue("ops", req.operationalStatus())
+                .addValue("txc", req.transactionCycle())
+                .addValue("apptype", req.applicationType())
+                .addValue("apptier", req.applicationTier())
+                .addValue("arch", req.architectureType())
+                .addValue("inst", req.installType())
+                .addValue("house", req.housePosition())
+                .addValue("po", req.productOwner())
+                .addValue("pobrid", req.productOwnerBrid())
                 .addValue("onb", req.onboardingStatus())
                 .addValue("owner", req.ownerId());
 
@@ -176,6 +194,14 @@ public class ApplicationServiceImpl implements ApplicationService {
         setField(set, p, "lean_control_service_id", req.leanControlServiceId());
         setField(set, p, "repo_id", req.repoId());
         setField(set, p, "operational_status", req.operationalStatus());
+        setField(set, p, "transaction_cycle", req.transactionCycle());
+        setField(set, p, "application_type", req.applicationType());
+        setField(set, p, "application_tier", req.applicationTier());
+        setField(set, p, "architecture_type", req.architectureType());
+        setField(set, p, "install_type", req.installType());
+        setField(set, p, "house_position", req.housePosition());
+        setField(set, p, "product_owner", req.productOwner());
+        setField(set, p, "product_owner_brid", req.productOwnerBrid());
         setField(set, p, "onboarding_status", req.onboardingStatus());
         setField(set, p, "owner_id", req.ownerId());
 
