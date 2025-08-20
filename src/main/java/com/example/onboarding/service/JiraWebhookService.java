@@ -3,7 +3,7 @@ package com.example.onboarding.service;
 
 import com.example.onboarding.integrations.JiraClient;
 import com.example.onboarding.integrations.JiraFieldResolver;
-import com.example.onboarding.opa.OpaClient;
+import com.example.onboarding.integrations.OpaClient;
 import com.example.onboarding.dto.policy.OpaRequest;
 import com.example.onboarding.dto.policy.PolicyDecision;
 import com.example.onboarding.dto.policy.PolicyInput;

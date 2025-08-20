@@ -1,5 +1,5 @@
 // src/main/java/com/example/onboarding/requirements/view/RequirementsView.java
-package com.example.onboarding.view;
+package com.example.onboarding.dto.policy;
 
 import java.util.List;
 
@@ -34,6 +34,7 @@ public record RequirementsView(
             String profileField,
             Integer maxAgeDays,
             String reviewer,
-            List<String> uiOptions
+            List<String> uiOptions,
+            ReuseCandidate reuseCandidate   // <-- NEW (nullable)
     ) {}
 }

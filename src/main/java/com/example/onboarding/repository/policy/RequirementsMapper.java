@@ -2,7 +2,7 @@
 package com.example.onboarding.repository.policy;
 
 import com.example.onboarding.dto.policy.PolicyDecision;
-import com.example.onboarding.view.RequirementsView;
+import com.example.onboarding.dto.policy.RequirementsView;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -23,19 +23,28 @@ public final class RequirementsMapper {
 
             var allOf = (r.required_evidence_types() != null && r.required_evidence_types().allOf() != null)
                     ? r.required_evidence_types().allOf().stream().map(et ->
-                    new RequirementsView.Part(et.label(), et.profileField(), et.maxAgeDays(), et.reviewer(), et.uiOptions())
+                    new RequirementsView.Part(
+                            et.label(), et.profileField(), et.maxAgeDays(), et.reviewer(), et.uiOptions(),
+                            null // reuseCandidate (filled later)
+                    )
             ).toList()
                     : List.<RequirementsView.Part>of();
 
             var anyOf = (r.required_evidence_types() != null && r.required_evidence_types().anyOf() != null)
                     ? r.required_evidence_types().anyOf().stream().map(et ->
-                    new RequirementsView.Part(et.label(), et.profileField(), et.maxAgeDays(), et.reviewer(), et.uiOptions())
+                    new RequirementsView.Part(
+                            et.label(), et.profileField(), et.maxAgeDays(), et.reviewer(), et.uiOptions(),
+                            null
+                    )
             ).toList()
                     : List.<RequirementsView.Part>of();
 
             var oneOf = (r.required_evidence_types() != null && r.required_evidence_types().oneOf() != null)
                     ? r.required_evidence_types().oneOf().stream().map(et ->
-                    new RequirementsView.Part(et.label(), et.profileField(), et.maxAgeDays(), et.reviewer(), et.uiOptions())
+                    new RequirementsView.Part(
+                            et.label(), et.profileField(), et.maxAgeDays(), et.reviewer(), et.uiOptions(),
+                            null
+                    )
             ).toList()
                     : List.<RequirementsView.Part>of();
 

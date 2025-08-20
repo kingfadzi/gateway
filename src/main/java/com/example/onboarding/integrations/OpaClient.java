@@ -1,5 +1,5 @@
 // src/main/java/com/example/onboarding/policy/OpaClient.java
-package com.example.onboarding.opa;
+package com.example.onboarding.integrations;
 
 import com.example.onboarding.config.OpaProperties;
 import org.springframework.http.*;

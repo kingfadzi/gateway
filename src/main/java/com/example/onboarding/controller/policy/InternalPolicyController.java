@@ -1,11 +1,11 @@
 // src/main/java/com/example/onboarding/policy/InternalPolicyController.java
-package com.example.onboarding.controller;
+package com.example.onboarding.controller.policy;
 
 import com.example.onboarding.dto.policy.OpaRequest;
 import com.example.onboarding.dto.policy.PolicyDecision;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
-import com.example.onboarding.opa.OpaClient;
+import com.example.onboarding.integrations.OpaClient;
 
 @RestController
 @RequestMapping("/internal/policy")

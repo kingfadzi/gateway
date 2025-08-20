@@ -1,4 +1,4 @@
-package com.example.onboarding.controller;
+package com.example.onboarding.controller.application;
 
 import com.example.onboarding.model.AppMetadataResponse;
 import com.example.onboarding.model.EnvironmentInstance;

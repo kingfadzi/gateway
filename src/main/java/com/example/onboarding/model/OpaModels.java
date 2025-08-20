@@ -1,5 +1,5 @@
 // src/main/java/com/example/onboarding/opa/OpaModels.java
-package com.example.onboarding.opa;
+package com.example.onboarding.model;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;

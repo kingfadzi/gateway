@@ -1,0 +1,123 @@
+version: 1
+updated_at: 2025-08-18
+
+fields:
+  # ---- Security (A1/A2/B/C/D)
+  - key: confidentiality_level
+    derived_from: security_rating
+    rule: { A1: restricted, A2: restricted, B: confidential, C: internal, D: public }
+
+  - key: encryption_at_rest
+    derived_from: security_rating
+    rule: { A1: required, A2: required, B: required, C: required, D: optional }
+
+  - key: encryption_in_transit
+    derived_from: security_rating
+    rule: { A1: required, A2: required, B: required, C: recommended, D: recommended }
+
+  - key: security_testing
+    derived_from: security_rating
+    rule:
+      A1: external_pentest_annual+continuous_scans
+      A2: internal_pentest_annual+continuous_scans
+      B:  sast+dast_on_release+quarterly_scan
+      C:  sast_on_release
+      D:  sast_optional
+
+  - key: secrets_management
+    derived_from: security_rating
+    rule:
+      A1: centralized_required
+      A2: centralized_required
+      B:  centralized_recommended
+      C:  centralized_recommended
+      D:  minimal_ok
+
+  - key: key_rotation_max
+    derived_from: security_rating
+    rule: { A1: 90d, A2: 180d, B: 365d, C: 365d, D: n/a }
+
+  # ---- Integrity (A-D)
+  - key: data_validation
+    derived_from: integrity_rating
+    rule: { A: dual_control, B: strong_validation, C: standard_validation, D: minimal_validation }
+
+  - key: reconciliation_frequency
+    derived_from: integrity_rating
+    rule: { A: daily, B: weekly, C: per_release, D: ad_hoc }
+
+  - key: audit_logging
+    derived_from: integrity_rating
+    rule:
+      A: full_with_daily_review
+      B: full_with_periodic_review
+      C: logging_enabled+sampled_review
+      D: basic_logging
+
+  - key: change_control
+    derived_from: integrity_rating
+    rule:
+      A: independent_review+regression_suite
+      B: peer_review+regression_suite
+      C: peer_review+unit_tests
+      D: optional_peer_review
+
+  - key: immutability_required
+    derived_from: integrity_rating
+    rule: { A: yes, B: yes, C: no, D: no }
+
+  # ---- Availability (A-D)
+  - key: rto_hours
+    derived_from: availability_rating
+    rule: { A: 1, B: 4, C: 24, D: best_effort }
+
+  - key: rpo_minutes
+    derived_from: availability_rating
+    rule: { A: 5, B: 60, C: 240, D: best_effort }
+
+  - key: ha_topology
+    derived_from: availability_rating
+    rule: { A: active_active, B: active_passive, C: backup_restore, D: none }
+
+  - key: monitoring_slos
+    derived_from: availability_rating
+    rule: { A: "99.9+_with_alerting", B: "99.5_with_alerting", C: "99.0", D: none }
+
+  - key: oncall_coverage
+    derived_from: availability_rating
+    rule: { A: "24x7", B: "16x5", C: "business_hours", D: none }
+
+  # ---- Resilience (0–4, 0 strongest)
+  - key: dr_test_frequency
+    derived_from: resilience_rating
+    rule: { "0": semi_annual_live, "1": annual_live, "2": annual_tabletop, "3": ad_hoc_tabletop, "4": none }
+
+  - key: backup_policy
+    derived_from: resilience_rating
+    rule:
+      "0": encrypted_geo_redundant+tested_restores
+      "1": encrypted+tested_restores
+      "2": standard_backups+periodic_restore_test
+      "3": standard_backups
+      "4": optional
+
+  - key: failover_automation
+    derived_from: resilience_rating
+    rule: { "0": automatic, "1": semi_automatic, "2": manual, "3": manual, "4": best_effort }
+
+  - key: runbook_maturity
+    derived_from: resilience_rating
+    rule: { "0": certified, "1": approved, "2": draft, "3": draft, "4": none }
+
+  - key: chaos_testing
+    derived_from: resilience_rating
+    rule: { "0": required, "1": recommended, "2": optional, "3": none, "4": none }
+
+  # ---- App Criticality (A-D) — summary only
+  - key: materiality
+    derived_from: app_criticality
+    rule: { A: crown_jewel, B: high, C: medium, D: low }
+
+  - key: review_depth
+    derived_from: app_criticality
+    rule: { A: full_review, B: scoped_review, C: express_review, D: self_attested }
