@@ -1,5 +1,3 @@
----
-
 # Quick Start (env)
 
 ```bash
@@ -154,4 +152,3 @@ Then re-run the **Step 5** reuse lookup.
 curl -sS "$BASE/internal/evidence/ev_xxxxxxxx" | jq .
 ```
 
----
