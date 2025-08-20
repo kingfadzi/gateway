@@ -15,22 +15,19 @@ public class RequirementsController {
         this.requirementsService = requirementsService;
     }
 
+    /**
+     * Read-only requirements endpoint (Chunk 2).
+     * Builds OPA input from the application's profile fields (no query-based ratings),
+     * calls OPA, maps to FE shape, and decorates with reuse where applicable.
+     *
+     * GET /api/apps/{appId}/requirements?releaseId=REL-001&releaseWindowStartIso=2025-09-01T10:00:00Z
+     */
     @GetMapping("/{appId}/requirements")
     public RequirementsView getRequirements(
             @PathVariable String appId,
-            @RequestParam(required = false) String releaseId,
-            @RequestParam(required = false) String releaseWindowStartIso,
-            // For now, accept inputs via query params; later hydrate from profile DB
-            @RequestParam(defaultValue = "B") String criticality,
-            @RequestParam(defaultValue = "A1") String security,
-            @RequestParam(defaultValue = "B") String integrity,
-            @RequestParam(defaultValue = "B") String availability,
-            @RequestParam(defaultValue = "B") String resilience,
-            @RequestParam(defaultValue = "true") boolean hasDependencies
+            @RequestParam String releaseId,
+            @RequestParam(required = false) String releaseWindowStartIso
     ) {
-        return requirementsService.getRequirements(
-                appId, releaseId, releaseWindowStartIso,
-                criticality, security, integrity, availability, resilience, hasDependencies
-        );
+        return requirementsService.getRequirements(appId, releaseId, releaseWindowStartIso);
     }
 }

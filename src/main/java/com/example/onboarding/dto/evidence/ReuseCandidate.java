@@ -1,5 +1,5 @@
 // src/main/java/com/example/onboarding/requirements/view/ReuseCandidate.java
-package com.example.onboarding.dto.policy;
+package com.example.onboarding.dto.evidence;
 
 import java.time.OffsetDateTime;
 

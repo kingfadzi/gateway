@@ -3,7 +3,7 @@ package com.example.onboarding.service.policy;
 import com.example.onboarding.dto.policy.ClaimDto;
 import com.example.onboarding.dto.policy.CreateClaimRequest;
 import com.example.onboarding.repository.policy.ControlClaimRepository;
-import com.example.onboarding.repository.policy.EvidenceReuseRepository;
+import com.example.onboarding.repository.evidence.EvidenceReuseRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.stereotype.Service;

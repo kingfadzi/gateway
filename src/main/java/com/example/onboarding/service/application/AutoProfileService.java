@@ -1,16 +1,17 @@
-package com.example.onboarding.application.service;
+package com.example.onboarding.service.application;
 
-import com.example.onboarding.application.dto.ProfileSnapshot;
-import com.example.onboarding.application.dto.SourceRow;
-import com.example.onboarding.application.repository.*;
+import com.example.onboarding.dto.application.ProfileSnapshot;
+import com.example.onboarding.dto.application.SourceRow;
 import com.example.onboarding.config.AutoProfileProperties;
-import com.example.onboarding.util.HashIds;
+import com.example.onboarding.repository.application.ApplicationRepository;
+import com.example.onboarding.repository.application.ProfileFieldRepository;
+import com.example.onboarding.repository.application.ProfileRepository;
+import com.example.onboarding.repository.application.SourceDao;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.LinkedHashMap;
 import java.util.Map;
 
 @Service

@@ -1,6 +1,8 @@
 // src/main/java/com/example/onboarding/requirements/view/RequirementsView.java
 package com.example.onboarding.dto.policy;
 
+import com.example.onboarding.dto.evidence.ReuseCandidate;
+
 import java.util.List;
 
 public record RequirementsView(

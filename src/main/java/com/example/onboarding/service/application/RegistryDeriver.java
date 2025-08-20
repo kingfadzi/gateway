@@ -1,4 +1,4 @@
-package com.example.onboarding.application.service;
+package com.example.onboarding.service.application;
 
 import com.example.onboarding.config.AutoProfileProperties;
 import org.springframework.core.io.Resource;

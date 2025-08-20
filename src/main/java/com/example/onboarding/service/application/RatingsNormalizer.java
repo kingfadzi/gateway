@@ -1,4 +1,4 @@
-package com.example.onboarding.application.service;
+package com.example.onboarding.service.application;
 
 import java.util.Map;
 import java.util.Set;

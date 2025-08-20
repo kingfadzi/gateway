@@ -1,9 +1,8 @@
-package com.example.onboarding.application.repository;
+package com.example.onboarding.repository.application;
 
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
+
 import java.util.Map;
 import static java.util.Map.entry;
 

@@ -1,81 +1,95 @@
-// src/main/java/com/example/onboarding/evidence/EvidenceReuseRepository.java
-package com.example.onboarding.repository.policy;
+package com.example.onboarding.repository.evidence;
 
+import com.example.onboarding.dto.evidence.ReuseCandidate;
 import com.example.onboarding.dto.policy.EvidenceForClaim;
-import com.example.onboarding.dto.policy.ReuseCandidate;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.dao.DataAccessException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.jdbc.core.RowMapper;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Timestamp;
+import java.sql.Types;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
+/**
+ * C3: Read-only selection of the best reusable evidence for a profile field.
+ */
 @Repository
 public class EvidenceReuseRepository {
 
-    private static final Logger log = LoggerFactory.getLogger(EvidenceReuseRepository.class);
     private final NamedParameterJdbcTemplate jdbc;
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     public EvidenceReuseRepository(NamedParameterJdbcTemplate jdbc) {
         this.jdbc = jdbc;
     }
 
-    public Optional<ReuseCandidate> findBestReusable(String appId, String profileField, Integer maxAgeDays, OffsetDateTime asOf) {
-        final Timestamp asOfTs   = asOf == null ? null : Timestamp.from(asOf.toInstant());
-        final boolean applyCutoff = (maxAgeDays != null && asOf != null);
-        final Timestamp cutoffTs = applyCutoff ? Timestamp.from(asOf.minusDays(maxAgeDays).toInstant()) : null;
+    public Optional<ReuseCandidate> findBestReusable(String appId,
+                                                     String profileFieldKey,
+                                                     Integer maxAgeDays,
+                                                     OffsetDateTime asOf) {
+        // Use maxAgeDays if provided
+        OffsetDateTime minFrom = (maxAgeDays == null ? null : asOf.minusDays(maxAgeDays.longValue()));
 
         final String sql = """
-          SELECT e.evidence_id, e.valid_from, e.valid_until, e.revoked_at,
-                 e.confidence, e.method, e.uri, e.sha256, e."type", e.source_system,
-                 COALESCE(e.created_at, e.added_at) AS created_at
-          FROM evidence e
-          JOIN profile_field f ON f.id = e.profile_field_id
-          JOIN profile p       ON p.profile_id = f.profile_id
-          WHERE p.scope_type = 'application'
-            AND p.scope_id   = :appId
-            AND f.field_key  = :profileField
-            AND e.revoked_at IS NULL
-            AND (e.valid_from IS NULL OR e.valid_from <= :asOf)
-            AND (e.valid_until IS NULL OR e.valid_until >= :asOf)
-            AND (
-                 :applyCutoff = false
-                 OR e.valid_from IS NULL
-                 OR e.valid_from >= :cutoff
-            )
-          ORDER BY
-            CASE COALESCE(e.confidence, '')
-              WHEN 'system_verified' THEN 3
-              WHEN 'human_verified'  THEN 2
-              WHEN 'self_attested'   THEN 1
-              ELSE 0
-            END DESC,
-            COALESCE(e.valid_from, COALESCE(e.created_at, e.added_at)) DESC
-          LIMIT 1
+        SELECT
+          e.evidence_id                       AS evidence_id,
+          e.valid_from                        AS valid_from,
+          e.valid_until                       AS valid_until,
+          NULL                                AS confidence,   -- column not present in table
+          NULL                                AS method,       -- column not present in table
+          e.uri                               AS uri,
+          e.sha256                            AS sha256,
+          e.type                              AS type,
+          e.source_system                     AS source_system,
+          e.created_at                        AS created_at
+        FROM profile p
+        JOIN profile_field pf ON pf.profile_id = p.profile_id
+        JOIN evidence e       ON e.profile_field_id = pf.id
+        WHERE p.scope_type = 'application'
+          AND p.scope_id   = :app
+          AND p.version    = (
+            SELECT MAX(version) FROM profile
+            WHERE scope_type = 'application' AND scope_id = :app
+          )
+          AND pf.field_key = :field
+          AND e.status <> 'revoked' -- reuse rule: not revoked (allows active/superseded)
+          AND (e.valid_from  IS NULL OR e.valid_from  <= :asOf::timestamptz)
+          AND (e.valid_until IS NULL OR e.valid_until >= :asOf::timestamptz)
+          AND (:minFrom::timestamptz IS NULL OR e.valid_from IS NULL OR e.valid_from >= :minFrom::timestamptz)
+        ORDER BY
+          COALESCE(e.valid_from, e.created_at) DESC
+        LIMIT 1
         """;
 
-        Map<String, Object> params = new HashMap<>();
-        params.put("appId", appId);
-        params.put("profileField", profileField);
-        params.put("asOf", asOfTs);
-        params.put("applyCutoff", applyCutoff);
-        params.put("cutoff", cutoffTs);
+        var params = new MapSqlParameterSource()
+                .addValue("app", appId)
+                .addValue("field", profileFieldKey)
+                .addValue("asOf", asOf, Types.TIMESTAMP_WITH_TIMEZONE)
+                .addValue("minFrom", minFrom, Types.TIMESTAMP_WITH_TIMEZONE);
 
-        try {
-            var list = jdbc.query(sql, params, mapper());
-            return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
-        } catch (DataAccessException e) {
-            var root = e.getMostSpecificCause();
-            log.error("Evidence reuse SQL failed: {}", root == null ? e.getMessage() : root.getMessage());
-            throw e;
-        }
+        var list = jdbc.query(sql, params, (rs, i) -> new ReuseCandidate(
+                rs.getString("evidence_id"),
+                rs.getObject("valid_from",  OffsetDateTime.class),
+                rs.getObject("valid_until", OffsetDateTime.class),
+                null,                                // confidence not in table
+                null,                                // method not in table
+                rs.getString("uri"),
+                rs.getString("sha256"),
+                rs.getString("type"),
+                rs.getString("source_system"),
+                rs.getObject("created_at", OffsetDateTime.class)
+        ));
+
+        return list.stream().findFirst();
     }
 
     private static RowMapper<ReuseCandidate> mapper() {
@@ -202,6 +216,55 @@ public class EvidenceReuseRepository {
         """;
         return jdbc.queryForList(sql, Map.of("app", appId), String.class);
     }
+
+    public Map<String, Object> readPolicyContext(String appId) {
+        // The keys OPA needs; expand if your policy grows
+        List<String> keys = List.of(
+                "app_criticality",
+                "security_rating",
+                "integrity_rating",
+                "availability_rating",
+                "resilience_rating",
+                "has_dependencies",
+                "business_service_name"
+        );
+
+        final String sql = """
+        SELECT pf.field_key, pf.value
+        FROM profile p
+        JOIN profile_field pf ON pf.profile_id = p.profile_id
+        WHERE p.scope_type = 'application'
+          AND p.scope_id   = :app
+          AND p.version    = (
+            SELECT MAX(version) FROM profile
+            WHERE scope_type = 'application' AND scope_id = :app
+          )
+          AND pf.field_key IN (:keys)
+    """;
+
+        var params = new org.springframework.jdbc.core.namedparam.MapSqlParameterSource()
+                .addValue("app", appId)
+                .addValue("keys", keys);
+
+        Map<String, Object> out = new HashMap<>();
+        jdbc.query(sql, params, rs -> {
+            String k = rs.getString("field_key");
+            String json = rs.getString("value");
+            try {
+                JsonNode n = MAPPER.readTree(json);
+                Object v;
+                if (n == null || n.isNull())      v = null;
+                else if (n.isTextual())           v = n.asText();
+                else if (n.isBoolean())           v = n.asBoolean();
+                else if (n.isNumber())            v = n.numberValue();
+                else                               v = MAPPER.convertValue(n, Object.class);
+                out.put(k, v);
+            } catch (Exception e) {
+                // if parsing fails, fall back to raw string
+                out.put(k, json);
+            }
+        });
+        return out;
+    }
+
 }
-
-

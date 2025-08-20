@@ -1,4 +1,4 @@
-package com.example.onboarding.application.dto;
+package com.example.onboarding.dto.application;
 
 /** Flat row returned by the source query (single row per appId) */
 public record SourceRow(

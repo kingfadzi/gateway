@@ -1,6 +1,6 @@
-package com.example.onboarding.application.repository;
+package com.example.onboarding.repository.application;
 
-import com.example.onboarding.application.dto.SourceRow;
+import com.example.onboarding.dto.application.SourceRow;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
