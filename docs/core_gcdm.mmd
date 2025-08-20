@@ -1,94 +1,128 @@
 erDiagram
-    APPLICATION {
-        string app_id PK
-        enum   scope
-        string parent_app_id
-        string name
-        string app_criticality_assessment
-        string jira_backlog_id
-        string lean_control_service_id
-        string repo_id
-        string operational_status
-        string onboarding_status   "pending | in_progress | onboarded"
-        string owner_id            "FK → STAKEHOLDER.stakeholder_id (via Bridge)"
-    }
+APPLICATION {
+string app_id PK
+enum scope
+string parent_app_id
+string name
+string business_service_name
+string app_criticality_assessment
+string jira_backlog_id
+string lean_control_service_id
+string repo_id
+string operational_status
+string transaction_cycle
+string application_type
+string application_tier
+string architecture_type
+string install_type
+string house_position
+string product_owner
+string product_owner_brid
+string onboarding_status
+string owner_id
+datetime created_at
+datetime updated_at
+}
 
-    RELEASE {
-        string release_id PK
-        string scope_type
-        string scope_id
-        string version
-        datetime window_start
-        datetime window_end
-    }
+RELEASE {
+string release_id PK
+string scope_type
+string scope_id
+string version
+datetime window_start
+datetime window_end
+datetime created_at
+}
 
-    PROFILE {
-        string profile_id PK
-        string scope_type
-        string scope_id
-        int    version
-        datetime snapshot_at
-    }
+PROFILE {
+string profile_id PK
+string scope_type
+string scope_id
+int version
+datetime snapshot_at
+datetime created_at
+datetime updated_at
+}
 
-    PROFILE_FIELD {
-        string id PK
-        string profile_id
-        string key
-        json   value
-        string confidence
-    }
+PROFILE_FIELD {
+string id PK
+string profile_id FK
+string field_key
+json value
+string confidence
+string source_system
+string source_ref
+datetime collected_at
+datetime created_at
+datetime updated_at
+}
 
-    EVIDENCE {
-        string evidence_id PK
-        string profile_field_id
-        string uri
-        string type
-        datetime added_at
-    }
+EVIDENCE {
+string evidence_id PK
+string profile_field_id FK
+string uri
+string type
+string sha256
+string source_system
+string submitted_by
+datetime valid_from
+datetime valid_until
+enum status "active | superseded | revoked"
+datetime revoked_at
+string tags
+datetime added_at
+}
 
-    POLICY_REQUIREMENT {
-        string requirement_id PK
-        string domain
-        string policy_id
-        string scope_type
-        string scope_id
-        string release_id
-        string required_evidence_types
-        string severity
-        datetime due_date
-        string  policy_version_applied
-    }
+POLICY_REQUIREMENT {
+string requirement_id PK
+string domain
+string policy_id
+string scope_type
+string scope_id
+string release_id FK
+string required_evidence_types
+string severity
+datetime due_date
+string policy_version_applied
+datetime created_at
+datetime updated_at
+}
 
-    CONTROL_CLAIM {
-        string claim_id PK
-        string requirement_id
-        string scope_type
-        string scope_id
-        string release_id
-        string method
-        string status
-        datetime submitted_at
-        datetime reviewed_at
-        datetime assigned_at
-        string comment
-    }
+CONTROL_CLAIM {
+string claim_id PK
+string requirement_id FK
+string scope_type
+string scope_id
+string release_id FK
+string method
+string status
+datetime submitted_at
+datetime reviewed_at
+datetime assigned_at
+string comment
+json decision_json
+datetime created_at
+datetime updated_at
+}
 
-    RISK_STORY {
-        string risk_key PK
-        string domain
-        string status
-        string scope_type
-        string scope_id
-        string release_id
-        datetime sla_due
-    }
+RISK_STORY {
+string risk_key PK
+string domain
+string status
+string scope_type
+string scope_id
+string release_id FK
+datetime sla_due
+datetime created_at
+datetime updated_at
+}
 
-    APPLICATION ||--o{ APPLICATION : parent_of
-    APPLICATION ||--o{ RELEASE     : has
-    APPLICATION ||--o{ PROFILE     : has
-    PROFILE     ||--o{ PROFILE_FIELD : has
-    PROFILE_FIELD ||--o{ EVIDENCE    : supports
-    RELEASE ||--o{ POLICY_REQUIREMENT : emits
-    POLICY_REQUIREMENT ||--o{ CONTROL_CLAIM : fulfilled_by
-    RELEASE ||--o{ RISK_STORY : tracked_by
-    POLICY_REQUIREMENT }o--o{ RISK_STORY : referenced_by
+APPLICATION ||--o{ APPLICATION : parent_of
+APPLICATION ||--o{ RELEASE : has
+APPLICATION ||--o{ PROFILE : has
+PROFILE ||--o{ PROFILE_FIELD : has
+PROFILE_FIELD ||--o{ EVIDENCE : supports
+RELEASE ||--o{ POLICY_REQUIREMENT : emits
+POLICY_REQUIREMENT ||--o{ CONTROL_CLAIM : fulfilled_by
+RELEASE ||--o{ RISK_STORY : tracked_by
+POLICY_REQUIREMENT }o--o{ RISK_STORY : referenced_by
