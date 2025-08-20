@@ -1,12 +1,12 @@
+// src/main/java/com/example/onboarding/service/JiraWebhookService.java
 package com.example.onboarding.service;
 
 import com.example.onboarding.integrations.JiraClient;
 import com.example.onboarding.integrations.JiraFieldResolver;
 import com.example.onboarding.opa.OpaClient;
-import com.example.onboarding.opa.OpaModels.OpaInput;
-import com.example.onboarding.opa.OpaModels.OpaRequest;
-import com.example.onboarding.opa.OpaModels.OpaResponse;
-import com.example.onboarding.opa.OpaModels.OpaResult;
+import com.example.onboarding.dto.policy.OpaRequest;
+import com.example.onboarding.dto.policy.PolicyDecision;
+import com.example.onboarding.dto.policy.PolicyInput;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -108,32 +108,51 @@ public class JiraWebhookService {
      * - Leave a single consolidated parent comment summarizing created items.
      */
     private void applyPolicyFlow(String parentIssueKey, String projectKey, JsonNode webhookJson) {
-        // 1) Build OPA input
-        OpaInput in = new OpaInput();
-        in.criticality     = textAt(webhookJson, "issue.fields.criticality");
-        in.security        = textAt(webhookJson, "issue.fields.security");
-        in.integrity       = textAt(webhookJson, "issue.fields.integrity");
-        in.availability    = textAt(webhookJson, "issue.fields.availability");
-        in.resilience      = textAt(webhookJson, "issue.fields.resilience");
-        in.confidentiality = textAt(webhookJson, "issue.fields.confidentiality");
-        in.hasDependencies = boolAt(webhookJson, "issue.fields.has_dependencies");
+        // 1) Build OPA input using new DTOs (app id = project key by default)
+        String appId = nvl(textAt(webhookJson, "issue.fields.project.key"), projectKey);
 
-        // 2) Evaluate policy
-        OpaResponse resp = opa.evaluate(new OpaRequest(in));
-        if (resp == null || resp.result == null) {
+        String criticality  = nvl(textAt(webhookJson, "issue.fields.criticality"), "B");
+        String security     = nvl(textAt(webhookJson, "issue.fields.security"), "A1");
+        String integrity    = nvl(textAt(webhookJson, "issue.fields.integrity"), "B");
+        String availability = nvl(textAt(webhookJson, "issue.fields.availability"), "B");
+        String resilience   = nvl(textAt(webhookJson, "issue.fields.resilience"), "B");
+        Boolean hasDeps     = boolAt(webhookJson, "issue.fields.has_dependencies");
+        boolean hasDependencies = hasDeps == null ? true : hasDeps;
+
+        // Optional release info (use if present)
+        String releaseId = textAt(webhookJson, "issue.fields.release_id");
+        String releaseWindowStartIso = textAt(webhookJson, "issue.fields.release_window_start");
+
+        PolicyInput.Release release = (releaseId == null && releaseWindowStartIso == null)
+                ? null
+                : new PolicyInput.Release(releaseId, releaseWindowStartIso);
+
+        PolicyInput input = new PolicyInput(
+                new PolicyInput.App(appId),
+                criticality, security, integrity, availability, resilience,
+                hasDependencies,
+                release
+        );
+
+        // 2) Evaluate policy (new client returns PolicyDecision directly)
+        PolicyDecision decision = opa.evaluate(new OpaRequest(input));
+        if (decision == null) {
             log.warn("OPA decision unavailable for {}", parentIssueKey);
             return;
         }
-        OpaResult r = resp.result;
 
         log.info("OPA decision for {} => review_mode={} assessment_required={} mandatory={} questionnaire_required={} attestation_required={}",
-                parentIssueKey, r.reviewMode, r.assessmentRequired, r.assessmentMandatory,
-                r.questionnaireRequired, r.attestationRequired);
+                parentIssueKey,
+                decision.review_mode(),
+                decision.assessment_required(),
+                decision.assessment_mandatory(),
+                decision.questionnaire_required(),
+                decision.attestation_required()
+        );
 
-        List<String> domains = safeList(r.arbDomains);
-
-        boolean questionnairesNeeded = Boolean.TRUE.equals(r.questionnaireRequired);
-        boolean attestationNeeded    = Boolean.TRUE.equals(r.attestationRequired);
+        List<String> domains = safeList(decision.arb_domains());
+        boolean questionnairesNeeded = Boolean.TRUE.equals(decision.questionnaire_required());
+        boolean attestationNeeded    = Boolean.TRUE.equals(decision.attestation_required());
 
         // Collect summary lines (single parent comment later)
         List<String> summaryLines = new ArrayList<>();
@@ -148,18 +167,18 @@ public class JiraWebhookService {
                 riskLabels.addAll(splitCsv(riskLabelsCsv));
                 riskLabels.add(domainSlug);
 
-                String riskSummary = "[Risk][" + domain + "] " + parentIssueKey + " · " + compact(r.reviewMode);
-                String triggers = (r.firedRules != null && !r.firedRules.isEmpty())
-                        ? String.join("; ", r.firedRules)
+                String riskSummary = "[Risk][" + domain + "] " + parentIssueKey + " · " + compact(decision.review_mode());
+                String triggers = (decision.fired_rules() != null && !decision.fired_rules().isEmpty())
+                        ? String.join("; ", decision.fired_rules())
                         : "N/A";
 
                 StringBuilder desc = new StringBuilder();
                 desc.append("Decision\n");
                 desc.append("- Domain: ").append(domain).append("\n");
-                desc.append("- Review mode: ").append(nvl(r.reviewMode, "N/A")).append("\n");
-                desc.append("- Assessment required: ").append(boolWord(r.assessmentRequired)).append("\n");
-                desc.append("- Mandatory: ").append(boolWord(r.assessmentMandatory)).append("\n");
-                desc.append("- Attestation required: ").append(boolWord(r.attestationRequired)).append("\n");
+                desc.append("- Review mode: ").append(nvl(decision.review_mode(), "N/A")).append("\n");
+                desc.append("- Assessment required: ").append(boolWord(decision.assessment_required())).append("\n");
+                desc.append("- Mandatory: ").append(boolWord(decision.assessment_mandatory())).append("\n");
+                desc.append("- Attestation required: ").append(boolWord(decision.attestation_required())).append("\n");
                 desc.append("- Triggers: ").append(triggers).append("\n\n");
                 desc.append("Notes\n");
                 desc.append("- This risk blocks ").append(parentIssueKey).append(".\n");
@@ -238,7 +257,7 @@ public class JiraWebhookService {
 
                 List<String> aLabels = new ArrayList<>(splitCsv(attestationLabelsCsv));
 
-                String aSummary = "[Attestation] " + parentIssueKey + " · " + compact(r.reviewMode);
+                String aSummary = "[Attestation] " + parentIssueKey + " · " + compact(decision.review_mode());
                 StringBuilder aDesc = new StringBuilder();
                 aDesc.append("You are required to complete an attestation for this capability.\n\n");
                 aDesc.append("Form: ").append(formUrl).append("\n");

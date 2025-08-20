@@ -5,14 +5,24 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "opa")
 public class OpaProperties {
-    private String url;
-    private int connectTimeoutMs = 2000;
-    private int readTimeoutMs = 4000;
+    private String baseUrl;
+    private String path;
+    private String authHeader;       // optional
+    private int connectTimeoutMs = 5000;
+    private int readTimeoutMs = 5000;
 
-    public String getUrl() { return url; }
-    public void setUrl(String url) { this.url = url; }
+    public String getBaseUrl() { return baseUrl; }
+    public void setBaseUrl(String baseUrl) { this.baseUrl = baseUrl; }
+
+    public String getPath() { return path; }
+    public void setPath(String path) { this.path = path; }
+
+    public String getAuthHeader() { return authHeader; }
+    public void setAuthHeader(String authHeader) { this.authHeader = authHeader; }
+
     public int getConnectTimeoutMs() { return connectTimeoutMs; }
     public void setConnectTimeoutMs(int connectTimeoutMs) { this.connectTimeoutMs = connectTimeoutMs; }
+
     public int getReadTimeoutMs() { return readTimeoutMs; }
     public void setReadTimeoutMs(int readTimeoutMs) { this.readTimeoutMs = readTimeoutMs; }
 }

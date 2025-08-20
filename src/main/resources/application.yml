@@ -44,9 +44,12 @@ cps:
     base-url: http://mars:5173/forms
 
 opa:
-  url: http://mars:8181/v1/data/change_arb
-  connectTimeoutMs: 2000
-  readTimeoutMs: 4000
+  base-url: http://mars:8181
+  path: /v1/data/change_arb/result
+  connect-timeout-ms: 5000
+  read-timeout-ms: 5000
+
+  # auth-header: "Bearer xxx"   # optional
 
 
 
