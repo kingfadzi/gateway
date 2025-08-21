@@ -1,4 +1,4 @@
-package com.example.onboarding.service;
+package com.example.onboarding.service.profile;
 
 import com.example.onboarding.dto.PageResponse;
 import com.example.onboarding.dto.evidence.CreateEvidenceRequest;

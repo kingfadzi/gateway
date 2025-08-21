@@ -36,21 +36,27 @@ public class EvidenceReuseRepository {
                                                      String profileFieldKey,
                                                      Integer maxAgeDays,
                                                      OffsetDateTime asOf) {
-        // Use maxAgeDays if provided
+        // Accept dotted keys (e.g., "security.encryption_at_rest") and fall back to "encryption_at_rest"
+        final String k1 = (profileFieldKey == null ? "" : profileFieldKey.trim());
+        final String k2 = (k1.contains(".") ? k1.substring(k1.lastIndexOf('.') + 1) : null);
+        final String[] keys = (k2 != null && !k2.isBlank() && !k2.equals(k1))
+                ? new String[]{k1, k2}
+                : new String[]{k1};
+
         OffsetDateTime minFrom = (maxAgeDays == null ? null : asOf.minusDays(maxAgeDays.longValue()));
 
         final String sql = """
         SELECT
-          e.evidence_id                       AS evidence_id,
-          e.valid_from                        AS valid_from,
-          e.valid_until                       AS valid_until,
-          NULL                                AS confidence,   -- column not present in table
-          NULL                                AS method,       -- column not present in table
-          e.uri                               AS uri,
-          e.sha256                            AS sha256,
-          e.type                              AS type,
-          e.source_system                     AS source_system,
-          e.created_at                        AS created_at
+          e.evidence_id   AS evidence_id,
+          e.valid_from    AS valid_from,
+          e.valid_until   AS valid_until,
+          NULL            AS confidence,   -- not in table
+          NULL            AS method,       -- not in table
+          e.uri           AS uri,
+          e.sha256        AS sha256,
+          e.type          AS type,
+          e.source_system AS source_system,
+          e.created_at    AS created_at
         FROM profile p
         JOIN profile_field pf ON pf.profile_id = p.profile_id
         JOIN evidence e       ON e.profile_field_id = pf.id
@@ -58,10 +64,10 @@ public class EvidenceReuseRepository {
           AND p.scope_id   = :app
           AND p.version    = (
             SELECT MAX(version) FROM profile
-            WHERE scope_type = 'application' AND scope_id = :app
+            WHERE scope_type='application' AND scope_id=:app
           )
-          AND pf.field_key = :field
-          AND e.status <> 'revoked' -- reuse rule: not revoked (allows active/superseded)
+          AND pf.field_key = ANY(:keys)
+          AND e.status <> 'revoked'
           AND (e.valid_from  IS NULL OR e.valid_from  <= :asOf::timestamptz)
           AND (e.valid_until IS NULL OR e.valid_until >= :asOf::timestamptz)
           AND (:minFrom::timestamptz IS NULL OR e.valid_from IS NULL OR e.valid_from >= :minFrom::timestamptz)
@@ -70,27 +76,27 @@ public class EvidenceReuseRepository {
         LIMIT 1
         """;
 
-        var params = new MapSqlParameterSource()
+        var params = new org.springframework.jdbc.core.namedparam.MapSqlParameterSource()
                 .addValue("app", appId)
-                .addValue("field", profileFieldKey)
-                .addValue("asOf", asOf, Types.TIMESTAMP_WITH_TIMEZONE)
-                .addValue("minFrom", minFrom, Types.TIMESTAMP_WITH_TIMEZONE);
+                .addValue("keys", keys)  // ANY(array)
+                .addValue("asOf", asOf, java.sql.Types.TIMESTAMP_WITH_TIMEZONE)
+                .addValue("minFrom", minFrom, java.sql.Types.TIMESTAMP_WITH_TIMEZONE);
 
-        var list = jdbc.query(sql, params, (rs, i) -> new ReuseCandidate(
+        var rows = jdbc.query(sql, params, (rs, i) -> new ReuseCandidate(
                 rs.getString("evidence_id"),
                 rs.getObject("valid_from",  OffsetDateTime.class),
                 rs.getObject("valid_until", OffsetDateTime.class),
-                null,                                // confidence not in table
-                null,                                // method not in table
+                null,
+                null,
                 rs.getString("uri"),
                 rs.getString("sha256"),
                 rs.getString("type"),
                 rs.getString("source_system"),
                 rs.getObject("created_at", OffsetDateTime.class)
         ));
-
-        return list.stream().findFirst();
+        return rows.stream().findFirst();
     }
+
 
     private static RowMapper<ReuseCandidate> mapper() {
         return new RowMapper<>() {

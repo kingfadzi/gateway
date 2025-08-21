@@ -1,8 +1,8 @@
-package com.example.onboarding.controller.policy;
+package com.example.onboarding.controller.evidence;
 
 import com.example.onboarding.dto.evidence.CreateEvidenceRequest;
 import com.example.onboarding.dto.evidence.EvidenceDto;
-import com.example.onboarding.service.policy.EvidenceService;
+import com.example.onboarding.service.evidence.EvidenceService;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;

@@ -1,16 +1,18 @@
+
+---
+
 # Quick Start (env)
 
 ```bash
-# Base URL & handy vars
 export BASE="http://localhost:8080"
 export APP_ID="CORR-12356"
 export RELEASE_ID="REL-001"
-export WINDOW_START="2025-09-01T10:00:00Z"   # example; use your release window start
+export WINDOW_START="2025-09-01T10:00:00Z"   # release window start (used as asOf)
 ```
 
 ---
 
-## Step 1 — Create the app (auto-profile)
+## 1) Create the app (auto-profile)
 
 ```bash
 curl -sS -X POST "$BASE/api/apps" \
@@ -18,59 +20,126 @@ curl -sS -X POST "$BASE/api/apps" \
   -d "{\"appId\":\"$APP_ID\"}" | jq .
 ```
 
-Expected: 200 with a profile snapshot (fields like `security_rating`, `availability_rating`, etc).
-
 ---
 
-## Step 2 — Inspect the profile (debug helpers)
-
-### 2a) Full profile payload
+## 2) Inspect profile & keys (debug helpers)
 
 ```bash
+# Full profile snapshot
 curl -sS "$BASE/api/apps/$APP_ID/profile" | jq .
-```
 
-### 2b) List available profile field keys
-
-```bash
+# Field keys for this app (useful when picking profileField)
 curl -sS "$BASE/internal/apps/$APP_ID/field-keys" | jq .
 ```
 
-### 2c) (Optional) Resolve a field key → field ID
-
-```bash
-curl -sS "$BASE/internal/apps/$APP_ID/field-id?key=security.encryption_at_rest" | jq .
-```
-
 ---
 
-## Step 3 — Requirements (C2: read-only, FE-ready)
+## 3) Requirements (C2: FE-ready)
 
 ```bash
 curl -sS "$BASE/api/apps/$APP_ID/requirements?releaseId=$RELEASE_ID&releaseWindowStartIso=$WINDOW_START" | jq .
 ```
 
-Expected: `{ reviewMode, assessment, domains, requirements[], firedRules, policyVersion }`
-(Each requirement has `parts.allOf/anyOf/oneOf`; `dueDateDisplay` shows your `WINDOW_START`.)
+Expected: `{ reviewMode, assessment, domains, requirements[], firedRules, policyVersion }`.
 
 ---
 
-## Step 4 — (Optional) Direct OPA evaluation (internal)
+## 4) Create Evidence (C5 helper to seed C3)
 
-If you want to see the raw policy decision (C1 pass-through):
+### 4a) JSON / link evidence
+
+> Supports **dotted** keys (e.g., `security.encryption_at_rest`). The server resolves to the stored key (`encryption_at_rest`) under the latest profile.
 
 ```bash
-cat > /tmp/opa-input.json <<'JSON'
+curl -sS -X POST "$BASE/api/apps/$APP_ID/evidence" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "fieldKey":"security.encryption_at_rest",
+    "type":"link",
+    "uri":"https://confluence/acme/security/encryption-policy-v3.pdf",
+    "sourceSystem":"MANUAL",
+    "validFrom":"2025-08-01T00:00:00Z"
+  }' | tee /tmp/evidence.json | jq .
+```
+
+Capture the id:
+
+```bash
+export EVID=$(jq -r '.evidenceId' /tmp/evidence.json)
+echo "EVID=$EVID"
+```
+
+**Dedup check** (same payload → returns existing):
+
+```bash
+curl -sS -X POST "$BASE/api/apps/$APP_ID/evidence" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "fieldKey":"security.encryption_at_rest",
+    "type":"link",
+    "uri":"https://confluence/acme/security/encryption-policy-v3.pdf",
+    "sourceSystem":"MANUAL",
+    "validFrom":"2025-08-01T00:00:00Z"
+  }' | jq .
+```
+
+### 4b) Multipart / file evidence (optional)
+
+```bash
+export FILE="/path/to/artifact.pdf"
+
+curl -sS -X POST "$BASE/api/apps/$APP_ID/evidence" \
+  -H "Content-Type: multipart/form-data" \
+  -F 'meta={"profileField":"security.encryption_at_rest","type":"file","sourceSystem":"MANUAL"};type=application/json' \
+  -F "file=@${FILE};type=application/pdf" | jq .
+```
+
+### 4c) Read back a specific evidence (debug)
+
+```bash
+curl -sS "$BASE/internal/evidence/$EVID" | jq .
+```
+
+### 4d) List evidence for the app/field (optional)
+
+```bash
+curl -sS "$BASE/api/apps/$APP_ID/evidence?fieldKey=security.encryption_at_rest&page=1&pageSize=20" | jq .
+```
+
+---
+
+## 5) Reuse Lookup (C3)
+
+> Finds the **best reusable** evidence for a requirement part.
+> Accepts dotted keys; internally also tries the flat last segment.
+
+```bash
+curl -sS -G "$BASE/internal/evidence/reuse" \
+  --data-urlencode "appId=$APP_ID" \
+  --data-urlencode "profileField=security.encryption_at_rest" \
+  --data-urlencode "maxAgeDays=365" \
+  --data-urlencode "asOf=$WINDOW_START" | jq .
+```
+
+Expected (when seeded): a `ReuseCandidate` with `evidenceId`, `valid_from/until`, `uri`, `sha256`, etc.
+If you get `null`, see “Troubleshooting” below.
+
+---
+
+## 6) (Optional) Raw OPA evaluation (C1 pass-through)
+
+```bash
+cat > /tmp/opa-input.json <<JSON
 {
   "input": {
-    "app": { "id": "CORR-12356" },
+    "app": { "id": "$APP_ID" },
     "criticality": "A",
     "security": "A2",
     "integrity": "B",
     "availability": "A",
     "resilience": "2",
     "has_dependencies": true,
-    "release": { "id": "REL-001", "window_start": "2025-09-01T10:00:00Z" }
+    "release": { "id": "$RELEASE_ID", "window_start": "$WINDOW_START" }
   }
 }
 JSON
@@ -82,73 +151,22 @@ curl -sS -X POST "$BASE/internal/policy/evaluate" \
 
 ---
 
-## Step 5 — Evidence Reuse Lookup (C3)
+## Troubleshooting
 
-> Returns the **best reusable evidence** for a specific `profileField` as of a timestamp.
-> Note: will return `null` until you have at least one evidence row for that field.
+* **Reuse returns `null`**
 
-```bash
-curl -sS -G "$BASE/internal/evidence/reuse" \
-  --data-urlencode "appId=$APP_ID" \
-  --data-urlencode "profileField=security.encryption_at_rest" \
-  --data-urlencode "maxAgeDays=365" \
-  --data-urlencode "asOf=$WINDOW_START" | jq .
-```
+    * Confirm the field key exists:
+      `curl -sS "$BASE/internal/apps/$APP_ID/field-keys" | jq .`
+    * Make sure **validFrom ≤ asOf** and `status!='revoked'`.
+    * Try loosening filters: omit `maxAgeDays`, or temporarily set `asOf=2100-01-01T00:00:00Z`.
 
-If you prefer “now”:
-
-```bash
-curl -sS -G "$BASE/internal/evidence/reuse" \
-  --data-urlencode "appId=$APP_ID" \
-  --data-urlencode "profileField=security.encryption_at_rest" \
-  --data-urlencode "asOf=$(date -u +%Y-%m-%dT%H:%M:%SZ)" | jq .
-```
-
-**Expected shape (when evidence exists):**
-
-```json
-{
-  "evidenceId": "ev_...",
-  "valid_from": "2025-08-01T00:00:00Z",
-  "valid_until": null,
-  "confidence": null,
-  "method": null,
-  "uri": "https://…/artifact.pdf",
-  "sha256": "…",
-  "type": "link",
-  "source_system": "MANUAL",
-  "created_at": "2025-08-05T12:34:56Z"
-}
-```
+* **Create evidence returns `profileFieldKey: null`**
+  The service now re-reads by id to include the join; if you still see null, you’re running an older build—rebuild and retry.
 
 ---
 
-## (Optional) Step 5a — Seed evidence so C3 returns a hit
+### Acceptance (what to look for)
 
-If your **create evidence API** is implemented:
-
-```bash
-# JSON (link) example
-curl -sS -X POST "$BASE/api/apps/$APP_ID/evidence" \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "profileField":"security.encryption_at_rest",
-    "type":"link",
-    "uri":"https://confluence/acme/security/encryption-policy-v3.pdf",
-    "valid_from":"2025-08-01T00:00:00Z",
-    "note":"seed for C3 test"
-  }' | jq .
-```
-
-Then re-run the **Step 5** reuse lookup.
-
-> If the evidence API isn’t live yet, insert a row directly in DB (one-off seed), then re-run Step 5.
-
----
-
-## (Optional) Debug a specific evidence record
-
-```bash
-curl -sS "$BASE/internal/evidence/ev_xxxxxxxx" | jq .
-```
-
+* **C2:** requirements endpoint returns FE-ready structure using your stored profile.
+* **C3:** reuse call returns a non-null `ReuseCandidate` for a field after creating evidence.
+* **Dedup:** posting the same evidence again yields the existing record (same `evidenceId`).

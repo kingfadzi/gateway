@@ -1,4 +1,4 @@
-package com.example.onboarding.service.policy;
+package com.example.onboarding.service.evidence;
 
 import com.example.onboarding.dto.evidence.CreateEvidenceRequest;
 import com.example.onboarding.dto.evidence.EvidenceDto;

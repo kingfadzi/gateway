@@ -1,16 +1,17 @@
-package com.example.onboarding.service.impl;
+package com.example.onboarding.service.profile;
 
 import com.example.onboarding.dto.PageResponse;
 import com.example.onboarding.dto.evidence.CreateEvidenceRequest;
 import com.example.onboarding.dto.evidence.EvidenceDto;
 import com.example.onboarding.dto.profile.*;
-import com.example.onboarding.service.ProfileService;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -18,7 +19,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
 
-// Added: Jackson imports to normalize jsonb -> native Java types
+// Jackson: normalize jsonb -> native Java types
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -32,7 +33,7 @@ public class ProfileServiceImpl implements ProfileService {
         this.jdbc = jdbc;
     }
 
-    // Added: ObjectMapper to parse jsonb text into native Java values
+    // ObjectMapper to parse jsonb text into native Java values
     private final ObjectMapper om = new ObjectMapper();
 
     /* -------- time util: convert JDBC Timestamp -> OffsetDateTime(UTC) -------- */
@@ -41,19 +42,18 @@ public class ProfileServiceImpl implements ProfileService {
         return ts == null ? null : ts.toInstant().atOffset(ZoneOffset.UTC);
     }
 
-    // Added: helper to convert JSON text -> Java scalar/Map/List
+    // Convert JSON text -> Java scalar/Map/List
     private Object jsonToJava(String json) {
         if (json == null) return null;
         try {
             JsonNode n = om.readTree(json);
-            if (n.isTextual()) return n.textValue();      // "A2" -> A2
+            if (n.isTextual()) return n.textValue();
             if (n.isNumber())  return n.numberValue();
             if (n.isBoolean()) return n.booleanValue();
             if (n.isNull())    return null;
-            return om.convertValue(n, Object.class);      // objects/arrays
+            return om.convertValue(n, Object.class);
         } catch (JsonProcessingException e) {
-            // fallback to raw string if parsing fails
-            return json;
+            return json; // fallback to raw string
         }
     }
 
@@ -123,7 +123,7 @@ public class ProfileServiceImpl implements ProfileService {
 
     /* -------- field & evidence mappers -------- */
 
-    // CHANGED: value column now read as text (value_json) and converted via jsonToJava(...)
+    // value column read as text (value_json) and converted via jsonToJava(...)
     private record FieldRow(
             String fieldId, String fieldKey, String valueJson, String sourceSystem, String sourceRef,
             int evidenceCount, OffsetDateTime updatedAt) {}
@@ -132,7 +132,7 @@ public class ProfileServiceImpl implements ProfileService {
             return new FieldRow(
                     rs.getString("field_id"),
                     rs.getString("field_key"),
-                    rs.getString("value_json"),   // was rs.getObject("value")
+                    rs.getString("value_json"),
                     rs.getString("source_system"),
                     rs.getString("source_ref"),
                     rs.getInt("evidence_count"),
@@ -141,14 +141,24 @@ public class ProfileServiceImpl implements ProfileService {
         }
     };
 
+    // UPDATED: Evidence mapper -> expanded EvidenceDto
     private static final RowMapper<EvidenceDto> EVIDENCE_MAPPER = new RowMapper<>() {
         @Override public EvidenceDto mapRow(ResultSet rs, int rowNum) throws SQLException {
             return new EvidenceDto(
                     rs.getString("evidence_id"),
                     rs.getString("profile_field_id"),
+                    rs.getString("profile_field_key"),
                     rs.getString("uri"),
                     rs.getString("type"),
-                    odt(rs, "added_at")
+                    rs.getString("sha256"),
+                    rs.getString("source_system"),
+                    rs.getString("status"),
+                    rs.getObject("valid_from",  OffsetDateTime.class),
+                    rs.getObject("valid_until", OffsetDateTime.class),
+                    rs.getObject("revoked_at",  OffsetDateTime.class),
+                    rs.getObject("added_at",    OffsetDateTime.class),
+                    rs.getObject("created_at",  OffsetDateTime.class),
+                    rs.getObject("updated_at",  OffsetDateTime.class)
             );
         }
     };
@@ -166,7 +176,7 @@ public class ProfileServiceImpl implements ProfileService {
         String profileId = prof.profileId();
         OffsetDateTime profUpdated = prof.updatedAt();
 
-        // CHANGED: select pf.value::text AS value_json to avoid quoted scalars in API
+        // select pf.value::text AS value_json to avoid quoted scalars in API
         String fieldsSql = """
            SELECT pf.id AS field_id,
                   pf.field_key AS field_key,
@@ -190,7 +200,7 @@ public class ProfileServiceImpl implements ProfileService {
                 .map(r -> new ProfileFieldDto(
                         r.fieldId(),
                         r.fieldKey(),
-                        jsonToJava(r.valueJson()),  // CHANGED: normalize jsonb -> Java
+                        jsonToJava(r.valueJson()),
                         r.sourceSystem(),
                         r.sourceRef(),
                         r.evidenceCount(),
@@ -275,33 +285,44 @@ public class ProfileServiceImpl implements ProfileService {
               JOIN profile_field pf ON pf.id = e.profile_field_id
             """ + where, p, Long.class);
 
-        int offset = (Math.max(page,1)-1) * Math.max(pageSize,1);
-        p.addValue("limit", pageSize).addValue("offset", offset);
+        int safePage = Math.max(page, 1);
+        int safeSize = Math.max(pageSize, 1);
+        int offset = (safePage - 1) * safeSize;
+        p.addValue("limit", safeSize).addValue("offset", offset);
 
         List<EvidenceDto> items = jdbc.query("""
-            SELECT e.evidence_id, e.profile_field_id, e.uri, e.type, e.added_at
+            SELECT e.*, pf.field_key AS profile_field_key
               FROM evidence e
               JOIN profile_field pf ON pf.id = e.profile_field_id
-            """ + where + " ORDER BY e.added_at DESC LIMIT :limit OFFSET :offset", p, EVIDENCE_MAPPER);
+            """ + where + " ORDER BY e.created_at DESC LIMIT :limit OFFSET :offset", p, EVIDENCE_MAPPER);
 
-        return new PageResponse<>(Math.max(page,1), Math.max(pageSize,1), total, items);
+        return new PageResponse<>(safePage, safeSize, total, items);
     }
 
     @Override
     @Transactional
     public EvidenceDto addEvidence(String appId, CreateEvidenceRequest req) {
-        if (req == null || req.uri() == null || req.uri().isBlank())
-            throw new IllegalArgumentException("uri is required");
+        if (req == null) throw new IllegalArgumentException("Request body is required");
 
-        String profileFieldId = req.profileFieldId();
-        if ((profileFieldId == null || profileFieldId.isBlank()) && (req.fieldKey() != null && !req.fieldKey().isBlank())) {
+        // Resolve profile_field_id: prefer explicit id, else resolve by key under latest profile
+        String profileFieldId = (req.profileFieldId() != null && !req.profileFieldId().isBlank())
+                ? req.profileFieldId().trim()
+                : null;
+
+        if (profileFieldId == null) {
+            String fieldKey = (req.profileField() != null && !req.profileField().isBlank())
+                    ? req.profileField().trim()
+                    : null;
+            if (fieldKey == null) {
+                throw new IllegalArgumentException("Provide either profileFieldId or profileField(fieldKey)");
+            }
             ProfileMeta prof = ensureProfile(appId, null);
             String pid = prof.profileId();
             try {
                 profileFieldId = jdbc.queryForObject("""
                     SELECT id FROM profile_field
                      WHERE profile_id=:pid AND field_key=:fk
-                """, new MapSqlParameterSource().addValue("pid", pid).addValue("fk", req.fieldKey()), String.class);
+                """, new MapSqlParameterSource().addValue("pid", pid).addValue("fk", fieldKey), String.class);
             } catch (EmptyResultDataAccessException e) {
                 profileFieldId = "pf_" + UUID.randomUUID().toString().replace("-", "");
                 jdbc.update("""
@@ -310,26 +331,79 @@ public class ProfileServiceImpl implements ProfileService {
                 """, new MapSqlParameterSource()
                         .addValue("id", profileFieldId)
                         .addValue("pid", pid)
-                        .addValue("fk", req.fieldKey()));
+                        .addValue("fk", fieldKey));
             }
         }
-        if (profileFieldId == null || profileFieldId.isBlank())
-            throw new IllegalArgumentException("profileFieldId or fieldKey is required");
 
+        // Require a URI for this JSON path (file uploads handled by multipart controller elsewhere)
+        if (req.uri() == null || req.uri().isBlank())
+            throw new IllegalArgumentException("uri is required for JSON/link evidence");
+
+        // Compute sha256 deterministically from URI string (for link evidence)
+        String sha256 = sha256Hex(req.uri().trim().getBytes(StandardCharsets.UTF_8));
+
+        // Insert or return existing (unique (profile_field_id, uri))
+        // Also populate validity + status + source_system; keep added_at for back-compat.
         String id = "ev_" + UUID.randomUUID().toString().replace("-", "");
-        jdbc.update("""
-           INSERT INTO evidence (evidence_id, profile_field_id, uri, type, added_at)
-           VALUES (:id, :pfid, :uri, :type, now())
-        """, new MapSqlParameterSource()
+        MapSqlParameterSource p = new MapSqlParameterSource()
                 .addValue("id", id)
                 .addValue("pfid", profileFieldId)
-                .addValue("uri", req.uri())
-                .addValue("type", req.type()));
+                .addValue("uri", req.uri().trim())
+                .addValue("type", req.type())
+                .addValue("sha", sha256)
+                .addValue("src", req.sourceSystem())
+                .addValue("vf", req.validFrom())
+                .addValue("vu", req.validUntil());
 
-        return jdbc.queryForObject("""
-            SELECT evidence_id, profile_field_id, uri, type, added_at
-              FROM evidence WHERE evidence_id=:id
-        """, Map.of("id", id), EVIDENCE_MAPPER);
+        // Try insert with ON CONFLICT; if no row returned, fetch the existing one
+        List<EvidenceDto> out = jdbc.query("""
+           INSERT INTO evidence (
+             evidence_id, profile_field_id, uri, type, sha256, source_system,
+             valid_from, valid_until, status, added_at, created_at, updated_at
+           ) VALUES (
+             :id, :pfid, :uri, :type, :sha, :src,
+             COALESCE(:vf, now()), :vu, 'active', now(), now(), now()
+           )
+           ON CONFLICT (profile_field_id, uri) DO NOTHING
+           RETURNING *
+        """, p, (rs, n) -> new EvidenceDto(
+                rs.getString("evidence_id"),
+                rs.getString("profile_field_id"),
+                null, // profile_field_key (will be populated below when we requery with join)
+                rs.getString("uri"),
+                rs.getString("type"),
+                rs.getString("sha256"),
+                rs.getString("source_system"),
+                rs.getString("status"),
+                rs.getObject("valid_from",  OffsetDateTime.class),
+                rs.getObject("valid_until", OffsetDateTime.class),
+                rs.getObject("revoked_at",  OffsetDateTime.class),
+                rs.getObject("added_at",    OffsetDateTime.class),
+                rs.getObject("created_at",  OffsetDateTime.class),
+                rs.getObject("updated_at",  OffsetDateTime.class)
+        ));
+
+        EvidenceDto dto;
+        if (out.isEmpty()) {
+            // existing — read with join to get field key included
+            dto = jdbc.queryForObject("""
+                SELECT e.*, pf.field_key AS profile_field_key
+                  FROM evidence e
+                  JOIN profile_field pf ON pf.id = e.profile_field_id
+                 WHERE e.profile_field_id=:pfid AND e.uri=:uri
+            """, new MapSqlParameterSource().addValue("pfid", profileFieldId).addValue("uri", req.uri().trim()),
+                    EVIDENCE_MAPPER);
+        } else {
+            // inserted — need to populate field key with a join
+            dto = jdbc.queryForObject("""
+                SELECT e.*, pf.field_key AS profile_field_key
+                  FROM evidence e
+                  JOIN profile_field pf ON pf.id = e.profile_field_id
+                 WHERE e.evidence_id=:id
+            """, new MapSqlParameterSource().addValue("id", out.get(0).evidenceId()), EVIDENCE_MAPPER);
+        }
+
+        return dto;
     }
 
     @Override
@@ -338,5 +412,16 @@ public class ProfileServiceImpl implements ProfileService {
         if (!appExists(appId)) throw new NoSuchElementException("Application not found: " + appId);
         int n = jdbc.update("DELETE FROM evidence WHERE evidence_id=:id", Map.of("id", evidenceId));
         if (n == 0) throw new NoSuchElementException("Evidence not found");
+    }
+
+    /* -------- helpers -------- */
+
+    private static String sha256Hex(byte[] bytes) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            return java.util.HexFormat.of().formatHex(md.digest(bytes));
+        } catch (Exception e) {
+            throw new RuntimeException("Unable to compute sha256", e);
+        }
     }
 }

@@ -6,7 +6,7 @@ import com.example.onboarding.dto.evidence.EvidenceDto;
 import com.example.onboarding.dto.profile.PatchProfileRequest;
 import com.example.onboarding.dto.profile.PatchProfileResponse;
 import com.example.onboarding.dto.profile.ProfileSnapshotDto;
-import com.example.onboarding.service.ProfileService;
+import com.example.onboarding.service.profile.ProfileService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
