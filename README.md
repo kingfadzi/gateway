@@ -287,3 +287,75 @@ curl -sS -X POST "$BASE/api/apps/$APP_ID/claims" \
 - **C4:** `/requirements` parts include `reuseCandidate` where applicable (confidence/recency rules).
 - **C6:** `POST /api/apps/{appId}/claims` accepts a suggested evidence and returns `acceptable=true`, `saved=true`.
 - **Dedup:** Posting identical evidence returns the existing record (same `evidenceId`).
+
+## 9) Manual review & supersession curls
+
+Set these once for your session:
+
+```bash
+export BASE="http://localhost:8080"
+export APP_ID="CORR-12356"
+export FIELD_KEY="security.encryption_at_rest"
+export URI1="https://confluence/acme/security/encryption-policy-v3.pdf"
+export URI2="https://confluence/acme/security/encryption-policy-v4.pdf"
+```
+
+### (A) Ensure the application & profile exist
+
+```bash
+curl -sS -X POST "$BASE/api/apps" \
+  -H "Content-Type: application/json" \
+  -d "{\"appId\":\"$APP_ID\"}" | jq .
+```
+
+### (B) Create evidence (capture `evidenceId`)
+
+```bash
+EVID=$(curl -sS -X POST "$BASE/api/apps/$APP_ID/evidence" \
+  -H "Content-Type: application/json" \
+  -d "{\"profileField\":\"$FIELD_KEY\",\"type\":\"link\",\"uri\":\"$URI1\",\"sourceSystem\":\"MANUAL\",\"validFrom\":\"2025-08-01T00:00:00Z\",\"submittedBy\":\"alice\"}" \
+  | jq -r '.evidenceId'); echo "EVID=$EVID"
+```
+
+### (C) Approve that evidence
+
+```bash
+curl -sS -X POST "$BASE/api/evidence/$EVID/review" \
+  -H "Content-Type: application/json" \
+  -d '{"action":"approve","reviewerId":"sme.bob"}' | jq .
+```
+
+### (D) Validate — list the chain for the field
+
+```bash
+curl -sS "$BASE/api/apps/$APP_ID/evidence?fieldKey=$FIELD_KEY" | jq .
+```
+
+### (E) Create a second evidence to reject
+
+```bash
+EVID2=$(curl -sS -X POST "$BASE/api/apps/$APP_ID/evidence" \
+  -H "Content-Type: application/json" \
+  -d "{\"profileField\":\"$FIELD_KEY\",\"type\":\"link\",\"uri\":\"$URI2\",\"sourceSystem\":\"MANUAL\",\"validFrom\":\"2025-08-10T00:00:00Z\",\"submittedBy\":\"carol\"}" \
+  | jq -r '.evidenceId'); echo "EVID2=$EVID2"
+```
+
+### (F) Reject it
+
+```bash
+curl -sS -X POST "$BASE/api/evidence/$EVID2/review" \
+  -H "Content-Type: application/json" \
+  -d '{"action":"reject","reviewerId":"sme.carol"}' | jq .
+```
+
+### (G) Validate again (compact view)
+
+```bash
+curl -sS "$BASE/api/apps/$APP_ID/evidence?fieldKey=$FIELD_KEY" \
+  | jq -c '.[] | {evidenceId, status, uri, reviewedBy, reviewedAt, validUntil}'
+```
+
+**Notes**
+
+* Approving a new evidence for the same field automatically sets previous active items to `superseded` and sets their `valid_until` to the new item’s `valid_from`.
+* `revoked` (rejected) evidence is excluded from reuse logic.

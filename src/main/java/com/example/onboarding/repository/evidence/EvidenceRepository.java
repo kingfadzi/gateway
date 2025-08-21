@@ -164,28 +164,49 @@ public class EvidenceRepository {
     }
 
     /** Map a raw joined row (from queryForList/queryForMap) to EvidenceDto. */
+    /** Map a raw joined row (from queryForList/queryForMap) to EvidenceDto. */
     public EvidenceDto rowToDto(Map<String, Object> row) {
         return new EvidenceDto(
-                (String) row.get("evidence_id"),
-                (String) row.get("profile_field_id"),
+                str(row, "evidence_id"),
+                str(row, "profile_field_id"),
+                // ensure your SELECT adds: pf.key AS profile_field_key
                 (String) row.getOrDefault("profile_field_key", null),
-                (String) row.get("uri"),
-                (String) row.get("type"),
-                (String) row.get("sha256"),
-                (String) row.get("source_system"),
-                (String) row.get("status"),
+
+                str(row, "uri"),
+                str(row, "type"),
+                str(row, "sha256"),
+                str(row, "source_system"),
+                str(row, "submitted_by"),                // NEW
+
+                str(row, "status"),
                 toOffsetDateTime(row.get("valid_from")),
                 toOffsetDateTime(row.get("valid_until")),
                 toOffsetDateTime(row.get("revoked_at")),
+
+                str(row, "reviewed_by"),                 // NEW
+                toOffsetDateTime(row.get("reviewed_at")),// NEW
+                str(row, "tags"),                        // NEW
+
                 toOffsetDateTime(row.get("added_at")),
                 toOffsetDateTime(row.get("created_at")),
                 toOffsetDateTime(row.get("updated_at"))
         );
     }
 
+    /* small null-safe string helper */
+    private static String str(Map<String, Object> row, String key) {
+        Object v = row.get(key);
+        return v == null ? null : v.toString();
+    }
+
+
     /* ===========================================================
        Helpers
        =========================================================== */
+
+/* ===========================================================
+   Helpers
+   =========================================================== */
 
     private RowMapper<EvidenceDto> evidenceRowMapper() {
         return new RowMapper<>() {
@@ -193,31 +214,85 @@ public class EvidenceRepository {
                 return new EvidenceDto(
                         rs.getString("evidence_id"),
                         rs.getString("profile_field_id"),
-                        rs.getString("profile_field_key"),
+                        // ensure SELECT includes "pf.key AS profile_field_key" if you need it
+                        getNullableString(rs, "profile_field_key"),
+
                         rs.getString("uri"),
                         rs.getString("type"),
                         rs.getString("sha256"),
                         rs.getString("source_system"),
+                        rs.getString("submitted_by"),                   // NEW
+
                         rs.getString("status"),
-                        rs.getObject("valid_from",  OffsetDateTime.class),
-                        rs.getObject("valid_until", OffsetDateTime.class),
-                        rs.getObject("revoked_at",  OffsetDateTime.class),
-                        rs.getObject("added_at",    OffsetDateTime.class),
-                        rs.getObject("created_at",  OffsetDateTime.class),
-                        rs.getObject("updated_at",  OffsetDateTime.class)
+                        rs.getObject("valid_from",  java.time.OffsetDateTime.class),
+                        rs.getObject("valid_until", java.time.OffsetDateTime.class),
+                        rs.getObject("revoked_at",  java.time.OffsetDateTime.class),
+
+                        getNullableString(rs, "reviewed_by"),           // NEW
+                        rs.getObject("reviewed_at", java.time.OffsetDateTime.class), // NEW
+                        getNullableString(rs, "tags"),                  // NEW
+
+                        rs.getObject("added_at",    java.time.OffsetDateTime.class),
+                        rs.getObject("created_at",  java.time.OffsetDateTime.class),
+                        rs.getObject("updated_at",  java.time.OffsetDateTime.class)
                 );
             }
         };
     }
 
-    private static OffsetDateTime toOffsetDateTime(Object v) {
-        if (v == null) return null;
-        if (v instanceof OffsetDateTime odt) return odt;
-        if (v instanceof java.sql.Timestamp ts) return ts.toInstant().atOffset(ZoneOffset.UTC);
-        if (v instanceof java.time.Instant i)  return i.atOffset(ZoneOffset.UTC);
-        // Last resort: attempt parsing
-        return OffsetDateTime.parse(v.toString());
+    private static String getNullableString(ResultSet rs, String col) throws SQLException {
+        try {
+            String v = rs.getString(col);
+            return (v == null || rs.wasNull()) ? null : v;
+        } catch (SQLException e) {
+            // Column may be absent in some queries; treat as null
+            return null;
+        }
     }
+
+    /** Accepts Timestamp, OffsetDateTime, or null */
+    private static java.time.OffsetDateTime toOffsetDateTime(Object v) {
+        if (v == null) return null;
+        if (v instanceof java.time.OffsetDateTime odt) return odt;
+        if (v instanceof java.sql.Timestamp ts) return ts.toInstant().atOffset(java.time.ZoneOffset.UTC);
+        if (v instanceof java.time.Instant i)   return i.atOffset(java.time.ZoneOffset.UTC);
+        // fallback for strings (e.g., JSON casting), ignore parse errors gracefully
+        try {
+            return java.time.OffsetDateTime.parse(v.toString());
+        } catch (Exception ignore) {
+            return null;
+        }
+    }
+
+
+    /**
+     * Lock an evidence row for update and return its profile_field_id + valid_from.
+     * Returns Optional.empty() if no such evidence exists.
+     */
+    public Optional<EvidenceHead> lockHeadById(String evidenceId) {
+        final String sql = """
+        SELECT e.evidence_id,
+               e.profile_field_id,
+               COALESCE(e.valid_from, now()) AS valid_from
+        FROM evidence e
+        WHERE e.evidence_id = :id
+        FOR UPDATE
+    """;
+        var params = new MapSqlParameterSource().addValue("id", evidenceId);
+        return jdbc.query(sql, params, (rs, i) -> new EvidenceHead(
+                rs.getString("evidence_id"),
+                rs.getString("profile_field_id"),
+                rs.getObject("valid_from", OffsetDateTime.class)
+        )).stream().findFirst();
+    }
+
+    /** Minimal projection used for review logic. */
+    public record EvidenceHead(
+            String evidenceId,
+            String profileFieldId,
+            OffsetDateTime validFrom
+    ) {}
+
 
     /* ===========================================================
        (Optional) Helper used by C6 create-claim path

@@ -141,27 +141,45 @@ public class ProfileServiceImpl implements ProfileService {
         }
     };
 
-    // UPDATED: Evidence mapper -> expanded EvidenceDto
     private static final RowMapper<EvidenceDto> EVIDENCE_MAPPER = new RowMapper<>() {
         @Override public EvidenceDto mapRow(ResultSet rs, int rowNum) throws SQLException {
             return new EvidenceDto(
                     rs.getString("evidence_id"),
                     rs.getString("profile_field_id"),
-                    rs.getString("profile_field_key"),
+                    // ensure query includes: pf.key AS profile_field_key
+                    getNullableString(rs, "profile_field_key"),
+
                     rs.getString("uri"),
                     rs.getString("type"),
                     rs.getString("sha256"),
                     rs.getString("source_system"),
+                    getNullableString(rs, "submitted_by"),                         // NEW
+
                     rs.getString("status"),
-                    rs.getObject("valid_from",  OffsetDateTime.class),
-                    rs.getObject("valid_until", OffsetDateTime.class),
-                    rs.getObject("revoked_at",  OffsetDateTime.class),
-                    rs.getObject("added_at",    OffsetDateTime.class),
-                    rs.getObject("created_at",  OffsetDateTime.class),
-                    rs.getObject("updated_at",  OffsetDateTime.class)
+                    rs.getObject("valid_from",  java.time.OffsetDateTime.class),
+                    rs.getObject("valid_until", java.time.OffsetDateTime.class),
+                    rs.getObject("revoked_at",  java.time.OffsetDateTime.class),
+
+                    getNullableString(rs, "reviewed_by"),                          // NEW
+                    rs.getObject("reviewed_at", java.time.OffsetDateTime.class),   // NEW
+                    getNullableString(rs, "tags"),                                 // NEW
+
+                    rs.getObject("added_at",    java.time.OffsetDateTime.class),
+                    rs.getObject("created_at",  java.time.OffsetDateTime.class),
+                    rs.getObject("updated_at",  java.time.OffsetDateTime.class)
             );
         }
     };
+
+    private static String getNullableString(ResultSet rs, String col) throws SQLException {
+        try {
+            String v = rs.getString(col);
+            return (v == null || rs.wasNull()) ? null : v;
+        } catch (SQLException e) {
+            // Column might not be present in some queries; treat as null
+            return null;
+        }
+    }
 
     /* -------- API methods -------- */
 
@@ -369,18 +387,27 @@ public class ProfileServiceImpl implements ProfileService {
         """, p, (rs, n) -> new EvidenceDto(
                 rs.getString("evidence_id"),
                 rs.getString("profile_field_id"),
-                null, // profile_field_key (will be populated below when we requery with join)
+                // ensure query includes: pf.key AS profile_field_key
+                getNullableString(rs, "profile_field_key"),
+
                 rs.getString("uri"),
                 rs.getString("type"),
                 rs.getString("sha256"),
                 rs.getString("source_system"),
+                getNullableString(rs, "submitted_by"),                         // NEW
+
                 rs.getString("status"),
-                rs.getObject("valid_from",  OffsetDateTime.class),
-                rs.getObject("valid_until", OffsetDateTime.class),
-                rs.getObject("revoked_at",  OffsetDateTime.class),
-                rs.getObject("added_at",    OffsetDateTime.class),
-                rs.getObject("created_at",  OffsetDateTime.class),
-                rs.getObject("updated_at",  OffsetDateTime.class)
+                rs.getObject("valid_from",  java.time.OffsetDateTime.class),
+                rs.getObject("valid_until", java.time.OffsetDateTime.class),
+                rs.getObject("revoked_at",  java.time.OffsetDateTime.class),
+
+                getNullableString(rs, "reviewed_by"),                          // NEW
+                rs.getObject("reviewed_at", java.time.OffsetDateTime.class),   // NEW
+                getNullableString(rs, "tags"),                                 // NEW
+
+                rs.getObject("added_at",    java.time.OffsetDateTime.class),
+                rs.getObject("created_at",  java.time.OffsetDateTime.class),
+                rs.getObject("updated_at",  java.time.OffsetDateTime.class)
         ));
 
         EvidenceDto dto;

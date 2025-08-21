@@ -2,10 +2,15 @@ package com.example.onboarding.controller.evidence;
 
 import com.example.onboarding.dto.evidence.CreateEvidenceRequest;
 import com.example.onboarding.dto.evidence.EvidenceDto;
+import com.example.onboarding.dto.evidence.ReviewEvidenceRequest;
+import com.example.onboarding.dto.evidence.ReviewEvidenceResponse;
 import com.example.onboarding.service.evidence.EvidenceService;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.util.List;
 
 @RestController
 public class EvidenceController {
@@ -36,4 +41,22 @@ public class EvidenceController {
     public EvidenceDto get(@PathVariable String id) {
         return service.get(id);
     }
+
+    @PostMapping("/api/evidence/{evidenceId}/review")
+    public ResponseEntity<ReviewEvidenceResponse> review(
+            @PathVariable String evidenceId,
+            @RequestBody ReviewEvidenceRequest req
+    ) {
+        return ResponseEntity.ok(service.review(evidenceId, req));
+    }
+
+    @GetMapping("/apps/{appId}/evidence")
+    public ResponseEntity<List<EvidenceDto>> list(
+            @PathVariable String appId,
+            @RequestParam("fieldKey") String fieldKey
+    ) {
+        return ResponseEntity.ok(service.listByAppAndField(appId, fieldKey));
+    }
+
+
 }

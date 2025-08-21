@@ -1,7 +1,6 @@
 package com.example.onboarding.service.application;
 
 import com.example.onboarding.dto.*;
-import com.example.onboarding.service.ApplicationService;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.*;

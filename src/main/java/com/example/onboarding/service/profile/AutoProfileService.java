@@ -1,4 +1,4 @@
-package com.example.onboarding.service.application;
+package com.example.onboarding.service.profile;
 
 import com.example.onboarding.dto.application.ProfileSnapshot;
 import com.example.onboarding.dto.application.SourceRow;
@@ -7,6 +7,8 @@ import com.example.onboarding.repository.application.ApplicationRepository;
 import com.example.onboarding.repository.application.ProfileFieldRepository;
 import com.example.onboarding.repository.application.ProfileRepository;
 import com.example.onboarding.repository.application.SourceDao;
+import com.example.onboarding.service.application.RatingsNormalizer;
+import com.example.onboarding.service.application.RegistryDeriver;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.slf4j.Logger;
@@ -48,8 +50,22 @@ public class AutoProfileService {
             log.debug("autoProfile: source for {} -> {}", appId, src);
         }
 
-        // 1) upsert application ...
-        // (unchanged)
+        // 1) Upsert the application row (idempotent) so later joins/pre-checks succeed
+        applicationRepository.upsertFromSource(
+                appId,
+                src.businessServiceName(),
+                src.appCriticality(),
+                src.applicationType(),
+                src.applicationTier(),
+                src.architectureType(),
+                src.installType(),
+                src.housePosition(),
+                src.operationalStatus(),
+                src.transactionCycle()
+        );
+        if (log.isDebugEnabled()) {
+            log.debug("autoProfile: upserted application for {}", appId);
+        }
 
         // 2) normalize
         Map<String,Object> ctx = RatingsNormalizer.normalizeCtx(

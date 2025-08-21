@@ -2,7 +2,7 @@ package com.example.onboarding.controller.application;
 
 import com.example.onboarding.dto.application.CreateAppRequest;
 import com.example.onboarding.dto.application.ProfileSnapshot;
-import com.example.onboarding.service.application.AutoProfileService;
+import com.example.onboarding.service.profile.AutoProfileService;
 import com.example.onboarding.config.AutoProfileProperties;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

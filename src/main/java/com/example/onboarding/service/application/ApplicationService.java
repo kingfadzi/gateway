@@ -1,4 +1,4 @@
-package com.example.onboarding.service;
+package com.example.onboarding.service.application;
 
 import com.example.onboarding.dto.*;
 
