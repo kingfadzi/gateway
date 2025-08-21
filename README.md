@@ -1,6 +1,3 @@
-
----
-
 # Quick Start (env)
 
 ```bash
@@ -34,17 +31,31 @@ curl -sS "$BASE/internal/apps/$APP_ID/field-keys" | jq .
 
 ---
 
-## 3) Requirements (C2: FE-ready)
+## 3) Requirements (C2 + C4: FE-ready **with reuse suggestions**)
 
 ```bash
 curl -sS "$BASE/api/apps/$APP_ID/requirements?releaseId=$RELEASE_ID&releaseWindowStartIso=$WINDOW_START" | jq .
 ```
 
-Expected: `{ reviewMode, assessment, domains, requirements[], firedRules, policyVersion }`.
+**Expected:**
+Top-level `{ reviewMode, assessment, domains, requirements[], firedRules, policyVersion }`.
+Each requirement has `.parts = { allOf[], anyOf[], oneOf[] }`.
+Each **part** may include **`reuseCandidate`** (nullable) with:
+`{ evidenceId, method, confidence, uri, type, validFrom, validUntil, createdAt, explanation }`.
+
+### Quick view of reuse suggestions only
+
+```bash
+curl -sS "$BASE/api/apps/$APP_ID/requirements?releaseId=$RELEASE_ID&releaseWindowStartIso=$WINDOW_START" \
+| jq -c '.requirements[].parts
+         | ((.allOf // []) + (.anyOf // []) + (.oneOf // []))
+         | map(select(.reuseCandidate != null))
+         | map({label, profileField, reuse: {evidenceId: .reuseCandidate.evidenceId, confidence: .reuseCandidate.confidence, validUntil: .reuseCandidate.validUntil}})'
+```
 
 ---
 
-## 4) Create Evidence (C5 helper to seed C3)
+## 4) Create Evidence (helper to seed reuse)
 
 ### 4a) JSON / link evidence
 
@@ -108,10 +119,10 @@ curl -sS "$BASE/api/apps/$APP_ID/evidence?fieldKey=security.encryption_at_rest&p
 
 ---
 
-## 5) Reuse Lookup (C3)
+## 5) Reuse Lookup (C3: server-side picker)
 
 > Finds the **best reusable** evidence for a requirement part.
-> Accepts dotted keys; internally also tries the flat last segment.
+> Accepts dotted keys; internally normalizes to the stored key.
 
 ```bash
 curl -sS -G "$BASE/internal/evidence/reuse" \
@@ -121,8 +132,7 @@ curl -sS -G "$BASE/internal/evidence/reuse" \
   --data-urlencode "asOf=$WINDOW_START" | jq .
 ```
 
-Expected (when seeded): a `ReuseCandidate` with `evidenceId`, `valid_from/until`, `uri`, `sha256`, etc.
-If you get `null`, see “Troubleshooting” below.
+**Expected:** a `ReuseCandidate` with id/uri/validity when seeded and valid at `asOf`; otherwise `null`.
 
 ---
 
@@ -153,20 +163,32 @@ curl -sS -X POST "$BASE/internal/policy/evaluate" \
 
 ## Troubleshooting
 
-* **Reuse returns `null`**
+* **Reuse shows `null` in Requirements**
 
     * Confirm the field key exists:
       `curl -sS "$BASE/internal/apps/$APP_ID/field-keys" | jq .`
-    * Make sure **validFrom ≤ asOf** and `status!='revoked'`.
-    * Try loosening filters: omit `maxAgeDays`, or temporarily set `asOf=2100-01-01T00:00:00Z`.
+    * Ensure `validFrom ≤ asOf` and evidence is not revoked/expired.
+    * Loosen filters: omit `maxAgeDays`, or test with a later `asOf` (`2100-01-01T00:00:00Z`).
 
 * **Create evidence returns `profileFieldKey: null`**
-  The service now re-reads by id to include the join; if you still see null, you’re running an older build—rebuild and retry.
+
+    * You may be on an older build. Rebuild and retry; the service re-reads by id to populate joins.
 
 ---
 
-### Acceptance (what to look for)
+## Acceptance (what to verify)
 
-* **C2:** requirements endpoint returns FE-ready structure using your stored profile.
-* **C3:** reuse call returns a non-null `ReuseCandidate` for a field after creating evidence.
-* **Dedup:** posting the same evidence again yields the existing record (same `evidenceId`).
+* **C2:** `/requirements` returns FE-ready structure driven by stored profile.
+* **C3:** `/internal/evidence/reuse` returns a non-null `ReuseCandidate` for seeded fields.
+* **C4:** `/requirements` parts include `reuseCandidate` where applicable (confidence/recency rules).
+* **Dedup:** Posting identical evidence returns the existing record (same `evidenceId`).
+
+---
+
+### Handy localhost one-liner (reuse view)
+
+```bash
+curl -sS "http://localhost:8080/api/apps/CORR-12356/requirements?releaseId=REL-001&releaseWindowStartIso=2025-09-01T10:00:00Z" \
+| jq -c '.requirements[].parts | ((.allOf // []) + (.anyOf // []) + (.oneOf // [])) | map({label, profileField, reuseCandidate})'
+```
+

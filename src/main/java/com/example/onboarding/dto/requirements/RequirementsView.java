@@ -1,5 +1,5 @@
-// src/main/java/com/example/onboarding/requirements/view/RequirementsView.java
-package com.example.onboarding.dto.policy;
+// src/main/java/com/example/onboarding/dto/policy/RequirementsView.java
+package com.example.onboarding.dto.requirements;
 
 import com.example.onboarding.dto.evidence.ReuseCandidate;
 
@@ -13,7 +13,11 @@ public record RequirementsView(
         List<String> firedRules,
         String policyVersion
 ) {
-    public record Assessment(boolean required, boolean mandatory, boolean questionnaireRequired) {}
+    public record Assessment(
+            boolean required,
+            boolean mandatory,
+            boolean questionnaireRequired
+    ) {}
 
     public record RequirementView(
             String id,             // policy_id
@@ -37,6 +41,6 @@ public record RequirementsView(
             Integer maxAgeDays,
             String reviewer,
             List<String> uiOptions,
-            ReuseCandidate reuseCandidate   // <-- NEW (nullable)
+            ReuseCandidate reuseCandidate   // nullable
     ) {}
 }

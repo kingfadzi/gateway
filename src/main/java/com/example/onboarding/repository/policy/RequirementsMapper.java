@@ -2,7 +2,7 @@
 package com.example.onboarding.repository.policy;
 
 import com.example.onboarding.dto.policy.PolicyDecision;
-import com.example.onboarding.dto.policy.RequirementsView;
+import com.example.onboarding.dto.requirements.RequirementsView;
 
 import java.time.OffsetDateTime;
 import java.util.List;

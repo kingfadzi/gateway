@@ -1,6 +1,7 @@
 // src/main/java/com/example/onboarding/config/AppConfig.java
 package com.example.onboarding.config;
 
+import org.springframework.boot.context.properties.ConfigurationPropertiesBinding;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -20,4 +21,10 @@ public class AppConfig {
         f.setReadTimeout(props.getReadTimeoutMs());
         return new RestTemplate(f);
     }
+
+    @Bean
+    @ConfigurationPropertiesBinding
+    public FeaturesProperties featuresProperties() { return new FeaturesProperties(); }
+
+
 }

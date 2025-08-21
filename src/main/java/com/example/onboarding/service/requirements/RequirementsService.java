@@ -1,9 +1,9 @@
-package com.example.onboarding.service.policy;
+package com.example.onboarding.service.requirements;
 
 import com.example.onboarding.dto.policy.OpaRequest;
 import com.example.onboarding.dto.policy.PolicyDecision;
 import com.example.onboarding.dto.policy.PolicyInput;
-import com.example.onboarding.dto.policy.RequirementsView;
+import com.example.onboarding.dto.requirements.RequirementsView;
 import com.example.onboarding.integrations.OpaClient;
 import com.example.onboarding.repository.evidence.EvidenceReuseRepository; // used to read profile context
 import com.example.onboarding.repository.policy.RequirementsMapper;     // static utility
