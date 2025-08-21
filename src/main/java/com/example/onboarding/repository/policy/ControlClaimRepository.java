@@ -1,6 +1,6 @@
 package com.example.onboarding.repository.policy;
 
-import com.example.onboarding.dto.policy.ClaimDto;
+import com.example.onboarding.dto.claims.ClaimDto;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.postgresql.util.PGobject;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;

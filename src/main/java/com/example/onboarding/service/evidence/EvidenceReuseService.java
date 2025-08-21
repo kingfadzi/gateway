@@ -3,20 +3,20 @@ package com.example.onboarding.service.evidence;
 
 import com.example.onboarding.dto.evidence.ReuseCandidate;
 import com.example.onboarding.repository.evidence.EvidenceReuseRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.LinkedHashSet;
 import java.util.Optional;
+import java.util.Set;
 
-/**
- * C3: server-side reuse check (read-only).
- * Selects the best reusable evidence for a given profile field using deterministic precedence rules.
- * Uses OffsetDateTime consistently across the codebase.
- */
 @Service
 public class EvidenceReuseService {
 
+    private static final Logger log = LoggerFactory.getLogger(EvidenceReuseService.class);
     private final EvidenceReuseRepository repo;
 
     public EvidenceReuseService(EvidenceReuseRepository repo) {
@@ -27,18 +27,38 @@ public class EvidenceReuseService {
                                                      String profileField,
                                                      Integer maxAgeDays,
                                                      OffsetDateTime asOf) {
-        String key = normalizeKey(profileField);
-        if (key == null || key.isBlank()) return Optional.empty();
+        if (profileField == null || profileField.isBlank()) return Optional.empty();
 
-        // default to "now" in UTC if caller omits asOf
         OffsetDateTime ref = (asOf == null) ? OffsetDateTime.now(ZoneOffset.UTC) : asOf;
 
-        return repo.findBestReusable(appId, key, maxAgeDays, ref);
+        // Build candidate keys in priority order:
+        //  1) last dotted segment (e.g., "security.encryption_at_rest" -> "encryption_at_rest")
+        //  2) dotted->underscored (e.g., "security_encryption_at_rest")
+        //  3) original (normalized)
+        Set<String> keys = new LinkedHashSet<>();
+
+        String trimmed = profileField.trim();
+        String lastSeg = trimmed.contains(".")
+                ? trimmed.substring(trimmed.lastIndexOf('.') + 1)
+                : trimmed;
+
+        keys.add(normalize(lastSeg));
+        keys.add(normalize(trimmed.replace('.', '_')));
+        keys.add(normalize(trimmed));
+
+        for (String k : keys) {
+            Optional<ReuseCandidate> hit = repo.findBestReusable(appId, k, maxAgeDays, ref);
+            if (hit.isPresent()) {
+                if (log.isDebugEnabled()) log.debug("Reuse hit: appId={}, key={}, asOf={}, maxAgeDays={}", appId, k, ref, maxAgeDays);
+                return hit;
+            } else {
+                if (log.isDebugEnabled()) log.debug("Reuse miss: appId={}, key={}, asOf={}, maxAgeDays={}", appId, k, ref, maxAgeDays);
+            }
+        }
+        return Optional.empty();
     }
 
-    /* -------- helpers -------- */
-    private static String normalizeKey(String key) {
-        if (key == null) return null;
-        return key.trim().toLowerCase().replace('.', '_');
+    private static String normalize(String key) {
+        return key == null ? null : key.trim().toLowerCase();
     }
 }

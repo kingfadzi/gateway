@@ -1,4 +1,4 @@
-package com.example.onboarding.dto.policy;
+package com.example.onboarding.dto.claims;
 
 import java.time.OffsetDateTime;
 import java.util.List;

@@ -192,3 +192,98 @@ curl -sS "http://localhost:8080/api/apps/CORR-12356/requirements?releaseId=REL-0
 | jq -c '.requirements[].parts | ((.allOf // []) + (.anyOf // []) + (.oneOf // [])) | map({label, profileField, reuseCandidate})'
 ```
 
+---
+
+## 7) Attach & Submit Claim (C6 — positive test)
+
+Use a real `requirementId`, `profileField`, and `evidenceId` from the decorated requirements response.
+
+### 7a) Find a reusable candidate and copy its IDs
+
+```bash
+# Lists: requirementId | profileField | evidenceId | type
+curl -sS "$BASE/api/apps/$APP_ID/requirements?releaseId=$RELEASE_ID&releaseWindowStartIso=$WINDOW_START" \
+| jq -r '.requirements[] as $r
+         | (($r.parts.allOf // []) + ($r.parts.anyOf // []) + ($r.parts.oneOf // []))[]
+         | select(.reuseCandidate != null)
+         | "\($r.id) | \(.profileField) | \(.reuseCandidate.evidenceId) | \(.reuseCandidate.type)"'
+```
+
+Copy three values from one line:
+- `requirementId`
+- `profileField`
+- `evidenceId`
+  (Use the printed `type` value for `typeExpected`, e.g., `"link"` or `"file"`.)
+
+### 7b) Submit the claim (full JSON body)
+
+> Replace the placeholders below before running:
+> `REQUIREMENT_ID_HERE`, `PROFILE_FIELD_HERE`, `EVIDENCE_ID_HERE`, and `TYPE_EXPECTED_HERE`.
+
+```bash
+curl -sS -X POST "$BASE/api/apps/$APP_ID/claims" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "releaseId": "'"$RELEASE_ID"'",
+    "requirementId": "REQUIREMENT_ID_HERE",
+    "profileFieldExpected": "PROFILE_FIELD_HERE",
+    "typeExpected": "TYPE_EXPECTED_HERE",
+    "evidenceId": "EVIDENCE_ID_HERE",
+    "method": "manual",
+    "releaseWindowStartIso": "'"$WINDOW_START"'",
+    "dryRun": false
+  }' | jq .
+```
+
+**Expected:**
+```json
+{
+  "acceptable": true,
+  "reasons": [],
+  "saved": true,
+  "claimId": "clm_xxx",
+  "appliedEvidence": { "...": "..." }
+}
+```
+
+---
+
+## 8) Validate Only (dry-run)
+
+```bash
+curl -sS -X POST "$BASE/api/apps/$APP_ID/claims" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "releaseId": "'"$RELEASE_ID"'",
+    "requirementId": "REQUIREMENT_ID_HERE",
+    "profileFieldExpected": "PROFILE_FIELD_HERE",
+    "typeExpected": "TYPE_EXPECTED_HERE",
+    "evidenceId": "EVIDENCE_ID_HERE",
+    "releaseWindowStartIso": "'"$WINDOW_START"'",
+    "dryRun": true
+  }' | jq .
+```
+**Expected:** `"acceptable": true, "saved": false`.
+
+---
+
+## Troubleshooting (claims)
+
+- **`requirement_part_not_found`**  
+  The `requirementId` and `profileFieldExpected` must match the values from `/requirements`. Re-copy them using step **7a**.
+
+- **`type_mismatch`**  
+  Use the `type` printed in step **7a** for `typeExpected` (e.g., `"file"` vs `"link"`).
+
+- **`too_old_for_max_age` / `not_valid_yet` / `expired`**  
+  The evidence validity window or `maxAgeDays` rule failed at `asOf = $WINDOW_START`. Adjust the window or pick a different evidence.
+
+---
+
+## Acceptance (updated)
+
+- **C2:** `/requirements` returns FE-ready structure driven by stored profile.
+- **C3:** `/internal/evidence/reuse` returns a non-null `ReuseCandidate` for seeded fields.
+- **C4:** `/requirements` parts include `reuseCandidate` where applicable (confidence/recency rules).
+- **C6:** `POST /api/apps/{appId}/claims` accepts a suggested evidence and returns `acceptable=true`, `saved=true`.
+- **Dedup:** Posting identical evidence returns the existing record (same `evidenceId`).

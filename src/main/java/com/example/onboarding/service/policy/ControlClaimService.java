@@ -1,6 +1,6 @@
 package com.example.onboarding.service.policy;
 
-import com.example.onboarding.dto.policy.ClaimDto;
+import com.example.onboarding.dto.claims.ClaimDto;
 import com.example.onboarding.dto.policy.CreateClaimRequest;
 import com.example.onboarding.repository.policy.ControlClaimRepository;
 import com.example.onboarding.repository.evidence.EvidenceReuseRepository;
