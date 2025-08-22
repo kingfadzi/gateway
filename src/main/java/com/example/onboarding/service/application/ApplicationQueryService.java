@@ -8,22 +8,20 @@ import org.springframework.data.jpa.domain.Specification;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
-public class ApplicationService {
+public class ApplicationQueryService {
     private final ApplicationRepository repository;
 
-    public ApplicationService(ApplicationRepository repository) {
+    public ApplicationQueryService(ApplicationRepository repository) {
         this.repository = repository;
     }
 
     public List<Application> search(Map<String, String> params) {
-        // Convert to <String, Object> and filter empty values
         Map<String, Object> filteredParams = params.entrySet().stream()
                 .filter(e -> e.getValue() != null && !e.getValue().isEmpty())
-                .collect(java.util.stream.Collectors.toMap(
-                        Map.Entry::getKey, Map.Entry::getValue
-                ));
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
         Specification<Application> spec = ApplicationSpecifications.withDynamicParams(filteredParams);
         return repository.findAll(spec);
     }

@@ -15,11 +15,11 @@ import java.time.ZoneOffset;
 import java.util.*;
 
 @Service
-public class ApplicationServiceImpl implements ApplicationService {
+public class ApplicationManagementServiceImpl implements ApplicationManagementService {
 
     private final NamedParameterJdbcTemplate jdbc;
 
-    public ApplicationServiceImpl(NamedParameterJdbcTemplate jdbc) {
+    public ApplicationManagementServiceImpl(NamedParameterJdbcTemplate jdbc) {
         this.jdbc = jdbc;
     }
 

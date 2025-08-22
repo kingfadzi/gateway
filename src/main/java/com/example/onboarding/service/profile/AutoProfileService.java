@@ -1,10 +1,10 @@
 package com.example.onboarding.service.profile;
 
-import com.example.onboarding.dto.application.ProfileSnapshot;
+import com.example.onboarding.dto.profile.ProfileSnapshot;
 import com.example.onboarding.dto.application.SourceRow;
 import com.example.onboarding.dto.application.ServiceInstanceRow;
 import com.example.onboarding.config.AutoProfileProperties;
-import com.example.onboarding.repository.application.ApplicationRepository;
+import com.example.onboarding.repository.application.ApplicationManagementRepository;
 import com.example.onboarding.repository.application.ServiceInstanceRepository;
 import com.example.onboarding.repository.application.SourceDao;
 import com.example.onboarding.repository.profile.ProfileFieldRepository;
@@ -24,7 +24,7 @@ import java.util.Map;
 public class AutoProfileService {
 
     private final SourceDao sourceDao;
-    private final ApplicationRepository applicationRepository;
+    private final ApplicationManagementRepository applicationManagementRepository;
     private final ServiceInstanceRepository serviceInstanceRepository;
     private final ProfileRepository profileRepository;
     private final ProfileFieldRepository profileFieldRepository;
@@ -34,14 +34,14 @@ public class AutoProfileService {
     private static final Logger log = LoggerFactory.getLogger(AutoProfileService.class);
 
     public AutoProfileService(SourceDao sourceDao,
-                              ApplicationRepository applicationRepository,
+                              ApplicationManagementRepository applicationManagementRepository,
                               ServiceInstanceRepository serviceInstanceRepository,
                               ProfileRepository profileRepository,
                               ProfileFieldRepository profileFieldRepository,
                               RegistryDeriver registryDeriver,
                               AutoProfileProperties props) {
         this.sourceDao = sourceDao;
-        this.applicationRepository = applicationRepository;
+        this.applicationManagementRepository = applicationManagementRepository;
         this.serviceInstanceRepository = serviceInstanceRepository;
         this.profileRepository = profileRepository;
         this.profileFieldRepository = profileFieldRepository;
@@ -85,7 +85,7 @@ public class AutoProfileService {
     }
 
     private void upsertApplication(SourceRow src) {
-        applicationRepository.upsertFromSource(src);
+        applicationManagementRepository.upsertFromSource(src);
         if (log.isDebugEnabled()) log.debug("autoProfile: upserted application for {}", src.appId());
     }
 

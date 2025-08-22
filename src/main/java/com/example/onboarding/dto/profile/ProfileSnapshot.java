@@ -1,4 +1,4 @@
-package com.example.onboarding.dto.application;
+package com.example.onboarding.dto.profile;
 
 import java.util.Map;
 

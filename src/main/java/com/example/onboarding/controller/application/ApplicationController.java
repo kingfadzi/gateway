@@ -1,11 +1,16 @@
 package com.example.onboarding.controller.application;
 
 import com.example.onboarding.dto.application.CreateAppRequest;
-import com.example.onboarding.dto.application.ProfileSnapshot;
+import com.example.onboarding.dto.profile.ProfileSnapshot;
+import com.example.onboarding.model.Application;
+import com.example.onboarding.service.application.ApplicationQueryService;
 import com.example.onboarding.service.profile.AutoProfileService;
 import com.example.onboarding.config.AutoProfileProperties;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/apps")
@@ -13,10 +18,22 @@ public class ApplicationController {
 
     private final AutoProfileService autoProfileService;
     private final AutoProfileProperties props;
+    private final ApplicationQueryService applicationQueryService;
 
-    public ApplicationController(AutoProfileService autoProfileService, AutoProfileProperties props) {
+    public ApplicationController(
+            AutoProfileService autoProfileService,
+            AutoProfileProperties props,
+            ApplicationQueryService applicationQueryService
+    ) {
         this.autoProfileService = autoProfileService;
         this.props = props;
+        this.applicationQueryService = applicationQueryService;
+    }
+
+    @GetMapping
+    public ResponseEntity<List<Application>> search(@RequestParam Map<String, String> params) {
+        List<Application> results = applicationQueryService.search(params);
+        return ResponseEntity.ok(results);
     }
 
     /** Minimal create: caller provides only appId; server fetches CIA+S+R and builds profile */
