@@ -1,4 +1,4 @@
-package com.example.onboarding.repository.application;
+package com.example.onboarding.repository.profile;
 
 import com.example.onboarding.util.Jsons;
 import com.example.onboarding.util.HashIds;

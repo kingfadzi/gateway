@@ -1,4 +1,4 @@
-package com.example.onboarding.repository.application;
+package com.example.onboarding.repository.profile;
 
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;

@@ -1,21 +1,36 @@
 package com.example.onboarding.dto.application;
 
-/** Flat row returned by the source query (single row per appId) */
+/**
+ * Authoritative application snapshot from source systems (SNOW views).
+ * All fields required by the auto profile are included.
+ */
 public record SourceRow(
-        String appId,                  // child_app.correlation_id
-        String businessServiceName,    // bs.service
+        String appId,
+        String businessServiceName,
+
         String applicationType,
         String applicationTier,
         String architectureType,
         String installType,
         String housePosition,
         String operationalStatus,
-        String transactionCycle,
 
-        // Ratings from service offering and CIA+S+R
-        String appCriticality,         // so.app_criticality_assessment (A/B/C/D)
-        String securityRating,         // A1/A2/B/C/D or A->A1
-        String integrityRating,        // A/B/C/D
-        String availabilityRating,     // A/B/C/D
-        String resilienceRating        // "0".."4"
-) { }
+        String transactionCycle,
+        String transactionCycleId,            // from owning_transaction_cycle>id (aliased)
+
+        String applicationProductOwner,
+        String applicationProductOwnerBrid,
+        String systemArchitect,
+        String systemArchitectBrid,
+
+        String businessApplicationSysId,      // child_app.business_application_sys_id
+        String applicationParent,             // child_app.application_parent (name/label)
+        String applicationParentId,           // child_app.application_parent_correlation_id
+        String architectureHosting,           // child_app.architecture_hosting
+
+        String appCriticality,
+        String securityRating,
+        String integrityRating,
+        String availabilityRating,
+        String resilienceRating
+) {}

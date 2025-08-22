@@ -4,26 +4,26 @@ import com.example.onboarding.dto.PageResponse;
 import com.example.onboarding.dto.evidence.CreateEvidenceRequest;
 import com.example.onboarding.dto.evidence.EvidenceDto;
 import com.example.onboarding.dto.profile.*;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.RowMapper;
-import org.springframework.jdbc.core.namedparam.*;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Timestamp;
+import java.sql.*;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
 
-// Jackson: normalize jsonb -> native Java types
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.core.JsonProcessingException;
-
+/**
+ * Profile API now returns profile + application row + service instances.
+ */
 @Service
 public class ProfileServiceImpl implements ProfileService {
 
@@ -33,7 +33,6 @@ public class ProfileServiceImpl implements ProfileService {
         this.jdbc = jdbc;
     }
 
-    // ObjectMapper to parse jsonb text into native Java values
     private final ObjectMapper om = new ObjectMapper();
 
     /* -------- time util: convert JDBC Timestamp -> OffsetDateTime(UTC) -------- */
@@ -123,7 +122,6 @@ public class ProfileServiceImpl implements ProfileService {
 
     /* -------- field & evidence mappers -------- */
 
-    // value column read as text (value_json) and converted via jsonToJava(...)
     private record FieldRow(
             String fieldId, String fieldKey, String valueJson, String sourceSystem, String sourceRef,
             int evidenceCount, OffsetDateTime updatedAt) {}
@@ -146,24 +144,19 @@ public class ProfileServiceImpl implements ProfileService {
             return new EvidenceDto(
                     rs.getString("evidence_id"),
                     rs.getString("profile_field_id"),
-                    // ensure query includes: pf.key AS profile_field_key
                     getNullableString(rs, "profile_field_key"),
-
                     rs.getString("uri"),
                     rs.getString("type"),
                     rs.getString("sha256"),
                     rs.getString("source_system"),
-                    getNullableString(rs, "submitted_by"),                         // NEW
-
+                    getNullableString(rs, "submitted_by"),
                     rs.getString("status"),
                     rs.getObject("valid_from",  java.time.OffsetDateTime.class),
                     rs.getObject("valid_until", java.time.OffsetDateTime.class),
                     rs.getObject("revoked_at",  java.time.OffsetDateTime.class),
-
-                    getNullableString(rs, "reviewed_by"),                          // NEW
-                    rs.getObject("reviewed_at", java.time.OffsetDateTime.class),   // NEW
-                    getNullableString(rs, "tags"),                                 // NEW
-
+                    getNullableString(rs, "reviewed_by"),
+                    rs.getObject("reviewed_at", java.time.OffsetDateTime.class),
+                    getNullableString(rs, "tags"),
                     rs.getObject("added_at",    java.time.OffsetDateTime.class),
                     rs.getObject("created_at",  java.time.OffsetDateTime.class),
                     rs.getObject("updated_at",  java.time.OffsetDateTime.class)
@@ -176,9 +169,45 @@ public class ProfileServiceImpl implements ProfileService {
             String v = rs.getString(col);
             return (v == null || rs.wasNull()) ? null : v;
         } catch (SQLException e) {
-            // Column might not be present in some queries; treat as null
             return null;
         }
+    }
+
+    /* -------- generic dynamic mappers for "all columns" -------- */
+
+    private Map<String, Object> queryOneAsMap(String sql, Map<String, ?> params) {
+        List<Map<String, Object>> rows = queryListAsMaps(sql, params);
+        return rows.isEmpty() ? null : rows.get(0);
+    }
+
+    private List<Map<String, Object>> queryListAsMaps(String sql, Map<String, ?> params) {
+        return jdbc.query(sql, params, (rs, rowNum) -> {
+            ResultSetMetaData md = rs.getMetaData();
+            int cols = md.getColumnCount();
+            Map<String, Object> map = new LinkedHashMap<>(cols);
+            for (int i = 1; i <= cols; i++) {
+                String col = md.getColumnLabel(i);
+                Object val = rs.getObject(i);
+                // Normalize timestamps -> OffsetDateTime(UTC)
+                if (val instanceof Timestamp ts) {
+                    val = ts.toInstant().atOffset(ZoneOffset.UTC);
+                }
+                map.put(col, val);
+            }
+            return map;
+        });
+    }
+
+    private boolean relationExists(String name) {
+        // Checks tables + views in current schema search_path
+        Boolean ok = jdbc.queryForObject("""
+            SELECT EXISTS (
+              SELECT 1
+                FROM information_schema.tables
+               WHERE table_name = :n
+            )
+        """, Map.of("n", name.toLowerCase()), Boolean.class);
+        return ok != null && ok;
     }
 
     /* -------- API methods -------- */
@@ -187,14 +216,28 @@ public class ProfileServiceImpl implements ProfileService {
     public ProfileSnapshotDto getProfile(String appId) {
         if (!appExists(appId)) throw new NoSuchElementException("Application not found: " + appId);
 
+        // 1) Application row (ALL columns)
+        Map<String, Object> application = queryOneAsMap(
+                "SELECT * FROM application WHERE app_id = :id",
+                Map.of("id", appId)
+        );
+
+        // 2) Service instances (try a few likely relations; return [] if none exist)
+        List<Map<String, Object>> serviceInstances = queryListAsMaps(
+                "SELECT * FROM service_instances WHERE app_id = :id ORDER BY created_at NULLS LAST, updated_at NULLS LAST",
+                Map.of("id", appId)
+        );
+
+        // 3) Profile snapshot (as before)
         ProfileMeta prof = getLatestProfile(appId);
         if (prof == null) {
-            return new ProfileSnapshotDto(appId, null, null, List.of());
+            // No profile yet -> empty fields but still return application + serviceInstances
+            return new ProfileSnapshotDto(appId, null, null, List.of(), application, serviceInstances);
         }
+
         String profileId = prof.profileId();
         OffsetDateTime profUpdated = prof.updatedAt();
 
-        // select pf.value::text AS value_json to avoid quoted scalars in API
         String fieldsSql = """
            SELECT pf.id AS field_id,
                   pf.field_key AS field_key,
@@ -207,7 +250,7 @@ public class ProfileServiceImpl implements ProfileService {
              LEFT JOIN (
                  SELECT profile_field_id, COUNT(*) AS cnt
                    FROM evidence
-               GROUP BY profile_field_id
+                 GROUP BY profile_field_id
              ) ev ON ev.profile_field_id = pf.id
             WHERE pf.profile_id = :pid
             ORDER BY pf.field_key
@@ -225,7 +268,7 @@ public class ProfileServiceImpl implements ProfileService {
                         r.updatedAt()))
                 .toList();
 
-        return new ProfileSnapshotDto(appId, profileId, profUpdated, fields);
+        return new ProfileSnapshotDto(appId, profileId, profUpdated, fields, application, serviceInstances);
     }
 
     @Override
@@ -322,7 +365,6 @@ public class ProfileServiceImpl implements ProfileService {
     public EvidenceDto addEvidence(String appId, CreateEvidenceRequest req) {
         if (req == null) throw new IllegalArgumentException("Request body is required");
 
-        // Resolve profile_field_id: prefer explicit id, else resolve by key under latest profile
         String profileFieldId = (req.profileFieldId() != null && !req.profileFieldId().isBlank())
                 ? req.profileFieldId().trim()
                 : null;
@@ -353,15 +395,11 @@ public class ProfileServiceImpl implements ProfileService {
             }
         }
 
-        // Require a URI for this JSON path (file uploads handled by multipart controller elsewhere)
         if (req.uri() == null || req.uri().isBlank())
             throw new IllegalArgumentException("uri is required for JSON/link evidence");
 
-        // Compute sha256 deterministically from URI string (for link evidence)
         String sha256 = sha256Hex(req.uri().trim().getBytes(StandardCharsets.UTF_8));
 
-        // Insert or return existing (unique (profile_field_id, uri))
-        // Also populate validity + status + source_system; keep added_at for back-compat.
         String id = "ev_" + UUID.randomUUID().toString().replace("-", "");
         MapSqlParameterSource p = new MapSqlParameterSource()
                 .addValue("id", id)
@@ -373,7 +411,6 @@ public class ProfileServiceImpl implements ProfileService {
                 .addValue("vf", req.validFrom())
                 .addValue("vu", req.validUntil());
 
-        // Try insert with ON CONFLICT; if no row returned, fetch the existing one
         List<EvidenceDto> out = jdbc.query("""
            INSERT INTO evidence (
              evidence_id, profile_field_id, uri, type, sha256, source_system,
@@ -387,24 +424,19 @@ public class ProfileServiceImpl implements ProfileService {
         """, p, (rs, n) -> new EvidenceDto(
                 rs.getString("evidence_id"),
                 rs.getString("profile_field_id"),
-                // ensure query includes: pf.key AS profile_field_key
                 getNullableString(rs, "profile_field_key"),
-
                 rs.getString("uri"),
                 rs.getString("type"),
                 rs.getString("sha256"),
                 rs.getString("source_system"),
-                getNullableString(rs, "submitted_by"),                         // NEW
-
+                getNullableString(rs, "submitted_by"),
                 rs.getString("status"),
                 rs.getObject("valid_from",  java.time.OffsetDateTime.class),
                 rs.getObject("valid_until", java.time.OffsetDateTime.class),
                 rs.getObject("revoked_at",  java.time.OffsetDateTime.class),
-
-                getNullableString(rs, "reviewed_by"),                          // NEW
-                rs.getObject("reviewed_at", java.time.OffsetDateTime.class),   // NEW
-                getNullableString(rs, "tags"),                                 // NEW
-
+                getNullableString(rs, "reviewed_by"),
+                rs.getObject("reviewed_at", java.time.OffsetDateTime.class),
+                getNullableString(rs, "tags"),
                 rs.getObject("added_at",    java.time.OffsetDateTime.class),
                 rs.getObject("created_at",  java.time.OffsetDateTime.class),
                 rs.getObject("updated_at",  java.time.OffsetDateTime.class)
@@ -412,7 +444,6 @@ public class ProfileServiceImpl implements ProfileService {
 
         EvidenceDto dto;
         if (out.isEmpty()) {
-            // existing — read with join to get field key included
             dto = jdbc.queryForObject("""
                 SELECT e.*, pf.field_key AS profile_field_key
                   FROM evidence e
@@ -421,7 +452,6 @@ public class ProfileServiceImpl implements ProfileService {
             """, new MapSqlParameterSource().addValue("pfid", profileFieldId).addValue("uri", req.uri().trim()),
                     EVIDENCE_MAPPER);
         } else {
-            // inserted — need to populate field key with a join
             dto = jdbc.queryForObject("""
                 SELECT e.*, pf.field_key AS profile_field_key
                   FROM evidence e

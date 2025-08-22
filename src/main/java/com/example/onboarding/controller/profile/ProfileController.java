@@ -1,4 +1,4 @@
-package com.example.onboarding.web;
+package com.example.onboarding.controller.profile;
 
 import com.example.onboarding.dto.PageResponse;
 import com.example.onboarding.dto.evidence.CreateEvidenceRequest;

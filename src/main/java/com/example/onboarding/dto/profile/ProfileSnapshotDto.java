@@ -1,11 +1,16 @@
-package com.example.onboarding.dto.profile;
+package com.example.onboarding.dto.profile;// package com.example.onboarding.dto.profile;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 
 public record ProfileSnapshotDto(
         String appId,
-        String profileId,                 // was: snapshotVersion (string)
+        String profileId,
         OffsetDateTime updatedAt,
-        List<ProfileFieldDto> fields
+        List<ProfileFieldDto> fields,
+
+        // NEW:
+        Map<String, Object> application,
+        List<Map<String, Object>> serviceInstances
 ) {}
