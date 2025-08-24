@@ -144,3 +144,34 @@ fields:
     label: Review Depth
     derived_from: app_criticality
     rule: { A: full_review, B: scoped_review, C: express_review, D: self_attested }
+
+  # ---- Artifacts (per release)
+  - key: product_vision
+    label: Product Vision
+    derived_from: artifact
+    rule: { required: required }
+
+  - key: product_roadmap
+    label: Product Roadmap
+    derived_from: artifact
+    rule: { required: required }
+
+  - key: architecture_vision
+    label: Architecture Vision
+    derived_from: artifact
+    rule: { required: required }
+
+  - key: service_vision
+    label: Service Vision
+    derived_from: artifact
+    rule: { required: required }
+
+  - key: security_vision
+    label: Security Vision
+    derived_from: artifact
+    rule: { required: required }
+
+  - key: test_vision
+    label: Test Vision
+    derived_from: artifact
+    rule: { required: required }

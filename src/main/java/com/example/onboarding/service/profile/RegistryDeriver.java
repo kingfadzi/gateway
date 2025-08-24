@@ -1,6 +1,7 @@
 package com.example.onboarding.service.profile;
 
 import com.example.onboarding.config.AutoProfileProperties;
+import com.example.onboarding.dto.profile.FieldRegistryItem;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.stereotype.Component;
@@ -14,11 +15,9 @@ import java.util.concurrent.atomic.AtomicReference;
 @Component
 public class RegistryDeriver {
 
-    public record Item(String key, String derivedFrom, Map<String, Object> rule) {}
-
     private final ResourceLoader resourceLoader;
     private final AutoProfileProperties props;
-    private final AtomicReference<List<Item>> registry = new AtomicReference<>(List.of());
+    private final AtomicReference<List<FieldRegistryItem>> registry = new AtomicReference<>(List.of());
 
     public RegistryDeriver(ResourceLoader resourceLoader, AutoProfileProperties props) {
         this.resourceLoader = resourceLoader;
@@ -28,35 +27,61 @@ public class RegistryDeriver {
     @PostConstruct
     public void load() {
         try {
-            Resource res = resourceLoader.getResource(props.getRegistryPath());
-            try (InputStream in = res.getInputStream()) {
-                Map<String, Object> y = new Yaml().load(in);
-                List<Map<String, Object>> fields = (List<Map<String,Object>>) y.getOrDefault("fields", List.of());
-                List<Item> items = new ArrayList<>();
-                for (Map<String,Object> m : fields) {
-                    String key = Objects.toString(m.get("key"), null);
-                    String df  = Objects.toString(m.get("derived_from"), null);
-                    Map<String,Object> rule = (Map<String,Object>) m.get("rule");
-                    if (key != null && df != null && rule != null) {
-                        items.add(new Item(key, df, rule));
-                    }
-                }
-                registry.set(List.copyOf(items));
+            Resource registryResource = resourceLoader.getResource(props.getRegistryPath());
+            try (InputStream inputStream = registryResource.getInputStream()) {
+                Map<String, Object> yamlContent = new Yaml().load(inputStream);
+                
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> fieldDefinitions = (List<Map<String, Object>>) 
+                    yamlContent.getOrDefault("fields", List.of());
+                
+                List<FieldRegistryItem> registryItems = fieldDefinitions.stream()
+                    .map(this::parseFieldDefinition)
+                    .filter(Objects::nonNull)
+                    .toList();
+                
+                registry.set(registryItems);
             }
         } catch (Exception e) {
             throw new IllegalStateException("Failed to load registry: " + props.getRegistryPath(), e);
         }
     }
-
-    /** Compute derived profile fields from normalized ctx */
-    public Map<String,Object> derive(Map<String,Object> ctx) {
-        Map<String,Object> out = new LinkedHashMap<>();
-        for (Item it : registry.get()) {
-            Object v = ctx.get(it.derivedFrom());
-            if (v == null) continue;
-            Object mapped = it.rule().get(String.valueOf(v));
-            if (mapped != null) out.put(it.key(), mapped);
+    
+    private FieldRegistryItem parseFieldDefinition(Map<String, Object> fieldMap) {
+        String fieldKey = Objects.toString(fieldMap.get("key"), null);
+        String derivedFrom = Objects.toString(fieldMap.get("derived_from"), null);
+        
+        @SuppressWarnings("unchecked")
+        Map<String, Object> ruleMap = (Map<String, Object>) fieldMap.get("rule");
+        
+        // Only create item if all required fields are present
+        if (fieldKey != null && derivedFrom != null && ruleMap != null) {
+            return new FieldRegistryItem(fieldKey, derivedFrom, ruleMap);
         }
-        return out;
+        
+        return null; // Invalid field definition, will be filtered out
+    }
+
+    /** Compute derived profile fields from application signal values */
+    public Map<String,Object> derive(Map<String,Object> appSignals) {
+        Map<String,Object> derivedFields = new LinkedHashMap<>();
+        
+        for (FieldRegistryItem registryItem : registry.get()) {
+
+            // Get the application's signal value (e.g., security_rating: "A1")
+            Object appSignalValue = appSignals.get(registryItem.derivedFrom());
+
+            if (appSignalValue == null) continue;
+            
+            // Apply the rule mapping to derive policy requirement (e.g., A1 -> "required")
+            Map<String, Object> ruleMap = registryItem.rule();
+            String signalKey = String.valueOf(appSignalValue);
+            Object policyRequirement = ruleMap.get(signalKey);
+            if (policyRequirement != null) {
+                derivedFields.put(registryItem.key(), policyRequirement);
+            }
+        }
+        
+        return derivedFields;
     }
 }
