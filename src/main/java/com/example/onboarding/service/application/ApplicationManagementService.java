@@ -1,9 +1,10 @@
 package com.example.onboarding.service.application;
 
 import com.example.onboarding.dto.*;
+import com.example.onboarding.dto.application.Application;
 
 public interface ApplicationManagementService {
-    PageResponse<ApplicationDto> list(
+    PageResponse<Application> list(
             String q,
             String ownerId,
             String onboardingStatus,
@@ -14,11 +15,11 @@ public interface ApplicationManagementService {
             int pageSize
     );
 
-    ApplicationDto get(String appId);
+    Application get(String appId);
 
-    ApplicationDto create(CreateAppRequest req);
+    Application create(CreateAppRequest req);
 
-    ApplicationDto patch(String appId, UpdateAppRequest req);
+    Application patch(String appId, UpdateAppRequest req);
 
     void delete(String appId, boolean soft);
 }

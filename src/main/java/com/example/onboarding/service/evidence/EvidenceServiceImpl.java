@@ -1,9 +1,8 @@
 package com.example.onboarding.service.evidence;
 
 import com.example.onboarding.dto.evidence.CreateEvidenceRequest;
-import com.example.onboarding.dto.evidence.EvidenceDto;
+import com.example.onboarding.dto.evidence.Evidence;
 import com.example.onboarding.repository.evidence.EvidenceRepository;
-import com.example.onboarding.service.evidence.EvidenceService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -22,16 +21,11 @@ import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 
 import com.example.onboarding.dto.evidence.ReviewEvidenceRequest;
 import com.example.onboarding.dto.evidence.ReviewEvidenceResponse;
-import com.example.onboarding.dto.evidence.EvidenceDto;
-import org.springframework.dao.EmptyResultDataAccessException;
-import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.RowMapper;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.Timestamp;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
 
@@ -50,7 +44,7 @@ public class EvidenceServiceImpl implements EvidenceService {
 
     @Override
     @Transactional
-    public EvidenceDto createOrDedup(String appId, CreateEvidenceRequest req, MultipartFile file) throws Exception {
+    public Evidence createOrDedup(String appId, CreateEvidenceRequest req, MultipartFile file) throws Exception {
         if (req == null) throw new IllegalArgumentException("Request body is required");
         if (req.profileField() == null || req.profileField().isBlank()) {
             throw new IllegalArgumentException("profileField is required");
@@ -111,7 +105,7 @@ public class EvidenceServiceImpl implements EvidenceService {
 
     @Override
     @Transactional(readOnly = true)
-    public EvidenceDto get(String evidenceId) {
+    public Evidence get(String evidenceId) {
         return repo.getById(evidenceId);
     }
 
@@ -209,7 +203,7 @@ public class EvidenceServiceImpl implements EvidenceService {
     }
 
     @Override
-    public List<EvidenceDto> listByAppAndField(String appId, String fieldKey) {
+    public List<Evidence> listByAppAndField(String appId, String fieldKey) {
         var params = new MapSqlParameterSource()
                 .addValue("appId", appId)
                 .addValue("fieldKey", fieldKey);
@@ -234,10 +228,10 @@ public class EvidenceServiceImpl implements EvidenceService {
 
 // ---------- helpers (add once if you don't have them) ----------
 
-    private static RowMapper<EvidenceDto> evidenceRowMapper() {
+    private static RowMapper<Evidence> evidenceRowMapper() {
         return new RowMapper<>() {
-            @Override public EvidenceDto mapRow(ResultSet rs, int rowNum) throws SQLException {
-                return new EvidenceDto(
+            @Override public Evidence mapRow(ResultSet rs, int rowNum) throws SQLException {
+                return new Evidence(
                         rs.getString("evidence_id"),
                         rs.getString("profile_field_id"),
                         // ensure your query includes: pf.key AS profile_field_key

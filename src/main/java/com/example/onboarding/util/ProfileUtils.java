@@ -1,0 +1,146 @@
+package com.example.onboarding.util;
+
+import com.example.onboarding.dto.evidence.Evidence;
+import com.example.onboarding.dto.profile.FieldRow;
+import com.example.onboarding.dto.profile.ProfileField;
+import com.example.onboarding.dto.profile.ProfileMeta;
+import com.example.onboarding.dto.risk.RiskStory;
+import org.springframework.jdbc.core.RowMapper;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+
+public final class ProfileUtils {
+    
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    
+    private ProfileUtils() {
+        // Utility class
+    }
+    
+    public static OffsetDateTime odt(ResultSet rs, String col) throws SQLException {
+        Timestamp ts = rs.getTimestamp(col);
+        return ts == null ? null : ts.toInstant().atOffset(ZoneOffset.UTC);
+    }
+    
+    public static Object jsonToJava(String json) {
+        if (json == null) return null;
+        try {
+            JsonNode n = OBJECT_MAPPER.readTree(json);
+            if (n.isTextual()) return n.textValue();
+            if (n.isNumber())  return n.numberValue();
+            if (n.isBoolean()) return n.booleanValue();
+            if (n.isNull())    return null;
+            return OBJECT_MAPPER.convertValue(n, Object.class);
+        } catch (JsonProcessingException e) {
+            return json; // fallback to raw string
+        }
+    }
+    
+    public static String toJsonString(Object v) {
+        if (v == null) return "null";
+        if (v instanceof Number || v instanceof Boolean) return v.toString();
+        String s = v.toString();
+        if (s.startsWith("{") || s.startsWith("[") || (s.startsWith("\"") && s.endsWith("\""))) return s;
+        return "\"" + s.replace("\"", "\\\"") + "\"";
+    }
+    
+    public static String sha256Hex(byte[] bytes) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            return java.util.HexFormat.of().formatHex(md.digest(bytes));
+        } catch (Exception e) {
+            throw new RuntimeException("Unable to compute sha256", e);
+        }
+    }
+    
+    private static String getNullableString(ResultSet rs, String col) throws SQLException {
+        try {
+            String v = rs.getString(col);
+            return (v == null || rs.wasNull()) ? null : v;
+        } catch (SQLException e) {
+            return null;
+        }
+    }
+    
+    public static Evidence mapEvidence(ResultSet rs, int rowNum) throws SQLException {
+        return new Evidence(
+                rs.getString("evidence_id"),
+                rs.getString("profile_field_id"),
+                getNullableString(rs, "profile_field_key"),
+                rs.getString("uri"),
+                rs.getString("type"),
+                rs.getString("sha256"),
+                rs.getString("source_system"),
+                getNullableString(rs, "submitted_by"),
+                rs.getString("status"),
+                rs.getObject("valid_from", java.time.OffsetDateTime.class),
+                rs.getObject("valid_until", java.time.OffsetDateTime.class),
+                rs.getObject("revoked_at", java.time.OffsetDateTime.class),
+                getNullableString(rs, "reviewed_by"),
+                rs.getObject("reviewed_at", java.time.OffsetDateTime.class),
+                getNullableString(rs, "tags"),
+                rs.getObject("added_at", java.time.OffsetDateTime.class),
+                rs.getObject("created_at", java.time.OffsetDateTime.class),
+                rs.getObject("updated_at", java.time.OffsetDateTime.class)
+        );
+    }
+    
+    public static ProfileMeta mapProfileMeta(ResultSet rs, int rowNum) throws SQLException {
+        return new ProfileMeta(
+                rs.getString("profile_id"),
+                rs.getInt("version"),
+                odt(rs, "updated_at")
+        );
+    }
+    
+    public static ProfileField mapProfileField(ResultSet rs, int rowNum) throws SQLException {
+        return new ProfileField(
+                rs.getString("id"),
+                rs.getString("field_key"),
+                jsonToJava(rs.getString("value")),
+                rs.getString("source_system"),
+                rs.getString("source_ref"),
+                rs.getInt("evidence_count"),
+                odt(rs, "updated_at")
+        );
+    }
+    
+    public static RiskStory mapRiskStory(ResultSet rs, int rowNum) throws SQLException {
+        return new RiskStory(
+                rs.getString("risk_key"),
+                rs.getString("domain"),
+                rs.getString("status"),
+                rs.getString("scope_type"),
+                rs.getString("scope_id"),
+                rs.getString("release_id"),
+                rs.getObject("sla_due", java.time.OffsetDateTime.class),
+                rs.getObject("created_at", java.time.OffsetDateTime.class),
+                rs.getObject("updated_at", java.time.OffsetDateTime.class)
+        );
+    }
+    
+    
+    public static final RowMapper<FieldRow> FIELD_ROW_MAPPER = new RowMapper<>() {
+        @Override 
+        public FieldRow mapRow(ResultSet rs, int rowNum) throws SQLException {
+            return new FieldRow(
+                    rs.getString("field_id"),
+                    rs.getString("field_key"),
+                    rs.getString("value_json"),
+                    rs.getString("source_system"),
+                    rs.getString("source_ref"),
+                    rs.getInt("evidence_count"),
+                    odt(rs, "updated_at")
+            );
+        }
+    };
+}

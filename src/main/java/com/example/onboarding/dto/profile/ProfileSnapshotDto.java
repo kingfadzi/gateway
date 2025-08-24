@@ -8,7 +8,7 @@ public record ProfileSnapshotDto(
         String appId,
         String profileId,
         OffsetDateTime updatedAt,
-        List<ProfileFieldDto> fields,
+        List<ProfileField> fields,
 
         // NEW:
         Map<String, Object> application,

@@ -1,8 +1,8 @@
-package com.example.onboarding.dto;
+package com.example.onboarding.dto.application;
 
 import java.time.OffsetDateTime;
 
-public record ApplicationDto(
+public record Application(
         String appId,
         String parentAppId,
         String name,

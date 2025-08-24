@@ -10,7 +10,6 @@ import com.example.onboarding.repository.application.SourceDao;
 import com.example.onboarding.repository.profile.ProfileFieldRepository;
 import com.example.onboarding.repository.profile.ProfileRepository;
 import com.example.onboarding.service.application.RatingsNormalizer;
-import com.example.onboarding.service.application.RegistryDeriver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;

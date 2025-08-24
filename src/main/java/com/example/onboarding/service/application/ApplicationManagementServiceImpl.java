@@ -1,6 +1,7 @@
 package com.example.onboarding.service.application;
 
 import com.example.onboarding.dto.*;
+import com.example.onboarding.dto.application.Application;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.*;
@@ -29,9 +30,9 @@ public class ApplicationManagementServiceImpl implements ApplicationManagementSe
         return ts == null ? null : ts.toInstant().atOffset(ZoneOffset.UTC);
     }
 
-    private static final RowMapper<ApplicationDto> APP_MAPPER = new RowMapper<>() {
-        @Override public ApplicationDto mapRow(ResultSet rs, int rowNum) throws SQLException {
-            return new ApplicationDto(
+    private static final RowMapper<Application> APP_MAPPER = new RowMapper<>() {
+        @Override public Application mapRow(ResultSet rs, int rowNum) throws SQLException {
+            return new Application(
                     rs.getString("app_id"),
                     rs.getString("parent_app_id"),
                     rs.getString("name"),
@@ -59,8 +60,8 @@ public class ApplicationManagementServiceImpl implements ApplicationManagementSe
     };
 
     @Override
-    public PageResponse<ApplicationDto> list(String q, String ownerId, String onboardingStatus, String operationalStatus,
-                                             String parentAppId, String sort, int page, int pageSize) {
+    public PageResponse<Application> list(String q, String ownerId, String onboardingStatus, String operationalStatus,
+                                          String parentAppId, String sort, int page, int pageSize) {
 
         StringBuilder where = new StringBuilder(" WHERE 1=1 ");
         Map<String,Object> params = new HashMap<>();
@@ -107,12 +108,12 @@ public class ApplicationManagementServiceImpl implements ApplicationManagementSe
             FROM application a
         """ + where + orderBy + " LIMIT :limit OFFSET :offset";
 
-        List<ApplicationDto> items = jdbc.query(sql, new MapSqlParameterSource(params), APP_MAPPER);
+        List<Application> items = jdbc.query(sql, new MapSqlParameterSource(params), APP_MAPPER);
         return new PageResponse<>(Math.max(page,1), Math.max(pageSize,1), total, items);
     }
 
     @Override
-    public ApplicationDto get(String appId) {
+    public Application get(String appId) {
         String sql = """
           SELECT a.*,
                  EXISTS (SELECT 1 FROM application c WHERE c.parent_app_id = a.app_id) AS has_children
@@ -128,7 +129,7 @@ public class ApplicationManagementServiceImpl implements ApplicationManagementSe
 
     @Override
     @Transactional
-    public ApplicationDto create(CreateAppRequest req) {
+    public Application create(CreateAppRequest req) {
         String appId = "app_" + UUID.randomUUID().toString().replace("-", "");
         String sql = """
             INSERT INTO application (
@@ -172,7 +173,7 @@ public class ApplicationManagementServiceImpl implements ApplicationManagementSe
 
     @Override
     @Transactional
-    public ApplicationDto patch(String appId, UpdateAppRequest req) {
+    public Application patch(String appId, UpdateAppRequest req) {
         // Optimistic concurrency
         if (req.expectedUpdatedAt() != null) {
             int matched = jdbc.update("""

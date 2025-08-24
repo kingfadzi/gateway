@@ -2,7 +2,7 @@ package com.example.onboarding.dto.evidence;
 
 import java.time.OffsetDateTime;
 
-public record EvidenceDto(
+public record Evidence(
         String evidenceId,
         String profileFieldId,
         String profileFieldKey,   // pf.key AS profile_field_key

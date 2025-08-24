@@ -1,6 +1,6 @@
 package com.example.onboarding.repository.evidence;
 
-import com.example.onboarding.dto.evidence.EvidenceDto;
+import com.example.onboarding.dto.evidence.Evidence;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -11,7 +11,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.Map;
 import java.util.Optional;
 
@@ -144,7 +143,7 @@ public class EvidenceRepository {
     }
 
     /** Read a single evidence row (joined with field key) by evidence_id. */
-    public EvidenceDto getById(String evidenceId) {
+    public Evidence getById(String evidenceId) {
         final String sql = """
           SELECT e.*,
                  pf.field_key AS profile_field_key
@@ -165,8 +164,8 @@ public class EvidenceRepository {
 
     /** Map a raw joined row (from queryForList/queryForMap) to EvidenceDto. */
     /** Map a raw joined row (from queryForList/queryForMap) to EvidenceDto. */
-    public EvidenceDto rowToDto(Map<String, Object> row) {
-        return new EvidenceDto(
+    public Evidence rowToDto(Map<String, Object> row) {
+        return new Evidence(
                 str(row, "evidence_id"),
                 str(row, "profile_field_id"),
                 // ensure your SELECT adds: pf.key AS profile_field_key
@@ -208,10 +207,10 @@ public class EvidenceRepository {
    Helpers
    =========================================================== */
 
-    private RowMapper<EvidenceDto> evidenceRowMapper() {
+    private RowMapper<Evidence> evidenceRowMapper() {
         return new RowMapper<>() {
-            @Override public EvidenceDto mapRow(ResultSet rs, int rowNum) throws SQLException {
-                return new EvidenceDto(
+            @Override public Evidence mapRow(ResultSet rs, int rowNum) throws SQLException {
+                return new Evidence(
                         rs.getString("evidence_id"),
                         rs.getString("profile_field_id"),
                         // ensure SELECT includes "pf.key AS profile_field_key" if you need it

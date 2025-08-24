@@ -2,10 +2,11 @@ package com.example.onboarding.controller.profile;
 
 import com.example.onboarding.dto.PageResponse;
 import com.example.onboarding.dto.evidence.CreateEvidenceRequest;
-import com.example.onboarding.dto.evidence.EvidenceDto;
+import com.example.onboarding.dto.evidence.Evidence;
+import com.example.onboarding.dto.profile.DomainGraphPayload;
 import com.example.onboarding.dto.profile.PatchProfileRequest;
 import com.example.onboarding.dto.profile.PatchProfileResponse;
-import com.example.onboarding.dto.profile.ProfileSnapshotDto;
+import com.example.onboarding.dto.profile.ProfilePayload;
 import com.example.onboarding.service.profile.ProfileService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -21,8 +22,8 @@ public class ProfileController {
     }
 
     @GetMapping("/profile")
-    public ProfileSnapshotDto getProfile(@PathVariable String appId) {
-        return svc.getProfile(appId);
+    public DomainGraphPayload getProfile(@PathVariable String appId) {
+        return svc.getProfileDomainGraph(appId);
     }
 
     @PatchMapping("/profile")
@@ -31,17 +32,17 @@ public class ProfileController {
     }
 
     @GetMapping("/evidence")
-    public PageResponse<EvidenceDto> listEvidence(@PathVariable String appId,
-                                                  @RequestParam(required = false, name = "key") String fieldKey, // keeps ?key= for UI
-                                                  @RequestParam(defaultValue = "1") int page,
-                                                  @RequestParam(name="page_size", defaultValue = "25") int pageSize) {
+    public PageResponse<Evidence> listEvidence(@PathVariable String appId,
+                                               @RequestParam(required = false, name = "key") String fieldKey, // keeps ?key= for UI
+                                               @RequestParam(defaultValue = "1") int page,
+                                               @RequestParam(name="page_size", defaultValue = "25") int pageSize) {
         return svc.listEvidence(appId, fieldKey, page, pageSize);
     }
 
     @PostMapping("/evidence")
-    public ResponseEntity<EvidenceDto> addEvidence(@PathVariable String appId,
-                                                   @RequestBody CreateEvidenceRequest req) {
-        EvidenceDto created = svc.addEvidence(appId, req);
+    public ResponseEntity<Evidence> addEvidence(@PathVariable String appId,
+                                                @RequestBody CreateEvidenceRequest req) {
+        Evidence created = svc.addEvidence(appId, req);
         return ResponseEntity.status(201).body(created);
     }
 

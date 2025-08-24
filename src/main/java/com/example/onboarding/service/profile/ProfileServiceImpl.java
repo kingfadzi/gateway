@@ -1,25 +1,22 @@
 package com.example.onboarding.service.profile;
 
+import com.example.onboarding.config.FieldRegistryConfig;
 import com.example.onboarding.dto.PageResponse;
 import com.example.onboarding.dto.evidence.CreateEvidenceRequest;
-import com.example.onboarding.dto.evidence.EvidenceDto;
+import com.example.onboarding.dto.evidence.Evidence;
 import com.example.onboarding.dto.profile.*;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.dao.EmptyResultDataAccessException;
-import org.springframework.jdbc.core.RowMapper;
-import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import com.example.onboarding.dto.risk.RiskStory;
+import com.example.onboarding.repository.profile.ProfileRepository;
+import com.example.onboarding.util.ProfileUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.sql.*;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Profile API now returns profile + application row + service instances.
@@ -27,60 +24,21 @@ import java.util.*;
 @Service
 public class ProfileServiceImpl implements ProfileService {
 
-    private final NamedParameterJdbcTemplate jdbc;
+    private final ProfileRepository profileRepository;
+    private final FieldRegistryConfig fieldRegistryConfig;
 
-    public ProfileServiceImpl(NamedParameterJdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public ProfileServiceImpl(ProfileRepository profileRepository, FieldRegistryConfig fieldRegistryConfig) {
+        this.profileRepository = profileRepository;
+        this.fieldRegistryConfig = fieldRegistryConfig;
     }
 
-    private final ObjectMapper om = new ObjectMapper();
-
-    /* -------- time util: convert JDBC Timestamp -> OffsetDateTime(UTC) -------- */
-    private static OffsetDateTime odt(ResultSet rs, String col) throws SQLException {
-        Timestamp ts = rs.getTimestamp(col);
-        return ts == null ? null : ts.toInstant().atOffset(ZoneOffset.UTC);
-    }
-
-    // Convert JSON text -> Java scalar/Map/List
-    private Object jsonToJava(String json) {
-        if (json == null) return null;
-        try {
-            JsonNode n = om.readTree(json);
-            if (n.isTextual()) return n.textValue();
-            if (n.isNumber())  return n.numberValue();
-            if (n.isBoolean()) return n.booleanValue();
-            if (n.isNull())    return null;
-            return om.convertValue(n, Object.class);
-        } catch (JsonProcessingException e) {
-            return json; // fallback to raw string
-        }
-    }
-
-    /* -------- small meta record for profile rows -------- */
-    private record ProfileMeta(String profileId, int version, OffsetDateTime updatedAt) {}
 
     private boolean appExists(String appId) {
-        Boolean exists = jdbc.queryForObject(
-                "SELECT EXISTS(SELECT 1 FROM application WHERE app_id=:id)",
-                Map.of("id", appId), Boolean.class
-        );
-        return exists != null && exists;
+        return profileRepository.appExists(appId);
     }
 
     private ProfileMeta getLatestProfile(String appId) {
-        List<ProfileMeta> rows = jdbc.query("""
-            SELECT profile_id, version, updated_at
-              FROM v_app_profiles_latest
-             WHERE scope_type='application' AND scope_id=:id
-             ORDER BY version DESC
-             LIMIT 1
-        """, new MapSqlParameterSource().addValue("id", appId),
-                (rs, n) -> new ProfileMeta(
-                        rs.getString("profile_id"),
-                        rs.getInt("version"),
-                        odt(rs, "updated_at")
-                ));
-        return rows.isEmpty() ? null : rows.get(0);
+        return profileRepository.getLatestProfileMeta(appId);
     }
 
     @Transactional
@@ -90,143 +48,23 @@ public class ProfileServiceImpl implements ProfileService {
         if (version == null) {
             ProfileMeta latest = getLatestProfile(appId);
             if (latest != null) return latest;
-
-            String profileId = "prof_" + UUID.randomUUID().toString().replace("-", "");
-            jdbc.update("""
-                INSERT INTO profile (profile_id, scope_type, scope_id, version, snapshot_at, created_at, updated_at)
-                VALUES (:pid, 'application', :app, 1, now(), now(), now())
-            """, new MapSqlParameterSource().addValue("pid", profileId).addValue("app", appId));
-            return new ProfileMeta(profileId, 1, OffsetDateTime.now(ZoneOffset.UTC));
+            return profileRepository.createProfile(appId, null);
         } else {
-            List<ProfileMeta> rows = jdbc.query("""
-                SELECT profile_id, version, updated_at
-                  FROM profile
-                 WHERE scope_type='application' AND scope_id=:app AND version=:ver
-                 LIMIT 1
-            """, new MapSqlParameterSource().addValue("app", appId).addValue("ver", version),
-                    (rs, n) -> new ProfileMeta(
-                            rs.getString("profile_id"),
-                            rs.getInt("version"),
-                            odt(rs, "updated_at")
-                    ));
-            if (!rows.isEmpty()) return rows.get(0);
-
-            String profileId = "prof_" + UUID.randomUUID().toString().replace("-", "");
-            jdbc.update("""
-                INSERT INTO profile (profile_id, scope_type, scope_id, version, snapshot_at, created_at, updated_at)
-                VALUES (:pid, 'application', :app, :ver, now(), now(), now())
-            """, new MapSqlParameterSource().addValue("pid", profileId).addValue("app", appId).addValue("ver", version));
-            return new ProfileMeta(profileId, version, OffsetDateTime.now(ZoneOffset.UTC));
+            ProfileMeta existing = profileRepository.findProfileByVersion(appId, version);
+            if (existing != null) return existing;
+            return profileRepository.createProfile(appId, version);
         }
     }
-
-    /* -------- field & evidence mappers -------- */
-
-    private record FieldRow(
-            String fieldId, String fieldKey, String valueJson, String sourceSystem, String sourceRef,
-            int evidenceCount, OffsetDateTime updatedAt) {}
-    private static final RowMapper<FieldRow> FIELD_ROW_MAPPER = new RowMapper<>() {
-        @Override public FieldRow mapRow(ResultSet rs, int rowNum) throws SQLException {
-            return new FieldRow(
-                    rs.getString("field_id"),
-                    rs.getString("field_key"),
-                    rs.getString("value_json"),
-                    rs.getString("source_system"),
-                    rs.getString("source_ref"),
-                    rs.getInt("evidence_count"),
-                    odt(rs, "updated_at")
-            );
-        }
-    };
-
-    private static final RowMapper<EvidenceDto> EVIDENCE_MAPPER = new RowMapper<>() {
-        @Override public EvidenceDto mapRow(ResultSet rs, int rowNum) throws SQLException {
-            return new EvidenceDto(
-                    rs.getString("evidence_id"),
-                    rs.getString("profile_field_id"),
-                    getNullableString(rs, "profile_field_key"),
-                    rs.getString("uri"),
-                    rs.getString("type"),
-                    rs.getString("sha256"),
-                    rs.getString("source_system"),
-                    getNullableString(rs, "submitted_by"),
-                    rs.getString("status"),
-                    rs.getObject("valid_from",  java.time.OffsetDateTime.class),
-                    rs.getObject("valid_until", java.time.OffsetDateTime.class),
-                    rs.getObject("revoked_at",  java.time.OffsetDateTime.class),
-                    getNullableString(rs, "reviewed_by"),
-                    rs.getObject("reviewed_at", java.time.OffsetDateTime.class),
-                    getNullableString(rs, "tags"),
-                    rs.getObject("added_at",    java.time.OffsetDateTime.class),
-                    rs.getObject("created_at",  java.time.OffsetDateTime.class),
-                    rs.getObject("updated_at",  java.time.OffsetDateTime.class)
-            );
-        }
-    };
-
-    private static String getNullableString(ResultSet rs, String col) throws SQLException {
-        try {
-            String v = rs.getString(col);
-            return (v == null || rs.wasNull()) ? null : v;
-        } catch (SQLException e) {
-            return null;
-        }
-    }
-
-    /* -------- generic dynamic mappers for "all columns" -------- */
-
-    private Map<String, Object> queryOneAsMap(String sql, Map<String, ?> params) {
-        List<Map<String, Object>> rows = queryListAsMaps(sql, params);
-        return rows.isEmpty() ? null : rows.get(0);
-    }
-
-    private List<Map<String, Object>> queryListAsMaps(String sql, Map<String, ?> params) {
-        return jdbc.query(sql, params, (rs, rowNum) -> {
-            ResultSetMetaData md = rs.getMetaData();
-            int cols = md.getColumnCount();
-            Map<String, Object> map = new LinkedHashMap<>(cols);
-            for (int i = 1; i <= cols; i++) {
-                String col = md.getColumnLabel(i);
-                Object val = rs.getObject(i);
-                // Normalize timestamps -> OffsetDateTime(UTC)
-                if (val instanceof Timestamp ts) {
-                    val = ts.toInstant().atOffset(ZoneOffset.UTC);
-                }
-                map.put(col, val);
-            }
-            return map;
-        });
-    }
-
-    private boolean relationExists(String name) {
-        // Checks tables + views in current schema search_path
-        Boolean ok = jdbc.queryForObject("""
-            SELECT EXISTS (
-              SELECT 1
-                FROM information_schema.tables
-               WHERE table_name = :n
-            )
-        """, Map.of("n", name.toLowerCase()), Boolean.class);
-        return ok != null && ok;
-    }
-
-    /* -------- API methods -------- */
 
     @Override
     public ProfileSnapshotDto getProfile(String appId) {
         if (!appExists(appId)) throw new NoSuchElementException("Application not found: " + appId);
 
         // 1) Application row (ALL columns)
-        Map<String, Object> application = queryOneAsMap(
-                "SELECT * FROM application WHERE app_id = :id",
-                Map.of("id", appId)
-        );
+        Map<String, Object> application = profileRepository.getApplication(appId);
 
         // 2) Service instances (try a few likely relations; return [] if none exist)
-        List<Map<String, Object>> serviceInstances = queryListAsMaps(
-                "SELECT * FROM service_instances WHERE app_id = :id ORDER BY created_at NULLS LAST, updated_at NULLS LAST",
-                Map.of("id", appId)
-        );
+        List<Map<String, Object>> serviceInstances = profileRepository.getServiceInstances(appId);
 
         // 3) Profile snapshot (as before)
         ProfileMeta prof = getLatestProfile(appId);
@@ -238,30 +76,12 @@ public class ProfileServiceImpl implements ProfileService {
         String profileId = prof.profileId();
         OffsetDateTime profUpdated = prof.updatedAt();
 
-        String fieldsSql = """
-           SELECT pf.id AS field_id,
-                  pf.field_key AS field_key,
-                  pf.value::text AS value_json,
-                  pf.source_system,
-                  pf.source_ref,
-                  COALESCE(ev.cnt,0) AS evidence_count,
-                  pf.updated_at
-             FROM profile_field pf
-             LEFT JOIN (
-                 SELECT profile_field_id, COUNT(*) AS cnt
-                   FROM evidence
-                 GROUP BY profile_field_id
-             ) ev ON ev.profile_field_id = pf.id
-            WHERE pf.profile_id = :pid
-            ORDER BY pf.field_key
-        """;
-
-        List<FieldRow> rows = jdbc.query(fieldsSql, Map.of("pid", profileId), FIELD_ROW_MAPPER);
+        List<FieldRow> rows = profileRepository.getProfileFieldRows(profileId);
         var fields = rows.stream()
-                .map(r -> new ProfileFieldDto(
+                .map(r -> new ProfileField(
                         r.fieldId(),
                         r.fieldKey(),
-                        jsonToJava(r.valueJson()),
+                        ProfileUtils.jsonToJava(r.valueJson()),
                         r.sourceSystem(),
                         r.sourceRef(),
                         r.evidenceCount(),
@@ -269,6 +89,225 @@ public class ProfileServiceImpl implements ProfileService {
                 .toList();
 
         return new ProfileSnapshotDto(appId, profileId, profUpdated, fields, application, serviceInstances);
+    }
+
+    @Override
+    public ProfilePayload getProfilePayload(String appId) {
+        Map<String, Object> appData = profileRepository.getApplication(appId);
+        if (appData == null) return null;
+        
+        ProfileMeta profile = getLatestProfile(appId);
+        if (profile == null) return null;
+        
+        List<ProfileField> fields = profileRepository.getProfileFields(profile.profileId());
+        List<String> fieldIds = fields.stream().map(ProfileField::fieldId).collect(Collectors.toList());
+        
+        List<Evidence> evidenceList = profileRepository.getEvidence(fieldIds);
+        List<RiskStory> riskList = profileRepository.getRisks(appId);
+        
+        // Build drivers map
+        Map<String, String> drivers = new HashMap<>();
+        drivers.put("security_rating", (String) appData.get("security_rating"));
+        drivers.put("integrity_rating", (String) appData.get("integrity_rating"));
+        drivers.put("availability_rating", (String) appData.get("availability_rating"));
+        drivers.put("resilience_rating", (String) appData.get("resilience_rating"));
+        drivers.put("app_criticality", (String) appData.get("app_criticality_assessment"));
+        
+        // Convert ProfileFields to ProfileFieldPayloads with derived_from mapping
+        List<ProfileFieldPayload> fieldPayloads = fields.stream()
+                .map(field -> new ProfileFieldPayload(
+                        field.fieldId(),
+                        profile.profileId(),
+                        field.fieldKey(),
+                        field.value(),
+                        fieldRegistryConfig.getDerivedFromByFieldKey(field.fieldKey())
+                ))
+                .collect(Collectors.toList());
+        
+        // Convert Evidence to EvidencePayload
+        List<EvidencePayload> evidencePayloads = evidenceList.stream()
+                .map(evidence -> new EvidencePayload(
+                        evidence.evidenceId(),
+                        evidence.profileFieldId(),
+                        evidence.uri(),
+                        evidence.status(),
+                        evidence.reviewedBy(),
+                        evidence.reviewedAt(),
+                        evidence.validFrom(),
+                        evidence.validUntil()
+                ))
+                .collect(Collectors.toList());
+        
+        // Convert RiskStory to RiskPayload - using riskKey as risk_id and domain as title for now
+        List<RiskPayload> riskPayloads = riskList.stream()
+                .map(risk -> new RiskPayload(
+                        risk.riskKey(),
+                        getProfileFieldIdForDomain(risk.domain(), fieldPayloads), // Map domain to field
+                        risk.domain(), // Using domain as title for now
+                        "Medium", // Default severity since not in RiskStory
+                        risk.status()
+                ))
+                .collect(Collectors.toList());
+        
+        return new ProfilePayload(
+                (String) appData.get("app_id"),
+                (String) appData.get("name"),
+                (OffsetDateTime) appData.get("updated_at"),
+                drivers,
+                fieldPayloads,
+                evidencePayloads,
+                riskPayloads
+        );
+    }
+
+    @Override
+    public DomainGraphPayload getProfileDomainGraph(String appId) {
+        Map<String, Object> appData = profileRepository.getApplication(appId);
+        if (appData == null) return null;
+        
+        ProfileMeta profile = getLatestProfile(appId);
+        if (profile == null) return null;
+        
+        List<ProfileField> fields = profileRepository.getProfileFields(profile.profileId());
+        List<String> fieldIds = fields.stream().map(ProfileField::fieldId).collect(Collectors.toList());
+        
+        List<Evidence> evidenceList = profileRepository.getEvidence(fieldIds);
+        List<RiskStory> riskList = profileRepository.getRisks(appId);
+        
+        // Group evidence by field ID
+        Map<String, List<Evidence>> evidenceByField = evidenceList.stream()
+                .collect(Collectors.groupingBy(Evidence::profileFieldId));
+        
+        // Group risks by domain (simplified - associate by domain matching)
+        Map<String, List<RiskStory>> risksByDomain = riskList.stream()
+                .collect(Collectors.groupingBy(RiskStory::domain));
+        
+        // Group fields by derived_from (domain)
+        Map<String, List<ProfileField>> fieldsByDomain = fields.stream()
+                .collect(Collectors.groupingBy(field -> 
+                    fieldRegistryConfig.getDerivedFromByFieldKey(field.fieldKey())));
+        
+        List<DomainPayload> domainPayloads = new ArrayList<>();
+        for (Map.Entry<String, List<ProfileField>> entry : fieldsByDomain.entrySet()) {
+            String domainKey = entry.getKey();
+            List<ProfileField> domainFields = entry.getValue();
+            
+            List<FieldGraphPayload> fieldPayloads = new ArrayList<>();
+            for (ProfileField field : domainFields) {
+                List<Evidence> evForField = evidenceByField.getOrDefault(field.fieldId(), Collections.emptyList());
+                String assurance = deriveAssurance(evForField);
+                
+                // Convert evidence to graph payload
+                List<EvidenceGraphPayload> evidenceGraphPayloads = evForField.stream()
+                        .map(evidence -> new EvidenceGraphPayload(
+                                evidence.evidenceId(),
+                                evidence.status(),
+                                evidence.validUntil(),
+                                evidence.reviewedBy()
+                        ))
+                        .collect(Collectors.toList());
+                
+                // Get risks for this domain (simplified mapping)
+                List<RiskStory> risksForDomain = risksByDomain.getOrDefault(domainKey.replace("_rating", ""), Collections.emptyList());
+                List<RiskGraphPayload> riskGraphPayloads = risksForDomain.stream()
+                        .map(risk -> new RiskGraphPayload(
+                                risk.riskKey(),
+                                risk.domain(), // Using domain as title for now
+                                "Medium", // Default severity
+                                risk.status()
+                        ))
+                        .collect(Collectors.toList());
+                
+                fieldPayloads.add(new FieldGraphPayload(
+                        field.fieldKey(),
+                        getFieldLabel(field.fieldKey()),
+                        field.value(),
+                        evidenceGraphPayloads,
+                        assurance,
+                        riskGraphPayloads
+                ));
+            }
+            
+            domainPayloads.add(new DomainPayload(
+                    domainKey,
+                    getDomainTitle(domainKey),
+                    getDomainIcon(domainKey),
+                    domainKey,
+                    getDriverValue(domainKey, appData),
+                    fieldPayloads
+            ));
+        }
+        
+        return new DomainGraphPayload(
+                (String) appData.get("app_id"),
+                (String) appData.get("name"),
+                (OffsetDateTime) appData.get("updated_at"),
+                domainPayloads
+        );
+    }
+    
+    
+    private String getProfileFieldIdForDomain(String domain, List<ProfileFieldPayload> fields) {
+        // Try to find the first field that matches the domain
+        return fields.stream()
+                .filter(field -> fieldRegistryConfig.getDerivedFromByFieldKey(field.field_key()).equals(domain + "_rating") 
+                              || fieldRegistryConfig.getDerivedFromByFieldKey(field.field_key()).equals(domain))
+                .findFirst()
+                .map(ProfileFieldPayload::id)
+                .orElse(null);
+    }
+    
+    private String getDomainTitle(String domainKey) {
+        return switch (domainKey) {
+            case "security_rating" -> "Confidentiality / Security";
+            case "integrity_rating" -> "Integrity";
+            case "availability_rating" -> "Availability";
+            case "resilience_rating" -> "Resilience";
+            case "app_criticality" -> "Summary";
+            default -> domainKey;
+        };
+    }
+
+    private String getDomainIcon(String domainKey) {
+        return switch (domainKey) {
+            case "security_rating" -> "SecurityIcon";
+            case "integrity_rating" -> "IntegrityIcon";
+            case "availability_rating" -> "AvailabilityIcon";
+            case "resilience_rating" -> "ResilienceIcon";
+            case "app_criticality" -> "SummaryIcon";
+            default -> "DefaultIcon";
+        };
+    }
+
+    private String getDriverValue(String domainKey, Map<String, Object> appData) {
+        return switch (domainKey) {
+            case "security_rating" -> (String) appData.get("security_rating");
+            case "integrity_rating" -> (String) appData.get("integrity_rating");
+            case "availability_rating" -> (String) appData.get("availability_rating");
+            case "resilience_rating" -> (String) appData.get("resilience_rating");
+            case "app_criticality" -> (String) appData.get("app_criticality_assessment");
+            default -> null;
+        };
+    }
+
+    private String getFieldLabel(String fieldKey) {
+        // Get label from the YAML registry
+        FieldRegistryConfig.FieldDefinition fieldDef = fieldRegistryConfig.getRegistry().fields.stream()
+                .filter(field -> field.key.equals(fieldKey))
+                .findFirst()
+                .orElse(null);
+        return fieldDef != null ? fieldDef.label : fieldKey;
+    }
+
+    private String deriveAssurance(List<Evidence> evidence) {
+        if (evidence == null || evidence.isEmpty()) return "Missing";
+        Evidence active = evidence.stream().filter(e -> "active".equals(e.status())).findFirst().orElse(null);
+        if (active == null) return "Expired";
+        if (active.validUntil() == null) return "Current";
+        long daysLeft = Duration.between(Instant.now(), active.validUntil().toInstant()).toDays();
+        if (daysLeft < 0) return "Expired";
+        if (daysLeft <= 90) return "Expiring";
+        return "Current";
     }
 
     @Override
@@ -283,86 +322,38 @@ public class ProfileServiceImpl implements ProfileService {
             if (f == null || f.key() == null || f.key().isBlank())
                 throw new IllegalArgumentException("Field key is required");
 
-            String fid;
-            try {
-                fid = jdbc.queryForObject("""
-                    SELECT id FROM profile_field
-                     WHERE profile_id=:pid AND field_key=:fk
-                """, new MapSqlParameterSource().addValue("pid", profileId).addValue("fk", f.key()), String.class);
-            } catch (EmptyResultDataAccessException e) {
-                fid = "pf_" + UUID.randomUUID().toString().replace("-", "");
-            }
-
-            jdbc.update("""
-                INSERT INTO profile_field (id, profile_id, field_key, value, source_system, source_ref, collected_at, created_at, updated_at)
-                VALUES (:id, :pid, :fk, CAST(:val AS jsonb), :sys, :sref, now(), now(), now())
-                ON CONFLICT (profile_id, field_key)
-                DO UPDATE SET value = CAST(:val AS jsonb),
-                              source_system = :sys,
-                              source_ref = :sref,
-                              updated_at = now()
-            """, new MapSqlParameterSource()
-                    .addValue("id", fid)
-                    .addValue("pid", profileId)
-                    .addValue("fk", f.key())
-                    .addValue("val", toJsonString(f.value()))
-                    .addValue("sys", f.sourceSystem())
-                    .addValue("sref", f.sourceRef()));
-
+            String fid = profileRepository.findOrCreateProfileField(profileId, f.key());
+            profileRepository.updateProfileField(fid, profileId, f.key(), ProfileUtils.toJsonString(f.value()), f.sourceSystem(), f.sourceRef());
             updated.add(new PatchProfileResponse.UpdatedField(fid, f.key(), f.value()));
         }
 
-        jdbc.update("UPDATE profile SET updated_at = now() WHERE profile_id = :pid", Map.of("pid", profileId));
+        profileRepository.updateProfileTimestamp(profileId);
         return new PatchProfileResponse(version, profileId, updated);
     }
 
-    private String toJsonString(Object v) {
-        if (v == null) return "null";
-        if (v instanceof Number || v instanceof Boolean) return v.toString();
-        String s = v.toString();
-        if (s.startsWith("{") || s.startsWith("[") || (s.startsWith("\"") && s.endsWith("\""))) return s;
-        return "\"" + s.replace("\"", "\\\"") + "\"";
-    }
 
     @Override
-    public PageResponse<EvidenceDto> listEvidence(String appId, String fieldKey, int page, int pageSize) {
+    public PageResponse<Evidence> listEvidence(String appId, String fieldKey, int page, int pageSize) {
         if (!appExists(appId)) throw new NoSuchElementException("Application not found: " + appId);
 
         ProfileMeta prof = getLatestProfile(appId);
         if (prof == null) return new PageResponse<>(page, pageSize, 0, List.of());
 
         String profileId = prof.profileId();
-        MapSqlParameterSource p = new MapSqlParameterSource().addValue("pid", profileId);
-
-        String where = " WHERE pf.profile_id = :pid ";
-        if (fieldKey != null && !fieldKey.isBlank()) {
-            where += " AND pf.field_key = :fk ";
-            p.addValue("fk", fieldKey);
-        }
-
-        long total = jdbc.queryForObject("""
-            SELECT COUNT(*)
-              FROM evidence e
-              JOIN profile_field pf ON pf.id = e.profile_field_id
-            """ + where, p, Long.class);
+        long total = profileRepository.countEvidence(profileId, fieldKey);
 
         int safePage = Math.max(page, 1);
         int safeSize = Math.max(pageSize, 1);
         int offset = (safePage - 1) * safeSize;
-        p.addValue("limit", safeSize).addValue("offset", offset);
 
-        List<EvidenceDto> items = jdbc.query("""
-            SELECT e.*, pf.field_key AS profile_field_key
-              FROM evidence e
-              JOIN profile_field pf ON pf.id = e.profile_field_id
-            """ + where + " ORDER BY e.created_at DESC LIMIT :limit OFFSET :offset", p, EVIDENCE_MAPPER);
+        List<Evidence> items = profileRepository.findEvidencePaginated(profileId, fieldKey, safeSize, offset);
 
         return new PageResponse<>(safePage, safeSize, total, items);
     }
 
     @Override
     @Transactional
-    public EvidenceDto addEvidence(String appId, CreateEvidenceRequest req) {
+    public Evidence addEvidence(String appId, CreateEvidenceRequest req) {
         if (req == null) throw new IllegalArgumentException("Request body is required");
 
         String profileFieldId = (req.profileFieldId() != null && !req.profileFieldId().isBlank())
@@ -378,107 +369,24 @@ public class ProfileServiceImpl implements ProfileService {
             }
             ProfileMeta prof = ensureProfile(appId, null);
             String pid = prof.profileId();
-            try {
-                profileFieldId = jdbc.queryForObject("""
-                    SELECT id FROM profile_field
-                     WHERE profile_id=:pid AND field_key=:fk
-                """, new MapSqlParameterSource().addValue("pid", pid).addValue("fk", fieldKey), String.class);
-            } catch (EmptyResultDataAccessException e) {
-                profileFieldId = "pf_" + UUID.randomUUID().toString().replace("-", "");
-                jdbc.update("""
-                    INSERT INTO profile_field (id, profile_id, field_key, value, created_at, updated_at)
-                    VALUES (:id, :pid, :fk, '{}'::jsonb, now(), now())
-                """, new MapSqlParameterSource()
-                        .addValue("id", profileFieldId)
-                        .addValue("pid", pid)
-                        .addValue("fk", fieldKey));
-            }
+            profileFieldId = profileRepository.findOrCreateProfileField(pid, fieldKey);
         }
 
         if (req.uri() == null || req.uri().isBlank())
             throw new IllegalArgumentException("uri is required for JSON/link evidence");
 
-        String sha256 = sha256Hex(req.uri().trim().getBytes(StandardCharsets.UTF_8));
-
+        String sha256 = ProfileUtils.sha256Hex(req.uri().trim().getBytes(StandardCharsets.UTF_8));
         String id = "ev_" + UUID.randomUUID().toString().replace("-", "");
-        MapSqlParameterSource p = new MapSqlParameterSource()
-                .addValue("id", id)
-                .addValue("pfid", profileFieldId)
-                .addValue("uri", req.uri().trim())
-                .addValue("type", req.type())
-                .addValue("sha", sha256)
-                .addValue("src", req.sourceSystem())
-                .addValue("vf", req.validFrom())
-                .addValue("vu", req.validUntil());
 
-        List<EvidenceDto> out = jdbc.query("""
-           INSERT INTO evidence (
-             evidence_id, profile_field_id, uri, type, sha256, source_system,
-             valid_from, valid_until, status, added_at, created_at, updated_at
-           ) VALUES (
-             :id, :pfid, :uri, :type, :sha, :src,
-             COALESCE(:vf, now()), :vu, 'active', now(), now(), now()
-           )
-           ON CONFLICT (profile_field_id, uri) DO NOTHING
-           RETURNING *
-        """, p, (rs, n) -> new EvidenceDto(
-                rs.getString("evidence_id"),
-                rs.getString("profile_field_id"),
-                getNullableString(rs, "profile_field_key"),
-                rs.getString("uri"),
-                rs.getString("type"),
-                rs.getString("sha256"),
-                rs.getString("source_system"),
-                getNullableString(rs, "submitted_by"),
-                rs.getString("status"),
-                rs.getObject("valid_from",  java.time.OffsetDateTime.class),
-                rs.getObject("valid_until", java.time.OffsetDateTime.class),
-                rs.getObject("revoked_at",  java.time.OffsetDateTime.class),
-                getNullableString(rs, "reviewed_by"),
-                rs.getObject("reviewed_at", java.time.OffsetDateTime.class),
-                getNullableString(rs, "tags"),
-                rs.getObject("added_at",    java.time.OffsetDateTime.class),
-                rs.getObject("created_at",  java.time.OffsetDateTime.class),
-                rs.getObject("updated_at",  java.time.OffsetDateTime.class)
-        ));
-
-        EvidenceDto dto;
-        if (out.isEmpty()) {
-            dto = jdbc.queryForObject("""
-                SELECT e.*, pf.field_key AS profile_field_key
-                  FROM evidence e
-                  JOIN profile_field pf ON pf.id = e.profile_field_id
-                 WHERE e.profile_field_id=:pfid AND e.uri=:uri
-            """, new MapSqlParameterSource().addValue("pfid", profileFieldId).addValue("uri", req.uri().trim()),
-                    EVIDENCE_MAPPER);
-        } else {
-            dto = jdbc.queryForObject("""
-                SELECT e.*, pf.field_key AS profile_field_key
-                  FROM evidence e
-                  JOIN profile_field pf ON pf.id = e.profile_field_id
-                 WHERE e.evidence_id=:id
-            """, new MapSqlParameterSource().addValue("id", out.get(0).evidenceId()), EVIDENCE_MAPPER);
-        }
-
-        return dto;
+        return profileRepository.insertEvidence(id, profileFieldId, req.uri().trim(), req.type(), sha256, req.sourceSystem(), req.validFrom(), req.validUntil());
     }
 
     @Override
     @Transactional
     public void deleteEvidence(String appId, String evidenceId) {
         if (!appExists(appId)) throw new NoSuchElementException("Application not found: " + appId);
-        int n = jdbc.update("DELETE FROM evidence WHERE evidence_id=:id", Map.of("id", evidenceId));
+        int n = profileRepository.deleteEvidenceById(evidenceId);
         if (n == 0) throw new NoSuchElementException("Evidence not found");
     }
 
-    /* -------- helpers -------- */
-
-    private static String sha256Hex(byte[] bytes) {
-        try {
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
-            return java.util.HexFormat.of().formatHex(md.digest(bytes));
-        } catch (Exception e) {
-            throw new RuntimeException("Unable to compute sha256", e);
-        }
-    }
 }
