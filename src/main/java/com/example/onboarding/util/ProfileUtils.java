@@ -1,5 +1,7 @@
 package com.example.onboarding.util;
 
+import com.example.onboarding.dto.application.ServiceInstanceRow;
+import com.example.onboarding.dto.application.SourceRow;
 import com.example.onboarding.dto.evidence.Evidence;
 import com.example.onboarding.dto.profile.FieldRow;
 import com.example.onboarding.dto.profile.ProfileField;
@@ -125,6 +127,52 @@ public final class ProfileUtils {
                 rs.getObject("sla_due", java.time.OffsetDateTime.class),
                 rs.getObject("created_at", java.time.OffsetDateTime.class),
                 rs.getObject("updated_at", java.time.OffsetDateTime.class)
+        );
+    }
+    
+    public static ServiceInstanceRow mapServiceInstance(ResultSet rs, int rowNum) throws SQLException {
+        return new ServiceInstanceRow(
+                rs.getString("it_service_instance_sysid"),
+                rs.getString("environment"),
+                rs.getString("it_business_service_sysid"),
+                rs.getString("business_application_sysid"),
+                rs.getString("service_offering_join"),
+                rs.getString("service_instance"),
+                rs.getString("install_type"),
+                rs.getString("service_classification")
+        );
+    }
+    
+    public static SourceRow mapSourceRow(ResultSet rs, int rowNum) throws SQLException {
+        return new SourceRow(
+                rs.getString("app_id"),
+                rs.getString("business_service_name"),
+
+                rs.getString("application_type"),
+                rs.getString("application_tier"),
+                rs.getString("architecture_type"),
+                rs.getString("install_type"),
+                rs.getString("house_position"),
+                rs.getString("operational_status"),
+
+                rs.getString("transaction_cycle"),
+                rs.getString("transaction_cycle_id"),
+
+                rs.getString("application_product_owner"),
+                rs.getString("application_product_owner_brid"),
+                rs.getString("system_architect"),
+                rs.getString("system_architect_brid"),
+
+                rs.getString("business_application_sys_id"),
+                rs.getString("application_parent"),
+                rs.getString("application_parent_id"),
+                rs.getString("architecture_hosting"),
+
+                rs.getString("app_criticality"),
+                rs.getString("security_rating"),
+                rs.getString("integrity_rating"),
+                rs.getString("availability_rating"),
+                rs.getString("resilience_rating")
         );
     }
     

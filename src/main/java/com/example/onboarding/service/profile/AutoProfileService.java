@@ -6,7 +6,7 @@ import com.example.onboarding.dto.application.ServiceInstanceRow;
 import com.example.onboarding.config.AutoProfileProperties;
 import com.example.onboarding.repository.application.ApplicationManagementRepository;
 import com.example.onboarding.repository.application.ServiceInstanceRepository;
-import com.example.onboarding.repository.application.SourceDao;
+import com.example.onboarding.repository.profile.ServiceNowRepository;
 import com.example.onboarding.repository.profile.ProfileFieldRepository;
 import com.example.onboarding.repository.profile.ProfileRepository;
 import com.example.onboarding.service.application.RatingsNormalizer;
@@ -22,7 +22,7 @@ import java.util.Map;
 @Service
 public class AutoProfileService {
 
-    private final SourceDao sourceDao;
+    private final ServiceNowRepository serviceNowRepository;
     private final ApplicationManagementRepository applicationManagementRepository;
     private final ServiceInstanceRepository serviceInstanceRepository;
     private final ProfileRepository profileRepository;
@@ -32,14 +32,14 @@ public class AutoProfileService {
 
     private static final Logger log = LoggerFactory.getLogger(AutoProfileService.class);
 
-    public AutoProfileService(SourceDao sourceDao,
+    public AutoProfileService(ServiceNowRepository serviceNowRepository,
                               ApplicationManagementRepository applicationManagementRepository,
                               ServiceInstanceRepository serviceInstanceRepository,
                               ProfileRepository profileRepository,
                               ProfileFieldRepository profileFieldRepository,
                               RegistryDeriver registryDeriver,
                               AutoProfileProperties props) {
-        this.sourceDao = sourceDao;
+        this.serviceNowRepository = serviceNowRepository;
         this.applicationManagementRepository = applicationManagementRepository;
         this.serviceInstanceRepository = serviceInstanceRepository;
         this.profileRepository = profileRepository;
@@ -82,9 +82,9 @@ public class AutoProfileService {
     /* ======================= helpers / logic units ======================= */
 
     private SourceRow loadSource(String appId) {
-        SourceRow src = sourceDao.fetchByAppId(appId)
-                .orElseThrow(() -> new IllegalArgumentException("appId not found in source: " + appId));
-        if (log.isDebugEnabled()) log.debug("autoProfile: source for {} -> {}", appId, src);
+        SourceRow src = serviceNowRepository.fetchApplicationData(appId)
+                .orElseThrow(() -> new IllegalArgumentException("appId not found in ServiceNow: " + appId));
+        if (log.isDebugEnabled()) log.debug("autoProfile: ServiceNow data for {} -> {}", appId, src);
         return src;
     }
 
@@ -94,8 +94,8 @@ public class AutoProfileService {
     }
 
     private List<ServiceInstanceRow> loadServiceInstances(String appId) {
-        List<ServiceInstanceRow> rows = sourceDao.fetchServiceInstances(appId);
-        if (log.isDebugEnabled()) log.debug("autoProfile: fetched {} service instances for {}", rows.size(), appId);
+        List<ServiceInstanceRow> rows = serviceNowRepository.fetchServiceInstances(appId);
+        if (log.isDebugEnabled()) log.debug("autoProfile: fetched {} ServiceNow service instances for {}", rows.size(), appId);
         return rows;
     }
 

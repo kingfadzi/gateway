@@ -1,27 +1,25 @@
-package com.example.onboarding.repository.application;
+package com.example.onboarding.repository.profile;
 
 import com.example.onboarding.dto.application.SourceRow;
 import com.example.onboarding.dto.application.ServiceInstanceRow;
-import org.springframework.jdbc.core.RowMapper;
+import com.example.onboarding.util.ProfileUtils;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 @Repository
-public class SourceDao {
+public class ServiceNowRepository {
     private final NamedParameterJdbcTemplate jdbc;
 
-    public SourceDao(NamedParameterJdbcTemplate jdbc) {
+    public ServiceNowRepository(NamedParameterJdbcTemplate jdbc) {
         this.jdbc = jdbc;
     }
 
-    /** Fetch authoritative data for an appId from source systems. */
-    public Optional<SourceRow> fetchByAppId(String appId) {
+    /** Fetch authoritative data for an appId from ServiceNow systems. */
+    public Optional<SourceRow> fetchApplicationData(String appId) {
         String sql = """
             SELECT
               child_app.correlation_id                    AS app_id,
@@ -65,44 +63,11 @@ public class SourceDao {
             LIMIT 1
             """;
 
-        var rows = jdbc.query(sql, Map.of("appId", appId), new RowMapper<SourceRow>() {
-            @Override public SourceRow mapRow(ResultSet rs, int rowNum) throws SQLException {
-                return new SourceRow(
-                        rs.getString("app_id"),
-                        rs.getString("business_service_name"),
-
-                        rs.getString("application_type"),
-                        rs.getString("application_tier"),
-                        rs.getString("architecture_type"),
-                        rs.getString("install_type"),
-                        rs.getString("house_position"),
-                        rs.getString("operational_status"),
-
-                        rs.getString("transaction_cycle"),
-                        rs.getString("transaction_cycle_id"),
-
-                        rs.getString("application_product_owner"),
-                        rs.getString("application_product_owner_brid"),
-                        rs.getString("system_architect"),
-                        rs.getString("system_architect_brid"),
-
-                        rs.getString("business_application_sys_id"),
-                        rs.getString("application_parent"),
-                        rs.getString("application_parent_id"),
-                        rs.getString("architecture_hosting"),
-
-                        rs.getString("app_criticality"),
-                        rs.getString("security_rating"),
-                        rs.getString("integrity_rating"),
-                        rs.getString("availability_rating"),
-                        rs.getString("resilience_rating")
-                );
-            }
-        });
+        var rows = jdbc.query(sql, Map.of("appId", appId), ProfileUtils::mapSourceRow);
         return rows.stream().findFirst();
     }
 
-    /** List all non-Dev service instances for the given appId. */
+    /** List all non-Dev service instances for the given appId from ServiceNow. */
     public List<ServiceInstanceRow> fetchServiceInstances(String appId) {
         String sql = """
             SELECT
@@ -124,19 +89,6 @@ public class SourceDao {
             ORDER BY si.environment, si.it_service_instance
             """;
 
-        return jdbc.query(sql, Map.of("appId", appId), new RowMapper<ServiceInstanceRow>() {
-            @Override public ServiceInstanceRow mapRow(ResultSet rs, int rowNum) throws SQLException {
-                return new ServiceInstanceRow(
-                        rs.getString("it_service_instance_sysid"),
-                        rs.getString("environment"),
-                        rs.getString("it_business_service_sysid"),
-                        rs.getString("business_application_sysid"),
-                        rs.getString("service_offering_join"),
-                        rs.getString("service_instance"),
-                        rs.getString("install_type"),
-                        rs.getString("service_classification")
-                );
-            }
-        });
+        return jdbc.query(sql, Map.of("appId", appId), ProfileUtils::mapServiceInstance);
     }
 }
