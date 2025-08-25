@@ -36,6 +36,15 @@ public class ApplicationController {
         return ResponseEntity.ok(results);
     }
 
+    @GetMapping("/{appId}")
+    public ResponseEntity<Application> getApplication(@PathVariable String appId) {
+        Application app = applicationQueryService.getById(appId);
+        if (app == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(app);
+    }
+
     /** Minimal create: caller provides only appId; server fetches CIA+S+R and builds profile */
     @PostMapping
     public ResponseEntity<?> create(@RequestBody CreateAppRequest req,

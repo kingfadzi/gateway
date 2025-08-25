@@ -22,4 +22,12 @@ public class KpiService {
         final int riskBlocked     = repo.riskBlocked();
         return new PortfolioKpis(compliant, missingEvidence, pendingReview, riskBlocked);
     }
+
+    public PortfolioKpis getApplicationKpis(String appId) {
+        final int compliant       = repo.compliantForApp(appId);
+        final int missingEvidence = repo.missingEvidenceForApp(appId);
+        final int pendingReview   = repo.pendingReviewForApp(appId);
+        final int riskBlocked     = repo.riskBlockedForApp(appId);
+        return new PortfolioKpis(compliant, missingEvidence, pendingReview, riskBlocked);
+    }
 }

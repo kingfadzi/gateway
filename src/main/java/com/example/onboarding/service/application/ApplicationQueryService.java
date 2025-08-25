@@ -25,4 +25,8 @@ public class ApplicationQueryService {
         Specification<Application> spec = ApplicationSpecifications.withDynamicParams(filteredParams);
         return repository.findAll(spec);
     }
+
+    public Application getById(String appId) {
+        return repository.findById(appId).orElse(null);
+    }
 }

@@ -4,6 +4,7 @@ package com.example.onboarding.controller.application;
 import com.example.onboarding.dto.application.PortfolioKpis;
 import com.example.onboarding.service.application.KpiService;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -18,7 +19,13 @@ public class KpiController {
     }
 
     @GetMapping("/kpis")
-    public PortfolioKpis kpis() {
+    public PortfolioKpis portfolioKpis() {
+
         return service.getPortfolioKpis();
+    }
+
+    @GetMapping("/{appId}/kpis")
+    public PortfolioKpis applicationKpis(@PathVariable String appId) {
+        return service.getApplicationKpis(appId);
     }
 }
