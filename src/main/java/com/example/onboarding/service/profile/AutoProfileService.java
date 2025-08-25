@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Service
 public class AutoProfileService {
@@ -25,9 +26,8 @@ public class AutoProfileService {
     private final ServiceNowRepository serviceNowRepository;
     private final ApplicationManagementRepository applicationManagementRepository;
     private final ServiceInstanceRepository serviceInstanceRepository;
-    private final ProfileRepository profileRepository;
-    private final ProfileFieldRepository profileFieldRepository;
     private final RegistryDeriver registryDeriver;
+    private final ProfileVersionService profileVersionService;
     private final AutoProfileProperties props;
 
     private static final Logger log = LoggerFactory.getLogger(AutoProfileService.class);
@@ -35,28 +35,22 @@ public class AutoProfileService {
     public AutoProfileService(ServiceNowRepository serviceNowRepository,
                               ApplicationManagementRepository applicationManagementRepository,
                               ServiceInstanceRepository serviceInstanceRepository,
-                              ProfileRepository profileRepository,
-                              ProfileFieldRepository profileFieldRepository,
                               RegistryDeriver registryDeriver,
+                              ProfileVersionService profileVersionService,
                               AutoProfileProperties props) {
         this.serviceNowRepository = serviceNowRepository;
         this.applicationManagementRepository = applicationManagementRepository;
         this.serviceInstanceRepository = serviceInstanceRepository;
-        this.profileRepository = profileRepository;
-        this.profileFieldRepository = profileFieldRepository;
         this.registryDeriver = registryDeriver;
+        this.profileVersionService = profileVersionService;
         this.props = props;
     }
 
     @Transactional
     public ProfileSnapshot autoSetup(String appId) {
-        // 1) Load authoritative source snapshot
+        // 1-3) Load source data and update application/service instances
         SourceRow src = loadSource(appId);
-
-        // 2) Upsert target application row (authoritative facts only)
         upsertApplication(src);
-
-        // 3) Load and upsert service instances
         List<ServiceInstanceRow> instances = loadServiceInstances(appId);
         upsertServiceInstances(appId, instances);
 
@@ -69,14 +63,41 @@ public class AutoProfileService {
         base.putAll(artifactContext);
 
         // 5) Derive risk profile controls
-        Map<String, Object> derived = derive(base);
+        Map<String, Object> newlyDerived = derive(base);
 
-        // 6) Upsert profile header and write **derived only** into profile_field
-        String profileId = upsertProfileHeader(appId);
-        writeDerivedOnly(profileId, appId, derived);
+        // 6) Load current complete profile state (if exists)  
+        Optional<com.example.onboarding.service.profile.ProfileVersionService.ProfileVersion> currentVersion = 
+                profileVersionService.getCurrentVersion(appId);
 
-        // Return snapshot with derived fields (the persisted content)
-        return new ProfileSnapshot(appId, profileId, props.getScopeType(), props.getProfileVersion(), derived);
+        if (currentVersion.isEmpty()) {
+            // No existing profile - create initial version
+            return profileVersionService.createInitialProfile(appId, props.getScopeType(), newlyDerived);
+        }
+
+        // 7) Analyze changes with significance assessment
+        com.example.onboarding.service.profile.ProfileChangeAnalysis analysis = 
+                com.example.onboarding.service.profile.ProfileChangeAnalysis.analyze(
+                        currentVersion.get().fields(), 
+                        newlyDerived
+                );
+
+        if (analysis.requiresNewVersion()) {
+            // Create new versioned profile with merged fields
+            return profileVersionService.createNewProfileVersion(
+                    appId, 
+                    props.getScopeType(), 
+                    currentVersion.get(), 
+                    analysis, 
+                    newlyDerived
+            );
+        }
+
+        // No significant changes - return current version snapshot
+        if (log.isDebugEnabled()) {
+            log.debug("autoProfile: no changes detected for appId={}, returning existing version {}", 
+                    appId, currentVersion.get().version());
+        }
+        return currentVersion.get().toSnapshot(props.getScopeType());
     }
 
     /* ======================= helpers / logic units ======================= */
@@ -84,7 +105,22 @@ public class AutoProfileService {
     private SourceRow loadSource(String appId) {
         SourceRow src = serviceNowRepository.fetchApplicationData(appId)
                 .orElseThrow(() -> new IllegalArgumentException("appId not found in ServiceNow: " + appId));
-        if (log.isDebugEnabled()) log.debug("autoProfile: ServiceNow data for {} -> {}", appId, src);
+        
+        // Debug raw ServiceNow data to investigate data quality issues
+        if (log.isDebugEnabled()) {
+            log.debug("autoProfile: ServiceNow raw data for appId={}", appId);
+            log.debug("  appCriticality: '{}' (type: {})", src.appCriticality(), 
+                    src.appCriticality() != null ? src.appCriticality().getClass().getSimpleName() : "null");
+            log.debug("  securityRating: '{}' (type: {})", src.securityRating(), 
+                    src.securityRating() != null ? src.securityRating().getClass().getSimpleName() : "null");
+            log.debug("  integrityRating: '{}' (type: {})", src.integrityRating(), 
+                    src.integrityRating() != null ? src.integrityRating().getClass().getSimpleName() : "null");
+            log.debug("  availabilityRating: '{}' (type: {})", src.availabilityRating(), 
+                    src.availabilityRating() != null ? src.availabilityRating().getClass().getSimpleName() : "null");
+            log.debug("  resilienceRating: '{}' (type: {})", src.resilienceRating(), 
+                    src.resilienceRating() != null ? src.resilienceRating().getClass().getSimpleName() : "null");
+        }
+        
         return src;
     }
 
@@ -107,8 +143,15 @@ public class AutoProfileService {
     /** Build ServiceNow rating signals for policy derivation */
     private Map<String, Object> buildServiceNowAppRatingContext(String appId, SourceRow src) {
         // Only provide rating signals for policy derivation
+        if (log.isDebugEnabled()) {
+            log.debug("autoProfile: About to normalize ratings for appId={}", appId);
+            log.debug("  Input: appCrit='{}', secRating='{}', integRating='{}', availRating='{}', resilRating='{}'", 
+                    src.appCriticality(), src.securityRating(), src.integrityRating(), 
+                    src.availabilityRating(), src.resilienceRating());
+        }
+        
         Map<String, Object> context = RatingsNormalizer.normalizeCtx(
-                src.appCriticality(), src.securityRating(), src.integrityRating(),
+                appId, src.appCriticality(), src.securityRating(), src.integrityRating(),
                 src.availabilityRating(), src.resilienceRating()
         );
 
@@ -133,20 +176,4 @@ public class AutoProfileService {
         return derived;
     }
 
-    private String upsertProfileHeader(String appId) {
-        String profileId = com.example.onboarding.util.HashIds.profileId(
-                props.getScopeType(), appId, props.getProfileVersion()
-        );
-        profileRepository.upsertProfile(profileId, props.getScopeType(), appId, props.getProfileVersion());
-        return profileId;
-    }
-
-    /** Persist **derived only** into profile_field. */
-    private void writeDerivedOnly(String profileId, String appId, Map<String, Object> derived) {
-        if (log.isDebugEnabled()) {
-            log.debug("autoProfile: writing {} derived fields for appId={}, profileId={}",
-                    derived.size(), appId, profileId);
-        }
-        profileFieldRepository.upsertAll(profileId, "SERVICE_NOW", appId, derived);
-    }
 }

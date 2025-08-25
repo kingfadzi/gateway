@@ -62,6 +62,11 @@ public class RegistryDeriver {
         return null; // Invalid field definition, will be filtered out
     }
 
+    /** Get registry items for UI usage */
+    public List<FieldRegistryItem> getRegistryItems() {
+        return registry.get();
+    }
+
     /** Compute derived profile fields from application signal values */
     public Map<String,Object> derive(Map<String,Object> appSignals) {
         Map<String,Object> derivedFields = new LinkedHashMap<>();
@@ -73,12 +78,21 @@ public class RegistryDeriver {
 
             if (appSignalValue == null) continue;
             
-            // Apply the rule mapping to derive policy requirement (e.g., A1 -> "required")
+            // Apply the rule mapping to derive policy requirement (e.g., A1 -> {value: "required", ttl: "0d", refresh: "per_release"})
             Map<String, Object> ruleMap = registryItem.rule();
             String signalKey = String.valueOf(appSignalValue);
-            Object policyRequirement = ruleMap.get(signalKey);
-            if (policyRequirement != null) {
-                derivedFields.put(registryItem.key(), policyRequirement);
+            Object ruleResult = ruleMap.get(signalKey);
+            if (ruleResult != null) {
+                // Handle both old format (direct values) and new format (objects with value/ttl/refresh)
+                if (ruleResult instanceof Map) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> ruleObject = (Map<String, Object>) ruleResult;
+                    derivedFields.put(registryItem.key(), ruleObject);
+                } else {
+                    // Fallback for old format - wrap in object structure
+                    Map<String, Object> wrappedValue = Map.of("value", ruleResult);
+                    derivedFields.put(registryItem.key(), wrappedValue);
+                }
             }
         }
         

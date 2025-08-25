@@ -55,7 +55,6 @@ autoprofile:
   enabled: true
   registryPath: classpath:profile-fields.registry.yaml
   scopeType: application
-  profileVersion: 1
 
 features:
   reuseSuggestions: true

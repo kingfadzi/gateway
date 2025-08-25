@@ -13,8 +13,6 @@ public class AutoProfileProperties {
     /** Profile scope_type */
     private String scopeType = "application";
 
-    /** Profile version integer */
-    private int profileVersion = 1;
 
     /** Source fetch timeout ms (if you add timeouts later) */
     private int fetchTimeoutMs = 3000;
@@ -28,8 +26,6 @@ public class AutoProfileProperties {
     public String getScopeType() { return scopeType; }
     public void setScopeType(String scopeType) { this.scopeType = scopeType; }
 
-    public int getProfileVersion() { return profileVersion; }
-    public void setProfileVersion(int profileVersion) { this.profileVersion = profileVersion; }
 
     public int getFetchTimeoutMs() { return fetchTimeoutMs; }
     public void setFetchTimeoutMs(int fetchTimeoutMs) { this.fetchTimeoutMs = fetchTimeoutMs; }
