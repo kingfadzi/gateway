@@ -2,6 +2,7 @@ package com.example.onboarding.repository.profile;
 
 import com.example.onboarding.util.Jsons;
 import com.example.onboarding.util.HashIds;
+import com.example.onboarding.config.FieldRegistryConfig;
 import org.springframework.jdbc.core.namedparam.*;
 import org.springframework.stereotype.Repository;
 
@@ -12,9 +13,11 @@ import java.util.*;
 @Repository
 public class ProfileFieldRepository {
     private final NamedParameterJdbcTemplate jdbc;
+    private final FieldRegistryConfig fieldRegistryConfig;
 
-    public ProfileFieldRepository(NamedParameterJdbcTemplate jdbc) {
+    public ProfileFieldRepository(NamedParameterJdbcTemplate jdbc, FieldRegistryConfig fieldRegistryConfig) {
         this.jdbc = jdbc;
+        this.fieldRegistryConfig = fieldRegistryConfig;
     }
 
     /** Idempotent upsert (by deterministic pf_id) for all key->value entries */
@@ -22,18 +25,20 @@ public class ProfileFieldRepository {
         if (fields == null || fields.isEmpty()) return;
 
         String sql = """
-          INSERT INTO profile_field (id, profile_id, field_key, value, source_system, source_ref, created_at, updated_at)
-          VALUES (:id, :pid, :key, CAST(:val AS jsonb), :srcsys, :srcref, :ts, :ts)
+          INSERT INTO profile_field (id, profile_id, field_key, value, source_system, source_ref, derived_from, created_at, updated_at)
+          VALUES (:id, :pid, :key, CAST(:val AS jsonb), :srcsys, :srcref, :derivedfrom, :ts, :ts)
           ON CONFLICT (id) DO UPDATE SET
             value = EXCLUDED.value,
             source_system = EXCLUDED.source_system,
             source_ref = EXCLUDED.source_ref,
+            derived_from = EXCLUDED.derived_from,
             updated_at = EXCLUDED.updated_at
         """;
         List<MapSqlParameterSource> batch = new ArrayList<>(fields.size());
         var now = OffsetDateTime.now(ZoneOffset.UTC);
         for (var e : fields.entrySet()) {
             String pfId = HashIds.profileFieldId(profileId, e.getKey());
+            String derivedFrom = fieldRegistryConfig.getDerivedFromByFieldKey(e.getKey());
             batch.add(new MapSqlParameterSource()
                     .addValue("id", pfId)
                     .addValue("pid", profileId)
@@ -41,6 +46,7 @@ public class ProfileFieldRepository {
                     .addValue("val", Jsons.toJson(e.getValue()))
                     .addValue("srcsys", sourceSystem)
                     .addValue("srcref", sourceRef)
+                    .addValue("derivedfrom", derivedFrom)
                     .addValue("ts", now)
             );
         }

@@ -6,6 +6,7 @@ import com.example.onboarding.dto.profile.ProfileField;
 import com.example.onboarding.dto.profile.ProfileMeta;
 import com.example.onboarding.dto.risk.RiskStory;
 import com.example.onboarding.util.ProfileUtils;
+import com.example.onboarding.config.FieldRegistryConfig;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -21,9 +22,11 @@ import java.util.*;
 @Repository
 public class ProfileRepository {
     private final NamedParameterJdbcTemplate jdbc;
+    private final FieldRegistryConfig fieldRegistryConfig;
 
-    public ProfileRepository(NamedParameterJdbcTemplate jdbc) {
+    public ProfileRepository(NamedParameterJdbcTemplate jdbc, FieldRegistryConfig fieldRegistryConfig) {
         this.jdbc = jdbc;
+        this.fieldRegistryConfig = fieldRegistryConfig;
     }
 
     public void upsertProfile(String profileId, String scopeType, String appId, int version) {
@@ -119,25 +122,29 @@ public class ProfileRepository {
                     .addValue("fk", fieldKey), String.class);
         } catch (EmptyResultDataAccessException e) {
             String fieldId = "pf_" + UUID.randomUUID().toString().replace("-", "");
+            String derivedFrom = fieldRegistryConfig.getDerivedFromByFieldKey(fieldKey);
             jdbc.update("""
-                INSERT INTO profile_field (id, profile_id, field_key, value, created_at, updated_at)
-                VALUES (:id, :pid, :fk, '{}'::jsonb, now(), now())
+                INSERT INTO profile_field (id, profile_id, field_key, value, derived_from, created_at, updated_at)
+                VALUES (:id, :pid, :fk, '{}'::jsonb, :derivedfrom, now(), now())
             """, new MapSqlParameterSource()
                     .addValue("id", fieldId)
                     .addValue("pid", profileId)
-                    .addValue("fk", fieldKey));
+                    .addValue("fk", fieldKey)
+                    .addValue("derivedfrom", derivedFrom));
             return fieldId;
         }
     }
 
     public void updateProfileField(String fieldId, String profileId, String fieldKey, String valueJson, String sourceSystem, String sourceRef) {
+        String derivedFrom = fieldRegistryConfig.getDerivedFromByFieldKey(fieldKey);
         jdbc.update("""
-            INSERT INTO profile_field (id, profile_id, field_key, value, source_system, source_ref, collected_at, created_at, updated_at)
-            VALUES (:id, :pid, :fk, CAST(:val AS jsonb), :sys, :sref, now(), now(), now())
+            INSERT INTO profile_field (id, profile_id, field_key, value, source_system, source_ref, derived_from, collected_at, created_at, updated_at)
+            VALUES (:id, :pid, :fk, CAST(:val AS jsonb), :sys, :sref, :derivedfrom, now(), now(), now())
             ON CONFLICT (profile_id, field_key)
             DO UPDATE SET value = CAST(:val AS jsonb),
                           source_system = :sys,
                           source_ref = :sref,
+                          derived_from = :derivedfrom,
                           updated_at = now()
         """, new MapSqlParameterSource()
                 .addValue("id", fieldId)
@@ -145,7 +152,8 @@ public class ProfileRepository {
                 .addValue("fk", fieldKey)
                 .addValue("val", valueJson)
                 .addValue("sys", sourceSystem)
-                .addValue("sref", sourceRef));
+                .addValue("sref", sourceRef)
+                .addValue("derivedfrom", derivedFrom));
     }
 
     public void updateProfileTimestamp(String profileId) {
