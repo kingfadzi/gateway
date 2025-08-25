@@ -37,6 +37,7 @@ public final class RatingsNormalizer {
         return normalized;
     }
 
+
     private static String validateResilienceRating(String value, String appId) {
         if (value == null || value.trim().isEmpty()) {
             throw new DataIntegrityException("ServiceNow", appId, "resilience_rating", 
@@ -51,10 +52,11 @@ public final class RatingsNormalizer {
     }
 
     /** Validate and normalize ratings from ServiceNow (source of truth) */
-    public static Map<String,Object> normalizeCtx(String appId, String appCriticality, String sec, String integ, String avail, String resil) {
+    public static Map<String,Object> normalizeCtx(String appId, String appCriticality, String sec, String conf, String integ, String avail, String resil) {
         return Map.of(
                 "app_criticality",  validateStandardRating(appCriticality, "App criticality", appId),
                 "security_rating",  validateSecurityRating(sec, appId),
+                "confidentiality_rating", validateStandardRating(conf, "Confidentiality", appId),
                 "integrity_rating", validateStandardRating(integ, "Integrity", appId),
                 "availability_rating", validateStandardRating(avail, "Availability", appId),
                 "resilience_rating", validateResilienceRating(resil, appId)

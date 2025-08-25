@@ -23,7 +23,7 @@ public class ApplicationManagementRepository {
               app_id, scope,
               parent_app_id, parent_app_name,
               name, business_service_name,
-              app_criticality_assessment, security_rating, integrity_rating, availability_rating, resilience_rating,
+              app_criticality_assessment, security_rating, confidentiality_rating, integrity_rating, availability_rating, resilience_rating,
               business_application_sys_id, architecture_hosting,
               jira_backlog_id, lean_control_service_id, repo_id,
               operational_status,
@@ -36,7 +36,7 @@ public class ApplicationManagementRepository {
               :app_id, 'application',
               :parent_app_id, :parent_app_name,
               :name, :business_service_name,
-              :app_criticality, :security_rating, :integrity_rating, :availability_rating, :resilience_rating,
+              :app_criticality, :security_rating, :confidentiality_rating, :integrity_rating, :availability_rating, :resilience_rating,
               :business_application_sys_id, :architecture_hosting,
               :jira_backlog_id, :lean_control_service_id, :repo_id,
               :operational_status,
@@ -53,6 +53,7 @@ public class ApplicationManagementRepository {
               business_service_name      = COALESCE(EXCLUDED.business_service_name,      application.business_service_name),
               app_criticality_assessment = COALESCE(EXCLUDED.app_criticality_assessment, application.app_criticality_assessment),
               security_rating            = COALESCE(EXCLUDED.security_rating,            application.security_rating),
+              confidentiality_rating     = COALESCE(EXCLUDED.confidentiality_rating,     application.confidentiality_rating),
               integrity_rating           = COALESCE(EXCLUDED.integrity_rating,           application.integrity_rating),
               availability_rating        = COALESCE(EXCLUDED.availability_rating,        application.availability_rating),
               resilience_rating          = COALESCE(EXCLUDED.resilience_rating,          application.resilience_rating),
@@ -86,6 +87,7 @@ public class ApplicationManagementRepository {
             .addValue("business_service_name",     nullIfBlank(src.businessServiceName()))
             .addValue("app_criticality",           nullIfBlank(src.appCriticality()))
             .addValue("security_rating",           nullIfBlank(src.securityRating()))
+            .addValue("confidentiality_rating",    nullIfBlank(src.confidentialityRating()))
             .addValue("integrity_rating",          nullIfBlank(src.integrityRating()))
             .addValue("availability_rating",       nullIfBlank(src.availabilityRating()))
             .addValue("resilience_rating",         nullIfBlank(src.resilienceRating()))

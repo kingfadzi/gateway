@@ -47,6 +47,7 @@ public class ServiceNowRepository {
 
               so.app_criticality_assessment               AS app_criticality,
               so.security_rating                           AS security_rating,
+              so.confidentiality_rating                    AS confidentiality_rating,
               so.integrity_rating                          AS integrity_rating,
               so.availability_rating                       AS availability_rating,
               so.resiliency_category                       AS resilience_rating

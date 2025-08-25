@@ -30,6 +30,7 @@ public record SourceRow(
 
         String appCriticality,
         String securityRating,
+        String confidentialityRating,
         String integrityRating,
         String availabilityRating,
         String resilienceRating

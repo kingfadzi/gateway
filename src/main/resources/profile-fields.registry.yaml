@@ -2,17 +2,35 @@ version: 1
 updated_at: 2025-08-18
 
 fields:
-  # ---- Security (A1/A2/B/C/D)
+  # ---- Confidentiality (A1/A2/B/C/D)
   - key: confidentiality_level
     label: Confidentiality Level
-    derived_from: security_rating
+    derived_from: confidentiality_rating
     rule:
-      A1: { value: restricted,   label: "Restricted",   ttl: 0d,   refresh: per_release }
-      A2: { value: restricted,   label: "Restricted",   ttl: 0d,   refresh: per_release }
+      A: { value: restricted,   label: "Restricted",   ttl: 0d,   refresh: per_release }
       B:  { value: confidential, label: "Confidential", ttl: 90d,  refresh: on_expiry }
       C:  { value: internal,     label: "Internal",     ttl: 180d, refresh: on_expiry }
       D:  { value: public,       label: "Public",       ttl: 365d, refresh: on_expiry }
 
+  - key: data_residency_control
+    label: Data Residency Control
+    derived_from: confidentiality_rating
+    rule:
+      A: { value: required_in_region,   label: "Required in-region",   ttl: 0d,   refresh: per_release }
+      B:  { value: preferred_in_region,  label: "Preferred in-region",  ttl: 90d,  refresh: on_expiry }
+      C:  { value: permitted_cross_region, label: "Permitted cross-region", ttl: 180d, refresh: on_expiry }
+      D:  { value: unrestricted,         label: "Unrestricted",         ttl: 365d, refresh: on_expiry }
+
+  - key: de_identification
+    label: De-Identification
+    derived_from: confidentiality_rating
+    rule:
+      A: { value: mandatory_strong,   label: "Mandatory (strong)",   ttl: 0d,   refresh: per_release }
+      B:  { value: required,           label: "Required",             ttl: 90d,  refresh: on_expiry }
+      C:  { value: recommended,        label: "Recommended",          ttl: 180d, refresh: on_expiry }
+      D:  { value: optional,           label: "Optional",             ttl: 365d, refresh: on_expiry }
+
+  # ---- Security (A1/A2/B/C/D)
   - key: encryption_at_rest
     label: Encryption at Rest
     derived_from: security_rating

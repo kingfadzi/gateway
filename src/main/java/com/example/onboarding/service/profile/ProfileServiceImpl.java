@@ -108,6 +108,7 @@ public class ProfileServiceImpl implements ProfileService {
         // Build drivers map
         Map<String, String> drivers = new HashMap<>();
         drivers.put("security_rating", (String) appData.get("security_rating"));
+        drivers.put("confidentiality_rating", (String) appData.get("confidentiality_rating"));
         drivers.put("integrity_rating", (String) appData.get("integrity_rating"));
         drivers.put("availability_rating", (String) appData.get("availability_rating"));
         drivers.put("resilience_rating", (String) appData.get("resilience_rating"));
@@ -261,10 +262,11 @@ public class ProfileServiceImpl implements ProfileService {
     
     private String getDomainTitle(String domainKey) {
         return switch (domainKey) {
-            case "security_rating" -> "Confidentiality / Security";
+            case "security_rating" -> "Security";
             case "integrity_rating" -> "Integrity";
             case "availability_rating" -> "Availability";
             case "resilience_rating" -> "Resilience";
+            case "confidentiality_rating" -> "Confidentiality";
             case "app_criticality" -> "Summary";
             default -> domainKey;
         };
@@ -284,6 +286,7 @@ public class ProfileServiceImpl implements ProfileService {
     private String getDriverValue(String domainKey, Map<String, Object> appData) {
         return switch (domainKey) {
             case "security_rating" -> (String) appData.get("security_rating");
+            case "confidentiality_rating" -> (String) appData.get("confidentiality_rating");
             case "integrity_rating" -> (String) appData.get("integrity_rating");
             case "availability_rating" -> (String) appData.get("availability_rating");
             case "resilience_rating" -> (String) appData.get("resilience_rating");

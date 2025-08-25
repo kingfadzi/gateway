@@ -40,6 +40,9 @@ public class Application {
     @Column(name = "security_rating")
     private String securityRating;
 
+    @Column(name = "confidentiality_rating")
+    private String confidentialityRating;
+
     @Column(name = "integrity_rating")
     private String integrityRating;
 

@@ -145,14 +145,14 @@ public class AutoProfileService {
         // Only provide rating signals for policy derivation
         if (log.isDebugEnabled()) {
             log.debug("autoProfile: About to normalize ratings for appId={}", appId);
-            log.debug("  Input: appCrit='{}', secRating='{}', integRating='{}', availRating='{}', resilRating='{}'", 
-                    src.appCriticality(), src.securityRating(), src.integrityRating(), 
+            log.debug("  Input: appCrit='{}', secRating='{}', confRating='{}', integRating='{}', availRating='{}', resilRating='{}'", 
+                    src.appCriticality(), src.securityRating(), src.confidentialityRating(), src.integrityRating(), 
                     src.availabilityRating(), src.resilienceRating());
         }
         
         Map<String, Object> context = RatingsNormalizer.normalizeCtx(
-                appId, src.appCriticality(), src.securityRating(), src.integrityRating(),
-                src.availabilityRating(), src.resilienceRating()
+                appId, src.appCriticality(), src.securityRating(), src.confidentialityRating(),
+                src.integrityRating(), src.availabilityRating(), src.resilienceRating()
         );
 
         if (log.isDebugEnabled()) log.debug("autoProfile: ServiceNow context for {} -> {}", appId, context);

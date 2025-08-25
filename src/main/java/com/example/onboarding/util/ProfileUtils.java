@@ -170,6 +170,7 @@ public final class ProfileUtils {
 
                 rs.getString("app_criticality"),
                 rs.getString("security_rating"),
+                rs.getString("confidentiality_rating"),
                 rs.getString("integrity_rating"),
                 rs.getString("availability_rating"),
                 rs.getString("resilience_rating")
