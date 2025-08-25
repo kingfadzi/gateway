@@ -152,6 +152,7 @@ public class ProfileServiceImpl implements ProfileService {
         return new ProfilePayload(
                 (String) appData.get("app_id"),
                 (String) appData.get("name"),
+                profile.version(),
                 (OffsetDateTime) appData.get("updated_at"),
                 drivers,
                 fieldPayloads,
@@ -241,6 +242,7 @@ public class ProfileServiceImpl implements ProfileService {
         return new DomainGraphPayload(
                 (String) appData.get("app_id"),
                 (String) appData.get("name"),
+                profile.version(),
                 (OffsetDateTime) appData.get("updated_at"),
                 domainPayloads
         );

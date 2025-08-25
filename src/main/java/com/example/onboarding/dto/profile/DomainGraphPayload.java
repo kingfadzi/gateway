@@ -6,6 +6,7 @@ import java.util.List;
 public record DomainGraphPayload(
         String appId,
         String name,
+        int version,
         OffsetDateTime updatedAt,
         List<DomainPayload> domains
 ) {

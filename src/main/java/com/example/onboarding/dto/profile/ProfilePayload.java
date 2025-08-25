@@ -7,6 +7,7 @@ import java.util.Map;
 public record ProfilePayload(
         String appId,
         String name,
+        int version,
         OffsetDateTime updatedAt,
         Map<String, String> drivers,
         List<ProfileFieldPayload> fields,
