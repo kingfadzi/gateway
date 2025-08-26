@@ -1,6 +1,7 @@
 package com.example.onboarding.controller.application;
 
 import com.example.onboarding.dto.application.CreateAppRequest;
+import com.example.onboarding.dto.application.ChildApplication;
 import com.example.onboarding.dto.profile.ProfileSnapshot;
 import com.example.onboarding.model.Application;
 import com.example.onboarding.service.application.ApplicationQueryService;
@@ -48,6 +49,12 @@ public class ApplicationController {
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
+    }
+
+    @GetMapping("/{appId}/children")
+    public ResponseEntity<List<ChildApplication>> getChildren(@PathVariable String appId) {
+        List<ChildApplication> children = applicationManagementService.getChildren(appId);
+        return ResponseEntity.ok(children);
     }
 
     /** Minimal create: caller provides only appId; server fetches CIA+S+R and builds profile */

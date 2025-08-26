@@ -22,6 +22,11 @@ public record Application(
         String productOwnerBrid,
         String onboardingStatus,
         String ownerId,
+        String securityRating,
+        String confidentialityRating,
+        String integrityRating,
+        String availabilityRating,
+        String resilienceRating,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt,
         Boolean hasChildren

@@ -2,6 +2,7 @@ package com.example.onboarding.service.application;
 
 import com.example.onboarding.dto.*;
 import com.example.onboarding.dto.application.Application;
+import com.example.onboarding.dto.application.ChildApplication;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.*;
@@ -52,6 +53,11 @@ public class ApplicationManagementServiceImpl implements ApplicationManagementSe
                     rs.getString("product_owner_brid"),
                     rs.getString("onboarding_status"),
                     rs.getString("owner_id"),
+                    rs.getString("security_rating"),
+                    rs.getString("confidentiality_rating"),
+                    rs.getString("integrity_rating"),
+                    rs.getString("availability_rating"),
+                    rs.getString("resilience_rating"),
                     odt(rs, "created_at"),
                     odt(rs, "updated_at"),
                     (Boolean) rs.getObject("has_children")
@@ -238,6 +244,27 @@ public class ApplicationManagementServiceImpl implements ApplicationManagementSe
             set.append(col).append(" = :").append(col);
             p.addValue(col, val);
         }
+    }
+
+    @Override
+    public List<ChildApplication> getChildren(String parentAppId) {
+        String sql = """
+            SELECT app_id, name, app_criticality_assessment, application_type, install_type, architecture_type
+            FROM application 
+            WHERE parent_app_id = :parentAppId
+            ORDER BY name ASC
+            """;
+        
+        RowMapper<ChildApplication> childMapper = (rs, rowNum) -> new ChildApplication(
+                rs.getString("app_id"),
+                rs.getString("name"),
+                rs.getString("app_criticality_assessment"),
+                rs.getString("application_type"),
+                rs.getString("install_type"),
+                rs.getString("architecture_type")
+        );
+        
+        return jdbc.query(sql, Map.of("parentAppId", parentAppId), childMapper);
     }
 
     private static RuntimeException notFound(String msg) {

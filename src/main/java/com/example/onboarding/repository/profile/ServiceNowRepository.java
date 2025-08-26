@@ -27,7 +27,7 @@ public class ServiceNowRepository {
               child_app.business_application_name         AS application_name,
 
               child_app.application_type,
-              child_app.application_tier,
+              child_app.applica, apption_tier,
               child_app.architecture_type,
               child_app.install_type,
               child_app.house_position,
