@@ -7,6 +7,7 @@ package com.example.onboarding.dto.application;
 public record SourceRow(
         String appId,
         String businessServiceName,
+        String applicationName,
 
         String applicationType,
         String applicationTier,

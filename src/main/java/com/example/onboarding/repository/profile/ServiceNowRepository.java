@@ -24,6 +24,7 @@ public class ServiceNowRepository {
             SELECT
               child_app.correlation_id                    AS app_id,
               bs.service                                  AS business_service_name,
+              child_app.business_application_name         AS application_name,
 
               child_app.application_type,
               child_app.application_tier,

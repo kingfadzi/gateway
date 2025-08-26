@@ -83,7 +83,7 @@ public class ApplicationManagementRepository {
             .addValue("app_id",                    src.appId())
             .addValue("parent_app_id",             nullIfBlank(src.applicationParentId()))
             .addValue("parent_app_name",           nullIfBlank(src.applicationParent()))
-            .addValue("name",                      nullIfBlank(src.businessServiceName())) // using service name as display
+            .addValue("name",                      nullIfBlank(src.applicationName())) // using application name as display
             .addValue("business_service_name",     nullIfBlank(src.businessServiceName()))
             .addValue("app_criticality",           nullIfBlank(src.appCriticality()))
             .addValue("security_rating",           nullIfBlank(src.securityRating()))

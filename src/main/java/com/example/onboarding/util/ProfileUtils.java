@@ -147,6 +147,7 @@ public final class ProfileUtils {
         return new SourceRow(
                 rs.getString("app_id"),
                 rs.getString("business_service_name"),
+                rs.getString("application_name"),
 
                 rs.getString("application_type"),
                 rs.getString("application_tier"),
