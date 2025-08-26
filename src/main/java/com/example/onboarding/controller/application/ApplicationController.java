@@ -4,6 +4,7 @@ import com.example.onboarding.dto.application.CreateAppRequest;
 import com.example.onboarding.dto.profile.ProfileSnapshot;
 import com.example.onboarding.model.Application;
 import com.example.onboarding.service.application.ApplicationQueryService;
+import com.example.onboarding.service.application.ApplicationManagementService;
 import com.example.onboarding.service.profile.AutoProfileService;
 import com.example.onboarding.config.AutoProfileProperties;
 import org.springframework.http.ResponseEntity;
@@ -19,15 +20,18 @@ public class ApplicationController {
     private final AutoProfileService autoProfileService;
     private final AutoProfileProperties props;
     private final ApplicationQueryService applicationQueryService;
+    private final ApplicationManagementService applicationManagementService;
 
     public ApplicationController(
             AutoProfileService autoProfileService,
             AutoProfileProperties props,
-            ApplicationQueryService applicationQueryService
+            ApplicationQueryService applicationQueryService,
+            ApplicationManagementService applicationManagementService
     ) {
         this.autoProfileService = autoProfileService;
         this.props = props;
         this.applicationQueryService = applicationQueryService;
+        this.applicationManagementService = applicationManagementService;
     }
 
     @GetMapping
@@ -37,12 +41,13 @@ public class ApplicationController {
     }
 
     @GetMapping("/{appId}")
-    public ResponseEntity<Application> getApplication(@PathVariable String appId) {
-        Application app = applicationQueryService.getById(appId);
-        if (app == null) {
+    public ResponseEntity<com.example.onboarding.dto.application.Application> getApplication(@PathVariable String appId) {
+        try {
+            com.example.onboarding.dto.application.Application app = applicationManagementService.get(appId);
+            return ResponseEntity.ok(app);
+        } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
-        return ResponseEntity.ok(app);
     }
 
     /** Minimal create: caller provides only appId; server fetches CIA+S+R and builds profile */
