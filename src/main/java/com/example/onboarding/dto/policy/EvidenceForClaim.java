@@ -4,7 +4,7 @@ import java.time.OffsetDateTime;
 
 public record EvidenceForClaim(
         String evidenceId,
-        String appId,              // p.scope_id (scope_type='application')
+        String appId,              // p.app_id
         String profileFieldId,     // e.profile_field_id
         String profileFieldKey,    // f.field_key (e.g., app_criticality)
         String type,               // e.type

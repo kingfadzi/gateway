@@ -215,8 +215,7 @@ public class EvidenceServiceImpl implements EvidenceService {
         FROM evidence e
         JOIN profile_field pf ON pf.id         = e.profile_field_id
         JOIN profile       p  ON p.profile_id  = pf.profile_id
-        JOIN application   a  ON a.app_id      = p.scope_id
-                             AND p.scope_type  = 'application'
+        JOIN application   a  ON a.app_id      = p.app_id
         WHERE a.app_id     = :appId
           AND pf.field_key = :fieldKey
         ORDER BY

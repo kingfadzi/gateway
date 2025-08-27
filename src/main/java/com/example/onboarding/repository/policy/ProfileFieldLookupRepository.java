@@ -22,8 +22,7 @@ public class ProfileFieldLookupRepository {
         SELECT f.id
         FROM profile_field f
         JOIN v_app_profiles_latest p ON p.profile_id = f.profile_id
-        WHERE p.scope_type = 'application'
-          AND p.scope_id   = :app
+        WHERE p.app_id = :app
           AND f.field_key  = :key
         LIMIT 1
         """;
@@ -37,7 +36,7 @@ public class ProfileFieldLookupRepository {
         SELECT f.field_key
         FROM profile_field f
         JOIN v_app_profiles_latest p ON p.profile_id = f.profile_id
-        WHERE p.scope_type='application' AND p.scope_id=:app
+        WHERE p.app_id=:app
         ORDER BY f.field_key
         """;
         return jdbc.queryForList(sql, Map.of("app", appId), String.class);

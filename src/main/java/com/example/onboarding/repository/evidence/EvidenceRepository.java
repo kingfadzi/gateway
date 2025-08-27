@@ -43,11 +43,10 @@ public class EvidenceRepository {
       SELECT pf.id, pf.field_key
       FROM profile p
       JOIN profile_field pf ON pf.profile_id = p.profile_id
-      WHERE p.scope_type = 'application'
-        AND p.scope_id   = :app
+      WHERE p.app_id = :app
         AND p.version    = (
           SELECT MAX(version) FROM profile
-           WHERE scope_type='application' AND scope_id=:app
+           WHERE app_id=:app
         )
         AND pf.field_key = ANY(:keys)
       ORDER BY
@@ -75,10 +74,9 @@ public class EvidenceRepository {
           FROM evidence e
           JOIN profile_field pf ON pf.id = e.profile_field_id
           JOIN profile p ON p.profile_id = pf.profile_id
-          WHERE p.scope_type = 'application'
-            AND p.scope_id   = :app
+          WHERE p.app_id = :app
             AND p.version    = (
-              SELECT MAX(version) FROM profile WHERE scope_type='application' AND scope_id=:app
+              SELECT MAX(version) FROM profile WHERE app_id=:app
             )
             AND e.sha256 = :sha
           ORDER BY e.created_at DESC

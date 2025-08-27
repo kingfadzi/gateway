@@ -24,8 +24,7 @@ public class KpiRepository {
                 SELECT 1 FROM profile p 
                 JOIN profile_field pf ON p.profile_id = pf.profile_id
                 JOIN evidence e ON e.profile_field_id = pf.id 
-                WHERE p.scope_id = a.app_id 
-                AND p.scope_type = 'application'
+                WHERE p.app_id = a.app_id
                 AND e.status = 'active'
             )
             """;
@@ -41,16 +40,14 @@ public class KpiRepository {
                 SELECT 1 FROM profile p 
                 JOIN profile_field pf ON p.profile_id = pf.profile_id
                 JOIN evidence e ON e.profile_field_id = pf.id 
-                WHERE p.scope_id = a.app_id 
-                AND p.scope_type = 'application'
+                WHERE p.app_id = a.app_id
                 AND e.status IN ('superseded','revoked')
             )
             AND NOT EXISTS (
                 SELECT 1 FROM profile p 
                 JOIN profile_field pf ON p.profile_id = pf.profile_id
                 JOIN evidence e ON e.profile_field_id = pf.id 
-                WHERE p.scope_id = a.app_id 
-                AND p.scope_type = 'application'
+                WHERE p.app_id = a.app_id
                 AND e.status = 'active'
             )
             """;
@@ -66,8 +63,7 @@ public class KpiRepository {
                 SELECT 1 FROM profile p 
                 JOIN profile_field pf ON p.profile_id = pf.profile_id
                 JOIN evidence e ON e.profile_field_id = pf.id 
-                WHERE p.scope_id = a.app_id 
-                AND p.scope_type = 'application'
+                WHERE p.app_id = a.app_id
                 AND e.status = 'active'
             )
             """;
@@ -90,11 +86,10 @@ public class KpiRepository {
             SELECT COUNT(DISTINCT pf.id) AS compliant
             FROM profile p 
             JOIN profile_field pf ON p.profile_id = pf.profile_id
-            WHERE p.scope_id = :appId 
-            AND p.scope_type = 'application'
+            WHERE p.app_id = :appId
             AND p.version = (
                 SELECT MAX(version) FROM profile 
-                WHERE scope_type = 'application' AND scope_id = :appId
+                WHERE app_id = :appId
             )
             AND EXISTS (
                 SELECT 1 FROM evidence e 
@@ -111,11 +106,10 @@ public class KpiRepository {
             SELECT COUNT(pf.id) AS missingEvidence
             FROM profile p 
             JOIN profile_field pf ON p.profile_id = pf.profile_id
-            WHERE p.scope_id = :appId 
-            AND p.scope_type = 'application'
+            WHERE p.app_id = :appId
             AND p.version = (
                 SELECT MAX(version) FROM profile 
-                WHERE scope_type = 'application' AND scope_id = :appId
+                WHERE app_id = :appId
             )
             AND NOT EXISTS (
                 SELECT 1 FROM evidence e 
@@ -131,11 +125,10 @@ public class KpiRepository {
             SELECT COUNT(pf.id) AS pendingReview
             FROM profile p 
             JOIN profile_field pf ON p.profile_id = pf.profile_id
-            WHERE p.scope_id = :appId 
-            AND p.scope_type = 'application'
+            WHERE p.app_id = :appId
             AND p.version = (
                 SELECT MAX(version) FROM profile 
-                WHERE scope_type = 'application' AND scope_id = :appId
+                WHERE app_id = :appId
             )
             AND EXISTS (
                 SELECT 1 FROM evidence e 
@@ -157,7 +150,7 @@ public class KpiRepository {
             SELECT COUNT(*) AS riskBlocked
             FROM risk_story r
             WHERE r.status = 'open'
-            AND r.scope_type = 'application'
+            AND r.app_id = :appId
             AND r.scope_id = :appId
             """;
         return jdbc.queryForObject(sql, Map.of("appId", appId), Integer.class);

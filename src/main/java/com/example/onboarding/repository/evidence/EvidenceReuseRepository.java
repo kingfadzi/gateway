@@ -60,11 +60,10 @@ public class EvidenceReuseRepository {
         FROM profile p
         JOIN profile_field pf ON pf.profile_id = p.profile_id
         JOIN evidence e       ON e.profile_field_id = pf.id
-        WHERE p.scope_type = 'application'
-          AND p.scope_id   = :app
+        WHERE p.app_id = :app
           AND p.version    = (
             SELECT MAX(version) FROM profile
-            WHERE scope_type='application' AND scope_id=:app
+            WHERE app_id=:app
           )
           AND pf.field_key = ANY(:keys)
           AND e.status <> 'revoked'
@@ -138,7 +137,6 @@ public class EvidenceReuseRepository {
           JOIN profile_field f ON f.id = e.profile_field_id
           JOIN profile p       ON p.profile_id = f.profile_id
           WHERE e.evidence_id = :ev
-            AND p.scope_type  = 'application'
           LIMIT 1
         """;
         var params = Map.of("ev", evidenceId);
@@ -164,7 +162,6 @@ public class EvidenceReuseRepository {
           JOIN profile_field f ON f.id = e.profile_field_id
           JOIN profile p       ON p.profile_id = f.profile_id
           WHERE e.evidence_id = :ev
-            AND p.scope_type  = 'application'
             AND p.scope_id    = :app
           LIMIT 1
         """;
@@ -180,7 +177,6 @@ public class EvidenceReuseRepository {
           JOIN profile_field f ON f.id = e.profile_field_id
           JOIN profile p       ON p.profile_id = f.profile_id
           WHERE e.evidence_id = :ev
-            AND p.scope_type  = 'application'
           LIMIT 1
         """;
         var list = jdbc.queryForList(sql, Map.of("ev", evidenceId), String.class);
@@ -193,11 +189,11 @@ public class EvidenceReuseRepository {
           SELECT f.id
           FROM profile_field f
           JOIN profile p ON p.profile_id = f.profile_id
-          WHERE p.scope_type = 'application'
+          WHERE TRUE
             AND p.scope_id   = :app
             AND p.version = (
                 SELECT MAX(version) FROM profile
-                WHERE scope_type='application' AND scope_id=:app
+                WHERE app_id=:app
             )
             AND f.field_key = :key
           LIMIT 1
@@ -212,11 +208,11 @@ public class EvidenceReuseRepository {
           SELECT f.field_key
           FROM profile_field f
           JOIN profile p ON p.profile_id = f.profile_id
-          WHERE p.scope_type='application'
+          WHERE TRUE
             AND p.scope_id=:app
             AND p.version = (
                 SELECT MAX(version) FROM profile
-                WHERE scope_type='application' AND scope_id=:app
+                WHERE app_id=:app
             )
           ORDER BY f.field_key
         """;
@@ -239,11 +235,11 @@ public class EvidenceReuseRepository {
         SELECT pf.field_key, pf.value
         FROM profile p
         JOIN profile_field pf ON pf.profile_id = p.profile_id
-        WHERE p.scope_type = 'application'
+        WHERE TRUE
           AND p.scope_id   = :app
           AND p.version    = (
             SELECT MAX(version) FROM profile
-            WHERE scope_type = 'application' AND scope_id = :app
+            WHERE app_id = :app
           )
           AND pf.field_key IN (:keys)
     """;

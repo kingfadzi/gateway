@@ -1,0 +1,157 @@
+erDiagram
+  APPLICATION {
+    text app_id PK
+    text scope
+    text parent_app_id
+    text parent_app_name
+    text name
+    text business_service_name
+    text app_criticality_assessment
+    text security_rating
+    text confidentiality_rating
+    text integrity_rating
+    text availability_rating
+    text resilience_rating
+    text business_application_sys_id
+    text architecture_hosting
+    text jira_backlog_id
+    text lean_control_service_id
+    text repo_id
+    text operational_status
+    text transaction_cycle
+    text transaction_cycle_id
+    text application_type
+    text application_tier
+    text architecture_type
+    text install_type
+    text house_position
+    text product_owner
+    text product_owner_brid
+    text system_architect
+    text system_architect_brid
+    text onboarding_status
+    text owner_id
+    timestamptz created_at
+    timestamptz updated_at
+  }
+
+  SERVICE_INSTANCES {
+    text it_service_instance_sysid PK
+    text app_id FK
+    text environment
+    text it_business_service_sysid
+    text business_application_sysid
+    text service_offering_join
+    text service_instance
+    text install_type
+    text service_classification
+    timestamptz created_at
+    timestamptz updated_at
+  }
+
+  PROFILE {
+    text profile_id PK
+    text app_id FK
+    int version
+    timestamptz snapshot_at
+    timestamptz created_at
+    timestamptz updated_at
+  }
+
+  PROFILE_FIELD {
+    text id PK
+    text profile_id FK
+    text field_key
+    text derived_from
+    jsonb value
+    text confidence
+    text source_system
+    text source_ref
+    timestamptz collected_at
+    timestamptz created_at
+    timestamptz updated_at
+  }
+
+  CONTROL_CLAIM {
+    text claim_id PK
+    text app_id FK
+    text field_key
+    text method
+    text status
+    text scope_type
+    text scope_id
+    timestamptz submitted_at
+    timestamptz reviewed_at
+    timestamptz assigned_at
+    text comment
+    jsonb decision_json
+    timestamptz created_at
+    timestamptz updated_at
+  }
+
+  EVIDENCE {
+    text evidence_id PK
+    text app_id FK
+    text profile_field_id FK
+    text claim_id FK
+    text uri
+    text type
+    text sha256
+    text source_system
+    text submitted_by
+    timestamptz valid_from
+    timestamptz valid_until
+    text status
+    timestamptz revoked_at
+    text reviewed_by
+    timestamptz reviewed_at
+    text tags
+    timestamptz added_at
+    timestamptz created_at
+    timestamptz updated_at
+    text document_id FK
+    text doc_version_id FK
+  }
+
+  DOCUMENT {
+    text document_id PK
+    text app_id FK
+    text title
+    text canonical_url
+    text source_type
+    text owners
+    int link_health
+    timestamptz created_at
+    timestamptz updated_at
+  }
+
+  DOCUMENT_VERSION {
+    text doc_version_id PK
+    text document_id FK
+    text version_id
+    text url_at_version
+    text author
+    timestamptz created_at
+  }
+
+  DOCUMENT_TAG {
+    text document_id FK
+    text tag_key
+  }
+
+  %% Relationships
+  APPLICATION ||--o{ SERVICE_INSTANCES : has
+  APPLICATION ||--o{ PROFILE : has
+  PROFILE ||--o{ PROFILE_FIELD : has
+
+  APPLICATION ||--o{ CONTROL_CLAIM : owns
+  APPLICATION ||--o{ EVIDENCE : owns
+
+  PROFILE_FIELD ||--o{ EVIDENCE : supported_by
+  CONTROL_CLAIM ||--o{ EVIDENCE : substantiated_by
+
+  APPLICATION ||--o{ DOCUMENT : owns
+  DOCUMENT ||--o{ DOCUMENT_VERSION : has
+  DOCUMENT ||--o{ DOCUMENT_TAG : tagged_by
+  DOCUMENT ||--o{ EVIDENCE : referenced_by
+  DOCUMENT_VERSION ||--o{ EVIDENCE : version_ref

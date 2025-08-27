@@ -29,15 +29,14 @@ public class ProfileRepository {
 
     public void upsertProfile(String profileId, String scopeType, String appId, int version) {
         String sql = """
-            INSERT INTO profile (profile_id, scope_type, scope_id, version, updated_at)
-            VALUES (:pid, :stype, :sid, :ver, :ts)
+            INSERT INTO profile (profile_id, app_id, version, updated_at)
+            VALUES (:pid, :app, :ver, :ts)
             ON CONFLICT (profile_id) DO UPDATE SET
               updated_at = EXCLUDED.updated_at
             """;
         jdbc.update(sql, Map.of(
                 "pid", profileId,
-                "stype", scopeType,
-                "sid", appId,
+                "app", appId,
                 "ver", version,
                 "ts", OffsetDateTime.now(ZoneOffset.UTC)
         ));
@@ -55,7 +54,7 @@ public class ProfileRepository {
         List<ProfileMeta> rows = jdbc.query("""
             SELECT profile_id, version, updated_at
             FROM profile
-            WHERE scope_type = 'application' AND scope_id = :id
+            WHERE app_id = :id
             ORDER BY version DESC
             LIMIT 1
         """, new MapSqlParameterSource().addValue("id", appId), ProfileUtils::mapProfileMeta);
@@ -67,8 +66,8 @@ public class ProfileRepository {
         int actualVersion = version != null ? version : 1;
         
         jdbc.update("""
-            INSERT INTO profile (profile_id, scope_type, scope_id, version, snapshot_at, created_at, updated_at)
-            VALUES (:pid, 'application', :app, :ver, now(), now(), now())
+            INSERT INTO profile (profile_id, app_id, version, snapshot_at, created_at, updated_at)
+            VALUES (:pid, :app, :ver, now(), now(), now())
         """, new MapSqlParameterSource()
                 .addValue("pid", profileId)
                 .addValue("app", appId)
@@ -81,7 +80,7 @@ public class ProfileRepository {
         List<ProfileMeta> rows = jdbc.query("""
             SELECT profile_id, version, updated_at
               FROM profile
-             WHERE scope_type='application' AND scope_id=:app AND version=:ver
+             WHERE app_id=:app AND version=:ver
              LIMIT 1
         """, new MapSqlParameterSource().addValue("app", appId).addValue("ver", version), ProfileUtils::mapProfileMeta);
         return rows.isEmpty() ? null : rows.get(0);
@@ -267,7 +266,7 @@ public class ProfileRepository {
         return jdbc.query("""
             SELECT risk_key, domain, status, scope_type, scope_id, release_id, sla_due, created_at, updated_at
             FROM risk_story
-            WHERE scope_type = 'application' AND scope_id = :appId
+            WHERE app_id = :appId
             ORDER BY created_at DESC
         """, new MapSqlParameterSource().addValue("appId", appId), ProfileUtils::mapRiskStory);
     }
