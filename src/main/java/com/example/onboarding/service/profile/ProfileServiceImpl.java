@@ -5,7 +5,10 @@ import com.example.onboarding.dto.PageResponse;
 import com.example.onboarding.dto.evidence.CreateEvidenceRequest;
 import com.example.onboarding.dto.evidence.Evidence;
 import com.example.onboarding.dto.profile.*;
+import com.example.onboarding.dto.document.DocumentSummary;
 import com.example.onboarding.repository.profile.ProfileRepository;
+import com.example.onboarding.service.document.DocumentService;
+import com.example.onboarding.service.profile.ProfileFieldRegistryService;
 import com.example.onboarding.util.ProfileUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,10 +28,17 @@ public class ProfileServiceImpl implements ProfileService {
 
     private final ProfileRepository profileRepository;
     private final FieldRegistryConfig fieldRegistryConfig;
+    private final DocumentService documentService;
+    private final ProfileFieldRegistryService profileFieldRegistryService;
 
-    public ProfileServiceImpl(ProfileRepository profileRepository, FieldRegistryConfig fieldRegistryConfig) {
+    public ProfileServiceImpl(ProfileRepository profileRepository, 
+                             FieldRegistryConfig fieldRegistryConfig,
+                             DocumentService documentService,
+                             ProfileFieldRegistryService profileFieldRegistryService) {
         this.profileRepository = profileRepository;
         this.fieldRegistryConfig = fieldRegistryConfig;
+        this.documentService = documentService;
+        this.profileFieldRegistryService = profileFieldRegistryService;
     }
 
 
@@ -198,6 +208,7 @@ public class ProfileServiceImpl implements ProfileService {
                 List<RiskGraphPayload> riskGraphPayloads = Collections.emptyList();
                 
                 fieldPayloads.add(new FieldGraphPayload(
+                        field.fieldId(),
                         field.fieldKey(),
                         getFieldLabel(field.fieldKey()),
                         field.value(),
@@ -223,6 +234,84 @@ public class ProfileServiceImpl implements ProfileService {
                 profile.version(),
                 (OffsetDateTime) appData.get("updated_at"),
                 domainPayloads
+        );
+    }
+    
+    @Override
+    public ProfileFieldContext getProfileFieldContext(String appId, String fieldKey) {
+        if (!appExists(appId)) return null;
+        
+        ProfileMeta profile = getLatestProfile(appId);
+        if (profile == null) return null;
+        
+        // Find the specific field
+        List<ProfileField> fields = profileRepository.getProfileFields(profile.profileId());
+        ProfileField targetField = fields.stream()
+                .filter(f -> f.fieldKey().equals(fieldKey))
+                .findFirst()
+                .orElse(null);
+                
+        if (targetField == null) return null;
+        
+        // Get evidence for this field
+        List<Evidence> evidenceList = profileRepository.getEvidence(List.of(targetField.fieldId()));
+        
+        // Convert evidence to graph payload
+        List<EvidenceGraphPayload> evidenceGraphPayloads = evidenceList.stream()
+                .map(evidence -> new EvidenceGraphPayload(
+                        evidence.evidenceId(),
+                        evidence.status(),
+                        evidence.validUntil(),
+                        evidence.reviewedBy()
+                ))
+                .collect(Collectors.toList());
+        
+        // Get field metadata
+        String label = getFieldLabel(fieldKey);
+        String derivedFrom = fieldRegistryConfig.getDerivedFromByFieldKey(fieldKey);
+        String domain = derivedFrom != null ? derivedFrom : "unknown";
+        String assurance = deriveAssurance(evidenceList);
+        
+        // Risk functionality removed
+        List<RiskGraphPayload> riskGraphPayloads = Collections.emptyList();
+        
+        return new ProfileFieldContext(
+                targetField.fieldId(),
+                targetField.fieldKey(),
+                label,
+                targetField.value(),
+                derivedFrom,
+                domain,
+                targetField.sourceSystem(),
+                targetField.sourceRef(),
+                assurance,
+                targetField.value(), // Using field value as policy requirement for now
+                evidenceGraphPayloads,
+                riskGraphPayloads,
+                targetField.updatedAt(),
+                targetField.evidenceCount()
+        );
+    }
+    
+    @Override
+    public SuggestedEvidence getSuggestedEvidence(String appId, String fieldKey) {
+        if (!appExists(appId)) return null;
+        
+        // Get field metadata
+        String fieldLabel = getFieldLabel(fieldKey);
+        
+        // Get documents that have this field key in their related evidence fields
+        List<DocumentSummary> suggestedDocuments = documentService.getDocumentsByFieldType(appId, fieldKey);
+        
+        // Build match criteria explanation
+        String matchCriteria = String.format("Documents with '%s' in related evidence fields", fieldKey);
+        
+        return new SuggestedEvidence(
+                fieldKey,
+                fieldLabel,
+                suggestedDocuments,
+                suggestedDocuments.size(),
+                matchCriteria
         );
     }
     
@@ -314,61 +403,5 @@ public class ProfileServiceImpl implements ProfileService {
     }
 
 
-    @Override
-    public PageResponse<Evidence> listEvidence(String appId, String fieldKey, int page, int pageSize) {
-        if (!appExists(appId)) throw new NoSuchElementException("Application not found: " + appId);
-
-        ProfileMeta prof = getLatestProfile(appId);
-        if (prof == null) return new PageResponse<>(page, pageSize, 0, List.of());
-
-        String profileId = prof.profileId();
-        long total = profileRepository.countEvidence(profileId, fieldKey);
-
-        int safePage = Math.max(page, 1);
-        int safeSize = Math.max(pageSize, 1);
-        int offset = (safePage - 1) * safeSize;
-
-        List<Evidence> items = profileRepository.findEvidencePaginated(profileId, fieldKey, safeSize, offset);
-
-        return new PageResponse<>(safePage, safeSize, total, items);
-    }
-
-    @Override
-    @Transactional
-    public Evidence addEvidence(String appId, CreateEvidenceRequest req) {
-        if (req == null) throw new IllegalArgumentException("Request body is required");
-
-        String profileFieldId = (req.profileFieldId() != null && !req.profileFieldId().isBlank())
-                ? req.profileFieldId().trim()
-                : null;
-
-        if (profileFieldId == null) {
-            String fieldKey = (req.profileField() != null && !req.profileField().isBlank())
-                    ? req.profileField().trim()
-                    : null;
-            if (fieldKey == null) {
-                throw new IllegalArgumentException("Provide either profileFieldId or profileField(fieldKey)");
-            }
-            ProfileMeta prof = ensureProfile(appId, null);
-            String pid = prof.profileId();
-            profileFieldId = profileRepository.findOrCreateProfileField(pid, fieldKey);
-        }
-
-        if (req.uri() == null || req.uri().isBlank())
-            throw new IllegalArgumentException("uri is required for JSON/link evidence");
-
-        String sha256 = ProfileUtils.sha256Hex(req.uri().trim().getBytes(StandardCharsets.UTF_8));
-        String id = "ev_" + UUID.randomUUID().toString().replace("-", "");
-
-        return profileRepository.insertEvidence(id, profileFieldId, req.uri().trim(), req.type(), sha256, req.sourceSystem(), req.validFrom(), req.validUntil());
-    }
-
-    @Override
-    @Transactional
-    public void deleteEvidence(String appId, String evidenceId) {
-        if (!appExists(appId)) throw new NoSuchElementException("Application not found: " + appId);
-        int n = profileRepository.deleteEvidenceById(evidenceId);
-        if (n == 0) throw new NoSuchElementException("Evidence not found");
-    }
 
 }

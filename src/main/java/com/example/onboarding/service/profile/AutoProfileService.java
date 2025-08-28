@@ -14,11 +14,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 @Service
 public class AutoProfileService {
@@ -29,6 +32,7 @@ public class AutoProfileService {
     private final RegistryDeriver registryDeriver;
     private final ProfileVersionService profileVersionService;
     private final AutoProfileProperties props;
+    private final NamedParameterJdbcTemplate jdbc;
 
     private static final Logger log = LoggerFactory.getLogger(AutoProfileService.class);
 
@@ -37,13 +41,15 @@ public class AutoProfileService {
                               ServiceInstanceRepository serviceInstanceRepository,
                               RegistryDeriver registryDeriver,
                               ProfileVersionService profileVersionService,
-                              AutoProfileProperties props) {
+                              AutoProfileProperties props,
+                              NamedParameterJdbcTemplate jdbc) {
         this.serviceNowRepository = serviceNowRepository;
         this.applicationManagementRepository = applicationManagementRepository;
         this.serviceInstanceRepository = serviceInstanceRepository;
         this.registryDeriver = registryDeriver;
         this.profileVersionService = profileVersionService;
         this.props = props;
+        this.jdbc = jdbc;
     }
 
     @Transactional
@@ -51,6 +57,7 @@ public class AutoProfileService {
         // 1-3) Load source data and update application/service instances
         SourceRow src = loadSource(appId);
         upsertApplication(src);
+        ensureDefaultTrack(appId);
         List<ServiceInstanceRow> instances = loadServiceInstances(appId);
         upsertServiceInstances(appId, instances);
 
@@ -174,6 +181,33 @@ public class AutoProfileService {
         Map<String,Object> derived = registryDeriver.derive(base);
         if (log.isDebugEnabled()) log.debug("autoProfile: derived -> {}", derived);
         return derived;
+    }
+
+    /**
+     * Ensure a default track exists for the application to avoid referential integrity issues
+     */
+    private void ensureDefaultTrack(String appId) {
+        // Check if any track exists for this app
+        String checkSql = "SELECT COUNT(*) FROM track WHERE app_id = :appId";
+        Long trackCount = jdbc.queryForObject(checkSql, 
+                new MapSqlParameterSource().addValue("appId", appId), Long.class);
+        
+        if (trackCount == null || trackCount == 0) {
+            // Create default track
+            String trackId = "track_" + UUID.randomUUID().toString().replace("-", "");
+            String trackSql = """
+                INSERT INTO track (track_id, app_id, provider, resource_type, resource_id, created_at, updated_at)
+                VALUES (:trackId, :appId, 'manual', 'control', 'default', now(), now())
+                """;
+            
+            jdbc.update(trackSql, new MapSqlParameterSource()
+                    .addValue("trackId", trackId)
+                    .addValue("appId", appId));
+            
+            log.info("Created default track {} for app {}", trackId, appId);
+        } else {
+            log.debug("App {} already has {} track(s), skipping default track creation", appId, trackCount);
+        }
     }
 
 }

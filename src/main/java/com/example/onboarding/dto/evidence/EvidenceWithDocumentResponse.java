@@ -1,15 +1,16 @@
 package com.example.onboarding.dto.evidence;
 
+import com.example.onboarding.dto.document.DocumentResponse;
 import java.time.OffsetDateTime;
 
 /**
- * Evidence entity aligned with current database schema
+ * Response DTO for evidence creation that includes the created document details
  */
-public record Evidence(
+public record EvidenceWithDocumentResponse(
         String evidenceId,
         String appId,
         String profileFieldId,
-        String claimId,             // optional reference to control_claim
+        String claimId,
         String uri,
         String type,
         String sha256,
@@ -17,15 +18,16 @@ public record Evidence(
         String submittedBy,
         OffsetDateTime validFrom,
         OffsetDateTime validUntil,
-        String status,              // 'active'|'superseded'|'revoked'
+        String status,
         OffsetDateTime revokedAt,
         String reviewedBy,
         OffsetDateTime reviewedAt,
         String relatedEvidenceFields,
-        String trackId,             // optional track binding
-        String documentId,          // optional document reference
-        String docVersionId,        // optional document version reference
+        String trackId,
+        String documentId,
+        String docVersionId,
         OffsetDateTime addedAt,
         OffsetDateTime createdAt,
-        OffsetDateTime updatedAt
+        OffsetDateTime updatedAt,
+        DocumentResponse document           // Embedded document details
 ) {}

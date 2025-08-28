@@ -1,293 +1,319 @@
 package com.example.onboarding.service.evidence;
 
+import com.example.onboarding.dto.PageResponse;
+import com.example.onboarding.dto.document.CreateDocumentRequest;
+import com.example.onboarding.dto.document.DocumentResponse;
 import com.example.onboarding.dto.evidence.CreateEvidenceRequest;
+import com.example.onboarding.dto.evidence.CreateEvidenceWithDocumentRequest;
 import com.example.onboarding.dto.evidence.Evidence;
+import com.example.onboarding.dto.evidence.EvidenceSummary;
+import com.example.onboarding.dto.evidence.EvidenceWithDocumentResponse;
+import com.example.onboarding.dto.evidence.UpdateEvidenceRequest;
 import com.example.onboarding.repository.evidence.EvidenceRepository;
+import com.example.onboarding.service.document.DocumentService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.time.OffsetDateTime;
-import java.util.HexFormat;
-import java.util.Map;
+import java.util.List;
 import java.util.Optional;
-
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
-import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
-
-import com.example.onboarding.dto.evidence.ReviewEvidenceRequest;
-import com.example.onboarding.dto.evidence.ReviewEvidenceResponse;
-import org.springframework.jdbc.core.RowMapper;
-
-import java.sql.Timestamp;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.time.ZoneOffset;
-import java.util.*;
-
+import java.util.Set;
 
 @Service
 public class EvidenceServiceImpl implements EvidenceService {
-
+    
     private static final Logger log = LoggerFactory.getLogger(EvidenceServiceImpl.class);
-    private final EvidenceRepository repo;
-    private final NamedParameterJdbcTemplate jdbc;
-
-    public EvidenceServiceImpl(NamedParameterJdbcTemplate jdbc, EvidenceRepository repo) {
-        this.jdbc = jdbc;
-        this.repo = repo;
+    
+    private final EvidenceRepository evidenceRepository;
+    private final DocumentService documentService;
+    
+    // Valid enum values for validation
+    private static final Set<String> VALID_STATUSES = Set.of("active", "superseded", "revoked");
+    
+    public EvidenceServiceImpl(EvidenceRepository evidenceRepository, DocumentService documentService) {
+        this.evidenceRepository = evidenceRepository;
+        this.documentService = documentService;
     }
-
+    
     @Override
     @Transactional
-    public Evidence createOrDedup(String appId, CreateEvidenceRequest req, MultipartFile file) throws Exception {
-        if (req == null) throw new IllegalArgumentException("Request body is required");
-        if (req.profileField() == null || req.profileField().isBlank()) {
-            throw new IllegalArgumentException("profileField is required");
-        }
-
-        // 1) Resolve profile_field_id for (appId, latest profile) + field key
-        final String profileFieldId;
-        if (req.profileFieldId() != null && !req.profileFieldId().isBlank()) {
-            profileFieldId = req.profileFieldId().trim();
-        } else if (req.profileField() != null && !req.profileField().isBlank()) {
-            profileFieldId = repo.resolveProfileFieldId(appId, req.profileField().trim())
-                    .orElseThrow(() -> new IllegalArgumentException(
-                            "Unknown profileField for app: " + appId + " :: " + req.profileField()));
-        } else {
-            throw new IllegalArgumentException("Provide either profileFieldId or fieldKey/profileField");
-        }
-
-        // 2) Determine content identity (URI or file) and compute sha256
-        final String sha256;
-        final String uri;
-        if (file != null) {
-            byte[] bytes = file.getBytes();
-            sha256 = sha256(bytes);
-            uri = (req.uri() != null && !req.uri().isBlank())
-                    ? req.uri().trim()
-                    : "file://" + sha256 + "/" + (file.getOriginalFilename() == null ? "upload.bin" : file.getOriginalFilename());
-        } else if (req.uri() != null && !req.uri().isBlank()) {
-            uri = req.uri().trim();
-            // simple, deterministic hash for link evidence
-            sha256 = sha256(uri.getBytes(StandardCharsets.UTF_8));
-        } else {
-            throw new IllegalArgumentException("Either 'uri' (for link evidence) or 'file' (multipart) must be provided");
-        }
-
-        // 3) Cross-app dedup *within the app* by sha256
-        Optional<Map<String, Object>> existingBySha = repo.findExistingInAppBySha(appId, sha256);
-        if (existingBySha.isPresent()) {
-            log.debug("Dedup (sha) hit for app={} sha256={}", appId, sha256);
-            return repo.rowToDto(existingBySha.get());
-        }
-
-        // 4) Insert (idempotent on (profile_field_id, uri)); if conflict, fetch existing
-        OffsetDateTime now = OffsetDateTime.now();
-        Optional<Map<String, Object>> inserted = repo.insertIfNotExists(
-                profileFieldId,
-                uri,
-                safe(req.type()),
-                sha256,
-                safe(req.sourceSystem()),
-                req.validFrom(),
-                req.validUntil(),
-                now
-        );
-
-        Map<String, Object> row = inserted.orElseGet(() -> repo.getByProfileFieldAndUri(profileFieldId, uri));
-        return repo.rowToDto(row);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public Evidence get(String evidenceId) {
-        return repo.getById(evidenceId);
-    }
-
-    @Override
-    @Transactional
-    public ReviewEvidenceResponse review(String evidenceId, ReviewEvidenceRequest req) {
-        String action = (req.action() == null ? "" : req.action().trim().toLowerCase(Locale.ROOT));
-        return switch (action) {
-            case "approve" -> approveEvidence(evidenceId, req.reviewerId());
-            case "reject"  -> rejectEvidence(evidenceId, req.reviewerId());
-            default -> throw new IllegalArgumentException("action must be 'approve' or 'reject'");
-        };
-    }
-
-    private ReviewEvidenceResponse approveEvidence(String evidenceId, String reviewerId) {
-        // 1) Lock target evidence and fetch its profile_field_id + valid_from
-        var head = repo.lockHeadById(evidenceId)
-                .orElseThrow(() -> new IllegalArgumentException("Evidence not found: " + evidenceId));
-
-        String profileFieldId = head.profileFieldId();
-        OffsetDateTime newValidFrom = head.validFrom() != null ? head.validFrom() : OffsetDateTime.now(ZoneOffset.UTC);
-
-
-        // 2) Lock & find other active evidence for same field to supersede
-        List<String> supersededIds = jdbc.query("""
-        SELECT evidence_id
-        FROM evidence
-        WHERE profile_field_id = :pf
-          AND status = 'active'
-          AND evidence_id <> :id
-        FOR UPDATE
-    """, new MapSqlParameterSource()
-                        .addValue("pf", profileFieldId)
-                        .addValue("id", evidenceId),
-                (rs, i) -> rs.getString("evidence_id"));
-
-        if (!supersededIds.isEmpty()) {
-            jdbc.update("""
-            UPDATE evidence
-            SET status = 'superseded',
-                valid_until = :until,
-                updated_at = now()
-            WHERE evidence_id IN (:ids)
-        """, new MapSqlParameterSource()
-                    .addValue("until", Timestamp.from(newValidFrom.toInstant()))
-                    .addValue("ids", supersededIds));
-        }
-
-        // 3) Approve target
-        jdbc.update("""
-        UPDATE evidence
-        SET status = 'active',
-            reviewed_by = :rb,
-            reviewed_at = now(),
-            updated_at = now()
-        WHERE evidence_id = :id
-    """, new MapSqlParameterSource()
-                .addValue("rb", reviewerId)
-                .addValue("id", evidenceId));
-
-        return new ReviewEvidenceResponse(
-                evidenceId,
-                "active",
-                OffsetDateTime.now(ZoneOffset.UTC),
-                reviewerId,
-                supersededIds
-        );
-    }
-
-    private ReviewEvidenceResponse rejectEvidence(String evidenceId, String reviewerId) {
-        // Lock row (ensures we don't race with a parallel approval)
-        repo.lockHeadById(evidenceId)
-                .orElseThrow(() -> new IllegalArgumentException("Evidence not found: " + evidenceId));
-
-
-        jdbc.update("""
-        UPDATE evidence
-        SET status = 'revoked',
-            revoked_at = now(),
-            reviewed_by = :rb,
-            reviewed_at = now(),
-            updated_at = now()
-        WHERE evidence_id = :id
-    """, new MapSqlParameterSource()
-                .addValue("rb", reviewerId)
-                .addValue("id", evidenceId));
-
-        return new ReviewEvidenceResponse(
-                evidenceId,
-                "revoked",
-                OffsetDateTime.now(ZoneOffset.UTC),
-                reviewerId,
-                List.of()
-        );
-    }
-
-    @Override
-    public List<Evidence> listByAppAndField(String appId, String fieldKey) {
-        var params = new MapSqlParameterSource()
-                .addValue("appId", appId)
-                .addValue("fieldKey", fieldKey);
-
-        return jdbc.query("""
-        SELECT
-            e.*,
-            pf.field_key AS profile_field_key
-        FROM evidence e
-        JOIN profile_field pf ON pf.id         = e.profile_field_id
-        JOIN profile       p  ON p.profile_id  = pf.profile_id
-        JOIN application   a  ON a.app_id      = p.app_id
-        WHERE a.app_id     = :appId
-          AND pf.field_key = :fieldKey
-        ORDER BY
-          CASE e.status WHEN 'active' THEN 0 WHEN 'superseded' THEN 1 ELSE 2 END,
-          COALESCE(e.valid_from, e.created_at) DESC
-    """, params, evidenceRowMapper());
-    }
-
-
-// ---------- helpers (add once if you don't have them) ----------
-
-    private static RowMapper<Evidence> evidenceRowMapper() {
-        return new RowMapper<>() {
-            @Override public Evidence mapRow(ResultSet rs, int rowNum) throws SQLException {
-                return new Evidence(
-                        rs.getString("evidence_id"),
-                        rs.getString("profile_field_id"),
-                        // ensure your query includes: pf.key AS profile_field_key
-                        getNullableString(rs, "profile_field_key"),
-
-                        rs.getString("uri"),
-                        rs.getString("type"),
-                        rs.getString("sha256"),
-                        rs.getString("source_system"),
-                        getNullableString(rs, "submitted_by"),
-
-                        rs.getString("status"),
-                        rs.getObject("valid_from",  java.time.OffsetDateTime.class),
-                        rs.getObject("valid_until", java.time.OffsetDateTime.class),
-                        rs.getObject("revoked_at",  java.time.OffsetDateTime.class),
-
-                        getNullableString(rs, "reviewed_by"),
-                        rs.getObject("reviewed_at", java.time.OffsetDateTime.class),
-                        getNullableString(rs, "tags"),
-
-                        // keep legacy for back-compat; ok if null / absent
-                        rs.getObject("added_at",    java.time.OffsetDateTime.class),
-                        rs.getObject("created_at",  java.time.OffsetDateTime.class),
-                        rs.getObject("updated_at",  java.time.OffsetDateTime.class)
-                );
-            }
-        };
-    }
-
-    private static String getNullableString(ResultSet rs, String col) throws SQLException {
+    public Evidence createEvidence(String appId, CreateEvidenceRequest request) {
+        log.debug("Creating evidence for app {}: {}", appId, request);
+        
+        // Validate required fields
+        validateCreateRequest(appId, request);
+        
+        // Set defaults
+        OffsetDateTime validFrom = request.validFrom() != null ? request.validFrom() : OffsetDateTime.now();
+        
         try {
-            String v = rs.getString(col);
-            return (v == null || rs.wasNull()) ? null : v;
-        } catch (SQLException e) {
-            // Column might not be selected in some queries; treat as null
-            return null;
+            String evidenceId = evidenceRepository.createEvidence(
+                appId,
+                request.profileFieldId(),
+                request.uri(),
+                request.type(),
+                request.sourceSystem(),
+                request.submittedBy(),
+                validFrom,
+                request.validUntil(),
+                request.relatedEvidenceFields(),
+                request.trackId(),
+                request.documentId(),
+                request.docVersionId()
+            );
+            
+            log.info("Successfully created evidence {} for app {}", evidenceId, appId);
+            
+            return evidenceRepository.findEvidenceById(evidenceId)
+                .orElseThrow(() -> new RuntimeException("Failed to retrieve created evidence"));
+                
+        } catch (Exception e) {
+            log.error("Failed to create evidence for app {}: {}", appId, e.getMessage(), e);
+            throw e;
         }
     }
-
-
-    private static OffsetDateTime odt(ResultSet rs, String col) throws SQLException {
-        Timestamp ts = rs.getTimestamp(col);
-        return ts == null ? null : ts.toInstant().atOffset(ZoneOffset.UTC);
+    
+    @Override
+    @Transactional
+    public Evidence updateEvidence(String evidenceId, UpdateEvidenceRequest request) {
+        log.debug("Updating evidence {}: {}", evidenceId, request);
+        
+        // Validate evidence exists
+        Evidence existing = evidenceRepository.findEvidenceById(evidenceId)
+            .orElseThrow(() -> new IllegalArgumentException("Evidence not found: " + evidenceId));
+        
+        // Validate update request
+        validateUpdateRequest(request);
+        
+        try {
+            boolean updated = evidenceRepository.updateEvidence(
+                evidenceId,
+                request.uri(),
+                request.type(),
+                request.sourceSystem(),
+                request.submittedBy(),
+                request.validFrom(),
+                request.validUntil(),
+                request.status(),
+                request.reviewedBy(),
+                request.relatedEvidenceFields(),
+                request.documentId(),
+                request.docVersionId()
+            );
+            
+            if (!updated) {
+                throw new RuntimeException("Failed to update evidence: " + evidenceId);
+            }
+            
+            log.info("Successfully updated evidence {}", evidenceId);
+            
+            return evidenceRepository.findEvidenceById(evidenceId)
+                .orElseThrow(() -> new RuntimeException("Failed to retrieve updated evidence"));
+                
+        } catch (Exception e) {
+            log.error("Failed to update evidence {}: {}", evidenceId, e.getMessage(), e);
+            throw e;
+        }
     }
-    private static OffsetDateTime toOdt(Timestamp ts) {
-        return ts == null ? null : ts.toInstant().atOffset(ZoneOffset.UTC);
+    
+    @Override
+    public Optional<Evidence> getEvidenceById(String evidenceId) {
+        return evidenceRepository.findEvidenceById(evidenceId);
     }
-
-
-    /* ---------------- helpers ---------------- */
-
-    private static String sha256(byte[] bytes) throws Exception {
-        MessageDigest md = MessageDigest.getInstance("SHA-256");
-        return HexFormat.of().formatHex(md.digest(bytes));
+    
+    @Override
+    public PageResponse<EvidenceSummary> getEvidenceByApp(String appId, int page, int pageSize) {
+        int safePage = Math.max(page, 1);
+        int safePageSize = Math.max(pageSize, 1);
+        int offset = (safePage - 1) * safePageSize;
+        
+        long total = evidenceRepository.countEvidenceByApp(appId);
+        List<EvidenceSummary> evidence = evidenceRepository.findEvidenceByApp(appId, safePageSize, offset);
+        
+        return new PageResponse<>(safePage, safePageSize, total, evidence);
     }
-
-    private static String safe(String s) {
-        return (s == null || s.isBlank()) ? null : s.trim();
+    
+    @Override
+    public PageResponse<EvidenceSummary> getEvidenceByProfileField(String profileFieldId, int page, int pageSize) {
+        int safePage = Math.max(page, 1);
+        int safePageSize = Math.max(pageSize, 1);
+        int offset = (safePage - 1) * safePageSize;
+        
+        // Note: We don't have a count method for profile field, so we'll use the list size as approximation
+        List<EvidenceSummary> evidence = evidenceRepository.findEvidenceByProfileField(profileFieldId, safePageSize, offset);
+        
+        return new PageResponse<>(safePage, safePageSize, evidence.size(), evidence);
+    }
+    
+    @Override
+    public PageResponse<EvidenceSummary> getEvidenceByClaim(String claimId, int page, int pageSize) {
+        int safePage = Math.max(page, 1);
+        int safePageSize = Math.max(pageSize, 1);
+        int offset = (safePage - 1) * safePageSize;
+        
+        List<EvidenceSummary> evidence = evidenceRepository.findEvidenceByClaim(claimId, safePageSize, offset);
+        
+        return new PageResponse<>(safePage, safePageSize, evidence.size(), evidence);
+    }
+    
+    @Override
+    public PageResponse<EvidenceSummary> getEvidenceByTrack(String trackId, int page, int pageSize) {
+        int safePage = Math.max(page, 1);
+        int safePageSize = Math.max(pageSize, 1);
+        int offset = (safePage - 1) * safePageSize;
+        
+        List<EvidenceSummary> evidence = evidenceRepository.findEvidenceByTrack(trackId, safePageSize, offset);
+        
+        return new PageResponse<>(safePage, safePageSize, evidence.size(), evidence);
+    }
+    
+    @Override
+    @Transactional
+    public Evidence revokeEvidence(String evidenceId, String reviewedBy) {
+        log.debug("Revoking evidence {} by {}", evidenceId, reviewedBy);
+        
+        // Validate evidence exists
+        Evidence existing = evidenceRepository.findEvidenceById(evidenceId)
+            .orElseThrow(() -> new IllegalArgumentException("Evidence not found: " + evidenceId));
+        
+        if (reviewedBy == null || reviewedBy.trim().isEmpty()) {
+            throw new IllegalArgumentException("ReviewedBy is required when revoking evidence");
+        }
+        
+        try {
+            boolean updated = evidenceRepository.revokeEvidence(evidenceId, reviewedBy);
+            
+            if (!updated) {
+                throw new RuntimeException("Failed to revoke evidence: " + evidenceId);
+            }
+            
+            log.info("Successfully revoked evidence {} by {}", evidenceId, reviewedBy);
+            
+            return evidenceRepository.findEvidenceById(evidenceId)
+                .orElseThrow(() -> new RuntimeException("Failed to retrieve revoked evidence"));
+                
+        } catch (Exception e) {
+            log.error("Failed to revoke evidence {}: {}", evidenceId, e.getMessage(), e);
+            throw e;
+        }
+    }
+    
+    private void validateCreateRequest(String appId, CreateEvidenceRequest request) {
+        if (appId == null || appId.trim().isEmpty()) {
+            throw new IllegalArgumentException("App ID is required");
+        }
+        
+        if (request.profileFieldId() == null || request.profileFieldId().trim().isEmpty()) {
+            throw new IllegalArgumentException("Profile field ID is required");
+        }
+        
+        if (request.uri() == null || request.uri().trim().isEmpty()) {
+            throw new IllegalArgumentException("URI is required");
+        }
+    }
+    
+    @Override
+    @Transactional
+    public EvidenceWithDocumentResponse createEvidenceWithDocument(String appId, CreateEvidenceWithDocumentRequest request) {
+        log.debug("Creating evidence with document for app {}: {}", appId, request);
+        
+        // Validate required fields
+        validateCreateEvidenceWithDocumentRequest(appId, request);
+        
+        try {
+            // Step 1: Create the document first
+            CreateDocumentRequest documentRequest = new CreateDocumentRequest(
+                request.document().title(),
+                request.document().url(),
+                request.document().fieldTypes()
+            );
+            
+            DocumentResponse document = documentService.createDocument(appId, documentRequest);
+            log.debug("Created document {} for evidence", document.documentId());
+            
+            // Step 2: Create evidence using the document
+            var evidenceMeta = request.evidence();
+            String docVersionId = (document.latestVersion() != null) ? document.latestVersion().docVersionId() : null;
+            
+            CreateEvidenceRequest evidenceRequest = new CreateEvidenceRequest(
+                request.profileFieldId(),
+                request.document().url(), // URI same as document URL
+                evidenceMeta != null ? evidenceMeta.type() : "document",
+                evidenceMeta != null ? evidenceMeta.sourceSystem() : "manual",
+                evidenceMeta != null ? evidenceMeta.submittedBy() : null,
+                evidenceMeta != null ? evidenceMeta.validFrom() : OffsetDateTime.now(),
+                evidenceMeta != null ? evidenceMeta.validUntil() : null,
+                evidenceMeta != null ? evidenceMeta.relatedEvidenceFields() : null,
+                evidenceMeta != null ? evidenceMeta.trackId() : null,
+                document.documentId(),
+                docVersionId
+            );
+            
+            Evidence evidence = createEvidence(appId, evidenceRequest);
+            log.info("Successfully created evidence {} with document {} for app {}", 
+                evidence.evidenceId(), document.documentId(), appId);
+            
+            // Step 3: Build response with both evidence and document
+            return new EvidenceWithDocumentResponse(
+                evidence.evidenceId(),
+                evidence.appId(),
+                evidence.profileFieldId(),
+                evidence.claimId(),
+                evidence.uri(),
+                evidence.type(),
+                evidence.sha256(),
+                evidence.sourceSystem(),
+                evidence.submittedBy(),
+                evidence.validFrom(),
+                evidence.validUntil(),
+                evidence.status(),
+                evidence.revokedAt(),
+                evidence.reviewedBy(),
+                evidence.reviewedAt(),
+                evidence.relatedEvidenceFields(),
+                evidence.trackId(),
+                evidence.documentId(),
+                evidence.docVersionId(),
+                evidence.addedAt(),
+                evidence.createdAt(),
+                evidence.updatedAt(),
+                document
+            );
+            
+        } catch (Exception e) {
+            log.error("Failed to create evidence with document for app {}: {}", appId, e.getMessage(), e);
+            throw e;
+        }
+    }
+    
+    private void validateCreateEvidenceWithDocumentRequest(String appId, CreateEvidenceWithDocumentRequest request) {
+        if (appId == null || appId.trim().isEmpty()) {
+            throw new IllegalArgumentException("App ID is required");
+        }
+        
+        if (request.profileFieldId() == null || request.profileFieldId().trim().isEmpty()) {
+            throw new IllegalArgumentException("Profile field ID is required");
+        }
+        
+        if (request.document() == null) {
+            throw new IllegalArgumentException("Document information is required");
+        }
+        
+        var doc = request.document();
+        if (doc.title() == null || doc.title().trim().isEmpty()) {
+            throw new IllegalArgumentException("Document title is required");
+        }
+        
+        if (doc.url() == null || doc.url().trim().isEmpty()) {
+            throw new IllegalArgumentException("Document URL is required");
+        }
+    }
+    
+    private void validateUpdateRequest(UpdateEvidenceRequest request) {
+        if (request.status() != null && !VALID_STATUSES.contains(request.status())) {
+            throw new IllegalArgumentException("Invalid status. Valid values: " + VALID_STATUSES);
+        }
     }
 }

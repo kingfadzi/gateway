@@ -14,7 +14,7 @@ public record DocumentSummary(
         String sourceType,
         String owners,
         Integer linkHealth,
-        List<String> tags,
+        List<String> relatedEvidenceFields,
         DocumentVersionInfo latestVersion,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt

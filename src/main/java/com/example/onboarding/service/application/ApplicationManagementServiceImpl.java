@@ -174,6 +174,18 @@ public class ApplicationManagementServiceImpl implements ApplicationManagementSe
                 .addValue("owner", req.ownerId());
 
         jdbc.update(sql, p);
+        
+        // Create default track to avoid referential integrity issues
+        String trackId = "track_" + UUID.randomUUID().toString().replace("-", "");
+        String trackSql = """
+            INSERT INTO track (track_id, app_id, provider, resource_type, resource_id, created_at, updated_at)
+            VALUES (:trackId, :appId, 'manual', 'control', 'default', now(), now())
+            """;
+        
+        jdbc.update(trackSql, new MapSqlParameterSource()
+                .addValue("trackId", trackId)
+                .addValue("appId", appId));
+        
         return get(appId);
     }
 

@@ -10,12 +10,14 @@ DROP FUNCTION IF EXISTS assert_track_app_match() CASCADE;
 
 DROP TABLE IF EXISTS evidence CASCADE;
 DROP TABLE IF EXISTS control_claim CASCADE;
-DROP TABLE IF EXISTS document_tag CASCADE;
+DROP TABLE IF EXISTS document_related_evidence_field CASCADE;
 DROP TABLE IF EXISTS document_version CASCADE;
 DROP TABLE IF EXISTS document CASCADE;
 DROP TABLE IF EXISTS profile_field CASCADE;
 DROP TABLE IF EXISTS profile CASCADE;
-DROP TABLE IF EXISTS track CASCADE;
+DROP TABLE IF EXISTS track_external_ref CASCADE;   -- NEW
+DROP TABLE IF EXISTS external_ref CASCADE;         -- NEW
+DROP TABLE IF EXISTS track CASCADE;                -- ensure track dropped here
 DROP TABLE IF EXISTS service_instances CASCADE;
 DROP TABLE IF EXISTS application CASCADE;
 
@@ -66,26 +68,35 @@ CREATE INDEX IF NOT EXISTS idx_application_parent ON application(parent_app_id);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_application_name ON application(lower(name));
 
 -- =========================
--- TRACK (bounded governance/compliance engagement)
+-- TRACK (bounded engagement; 1:1 external unit)
 -- =========================
 CREATE TABLE track (
-                       track_id      text PRIMARY KEY,
-                       app_id        text NOT NULL REFERENCES application(app_id) ON DELETE CASCADE,
-                       title         text,
-                       intent        text,            -- 'compliance'|'risk'|'security'|'architecture'
-                       status        text,            -- 'open'|'in_review'|'closed'
-                       result        text,            -- 'pass'|'fail'|'waived'|'abandoned'
-                       opened_at     timestamptz,
-                       closed_at     timestamptz,
-                       source_system text,            -- 'jira'|'snow'|'gitlab'|'manual'|'policy'
-                       source_ref    text,
-                       created_at    timestamptz NOT NULL DEFAULT now(),
-                       updated_at    timestamptz NOT NULL DEFAULT now()
+                       track_id       text PRIMARY KEY,
+                       app_id         text NOT NULL REFERENCES application(app_id) ON DELETE CASCADE,
+                       title          text,
+                       intent         text,            -- 'compliance'|'risk'|'security'|'architecture'
+                       status         text,            -- 'open'|'in_review'|'closed'
+                       result         text,            -- 'pass'|'fail'|'waived'|'abandoned'
+
+    -- Primary external anchor (denormalized)
+                       provider       text,            -- 'jira'|'snow'|'gitlab'|'manual'|'policy'|...
+                       resource_type  text,            -- 'epic'|'change'|'mr'|'note'|'control'|...
+                       resource_id    text,            -- native key, e.g. 'JIT-123','CHG0034567','!45'
+                       uri            text,            -- canonical link (jira://..., snow://..., etc.)
+                       attributes     jsonb NOT NULL DEFAULT '{}'::jsonb,  -- raw payload/fields
+
+                       opened_at      timestamptz,
+                       closed_at      timestamptz,
+                       created_at     timestamptz NOT NULL DEFAULT now(),
+                       updated_at     timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_track_app     ON track(app_id);
-CREATE INDEX IF NOT EXISTS idx_track_status  ON track(status);
-CREATE INDEX IF NOT EXISTS idx_track_source  ON track(source_system, source_ref);
+CREATE INDEX IF NOT EXISTS idx_track_app       ON track(app_id);
+CREATE INDEX IF NOT EXISTS idx_track_status    ON track(status);
+CREATE INDEX IF NOT EXISTS idx_track_provider  ON track(provider);
+CREATE INDEX IF NOT EXISTS idx_track_resource  ON track(resource_type, resource_id);
+CREATE INDEX IF NOT EXISTS idx_track_attrs_gin ON track USING GIN (attributes);
+
 
 -- =========================
 -- SERVICE_INSTANCES (TEXT IDs)
@@ -175,10 +186,10 @@ CREATE TABLE document_version (
 
 CREATE INDEX IF NOT EXISTS idx_docver_doc ON document_version(document_id);
 
-CREATE TABLE document_tag (
+CREATE TABLE document_related_evidence_field (
                               document_id  text NOT NULL REFERENCES document(document_id) ON DELETE CASCADE,
-                              tag_key      text NOT NULL,
-                              PRIMARY KEY (document_id, tag_key)
+                              field_key    text NOT NULL,
+                              PRIMARY KEY (document_id, field_key)
 );
 
 -- =========================
@@ -240,7 +251,7 @@ CREATE TABLE evidence (
                           reviewed_by       text,
                           reviewed_at       timestamptz,
 
-                          tags              text,
+                          related_evidence_fields text,
 
     -- optional explicit track binding (engagement)
                           track_id          text REFERENCES track(track_id) ON DELETE SET NULL,

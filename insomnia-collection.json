@@ -11,11 +11,16 @@
       "name": "Base Environment",
       "data": {
         "base_url": "http://localhost:8080",
-        "sample_app_id": "app-sample-001",
-        "sample_document_id": "doc_123456789"
+        "sample_app_id": "CORR-12356",
+        "sample_document_id": "doc_9f0f1e5d832449bb8342a8dacc84f42e",
+        "sample_claim_id": "clm_3fd647c5c2b446748380c664d7fc14b8",
+        "sample_track_id": "track_bb34cd152a17401b932d96f454f04b16",
+        "sample_doc_version_id": "dv_86086d317c414fcaa0cae307be1f20e9",
+        "sample_profile_field_id": "pf_8dc51d4fc8045857d48037cd719aabfa",
+        "sample_evidence_id": "ev_5e9f7828f4184fc6802c05c19ea2d3c9"
       },
       "dataPropertyOrder": {
-        "&": ["base_url", "sample_app_id", "sample_document_id"]
+        "&": ["base_url", "sample_app_id", "sample_document_id", "sample_claim_id", "sample_track_id", "sample_doc_version_id", "sample_profile_field_id", "sample_evidence_id"]
       },
       "color": null,
       "isPrivate": false,
@@ -321,6 +326,46 @@
       "isPrivate": false
     },
     {
+      "_id": "req_profile_field_context",
+      "parentId": "fld_profiles",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/apps/{{ _.sample_app_id }}/profile/field/encryption_at_rest",
+      "name": "Get Profile Field Context",
+      "description": "Get comprehensive context information for a specific profile field including evidence, policy requirements, and assurance status",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693167396000,
+      "isPrivate": false
+    },
+    {
+      "_id": "req_profile_field_suggested_evidence",
+      "parentId": "fld_profiles",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/apps/{{ _.sample_app_id }}/profile/field/encryption_in_transit/suggested-evidence",
+      "name": "Get Suggested Evidence for Field",
+      "description": "Get suggested evidence for a profile field based on document tags matching the field key",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693167395000,
+      "isPrivate": false
+    },
+    {
       "_id": "fld_documents",
       "parentId": "wrk_main",
       "_type": "request_group",
@@ -340,7 +385,7 @@
       "method": "POST",
       "body": {
         "mimeType": "application/json",
-        "text": "{\n  \"title\": \"Security Architecture Document\",\n  \"url\": \"https://gitlab.com/example/project/-/blob/main/docs/security.md\",\n  \"fieldTypes\": [\"security_vision\", \"encryption_at_rest\", \"security_testing\"]\n}"
+        "text": "{\n  \"title\": \"Security Architecture Document\",\n  \"url\": \"https://eros.butterflycluster.com/root/admin-bla/-/blob/main/README.md\",\n  \"fieldTypes\": [\"security_vision\", \"encryption_at_rest\", \"security_testing\"]\n}"
       },
       "parameters": [],
       "headers": [
@@ -468,16 +513,16 @@
       "metaSortKey": -1693167200000
     },
     {
-      "_id": "req_evidence_create_json",
+      "_id": "req_evidence_create",
       "parentId": "fld_evidence",
       "_type": "request",
       "url": "{{ _.base_url }}/api/apps/{{ _.sample_app_id }}/evidence",
-      "name": "Create Evidence (JSON)",
-      "description": "Create URI/link evidence",
+      "name": "Create Evidence",
+      "description": "Create new evidence for an application",
       "method": "POST",
       "body": {
         "mimeType": "application/json",
-        "text": "{\n  \"fieldKey\": \"security_vision\",\n  \"description\": \"Security architecture document\",\n  \"uri\": \"https://docs.company.com/security/architecture\",\n  \"metadata\": {\n    \"source\": \"confluence\",\n    \"lastUpdated\": \"2023-08-27\"\n  }\n}"
+        "text": "{\n  \"profileFieldId\": \"{{ _.sample_profile_field_id }}\",\n  \"uri\": \"https://docs.company.com/security/architecture.pdf\",\n  \"type\": \"document\",\n  \"sourceSystem\": \"confluence\",\n  \"submittedBy\": \"security-team\",\n  \"validFrom\": \"2025-08-28T10:00:00Z\",\n  \"validUntil\": \"2026-08-28T10:00:00Z\",\n  \"tags\": \"security,compliance,encryption\",\n  \"trackId\": \"{{ _.sample_track_id }}\",\n  \"documentId\": \"{{ _.sample_document_id }}\",\n  \"docVersionId\": \"{{ _.sample_doc_version_id }}\"\n}"
       },
       "parameters": [],
       "headers": [
@@ -495,99 +540,16 @@
       "isPrivate": false
     },
     {
-      "_id": "req_evidence_create_multipart",
+      "_id": "req_evidence_create_with_document",
       "parentId": "fld_evidence",
       "_type": "request",
-      "url": "{{ _.base_url }}/api/apps/{{ _.sample_app_id }}/evidence",
-      "name": "Create Evidence (File Upload)",
-      "description": "Create file evidence with multipart form data",
-      "method": "POST",
-      "body": {
-        "mimeType": "multipart/form-data",
-        "params": [
-          {
-            "id": "param_field_key",
-            "name": "fieldKey",
-            "value": "security_testing",
-            "description": "Profile field key"
-          },
-          {
-            "id": "param_description",
-            "name": "description",
-            "value": "Security test results",
-            "description": "Evidence description"
-          },
-          {
-            "id": "param_file",
-            "name": "file",
-            "type": "file",
-            "fileName": "",
-            "description": "File to upload"
-          }
-        ]
-      },
-      "parameters": [],
-      "headers": [
-        {
-          "name": "Accept",
-          "value": "application/json"
-        }
-      ],
-      "authentication": {},
-      "metaSortKey": -1693167199000,
-      "isPrivate": false
-    },
-    {
-      "_id": "req_evidence_list",
-      "parentId": "fld_evidence",
-      "_type": "request",
-      "url": "{{ _.base_url }}/api/apps/{{ _.sample_app_id }}/evidence",
-      "name": "List Evidence",
-      "description": "List evidence for an application",
-      "method": "GET",
-      "body": {},
-      "parameters": [
-        {
-          "id": "param_field_key",
-          "name": "fieldKey",
-          "value": "",
-          "description": "Filter by field key",
-          "disabled": true
-        },
-        {
-          "id": "param_page",
-          "name": "page",
-          "value": "0",
-          "description": "Page number"
-        },
-        {
-          "id": "param_size",
-          "name": "size",
-          "value": "20",
-          "description": "Page size"
-        }
-      ],
-      "headers": [
-        {
-          "name": "Accept",
-          "value": "application/json"
-        }
-      ],
-      "authentication": {},
-      "metaSortKey": -1693167198000,
-      "isPrivate": false
-    },
-    {
-      "_id": "req_evidence_review",
-      "parentId": "fld_evidence",
-      "_type": "request",
-      "url": "{{ _.base_url }}/api/evidence/evidence-123/review",
-      "name": "Review Evidence",
-      "description": "Submit a review for evidence",
+      "url": "{{ _.base_url }}/api/apps/{{ _.sample_app_id }}/evidence/with-document",
+      "name": "Create Evidence with New Document",
+      "description": "Create evidence and document in a single operation",
       "method": "POST",
       "body": {
         "mimeType": "application/json",
-        "text": "{\n  \"decision\": \"APPROVED\",\n  \"comments\": \"Evidence meets requirements\",\n  \"reviewerId\": \"reviewer-001\"\n}"
+        "text": "{\n  \"profileFieldId\": \"{{ _.sample_profile_field_id }}\",\n  \"document\": {\n    \"title\": \"New Security Policy Document\",\n    \"url\": \"https://docs.company.com/security/new-policy.pdf\",\n    \"fieldTypes\": [\"encryption_at_rest\", \"security_vision\"]\n  },\n  \"evidence\": {\n    \"type\": \"document\",\n    \"sourceSystem\": \"manual\",\n    \"submittedBy\": \"user@company.com\",\n    \"validFrom\": \"2025-08-28T18:30:00Z\",\n    \"validUntil\": \"2026-08-28T18:30:00Z\",\n    \"tags\": \"security,compliance,manual\",\n    \"trackId\": \"{{ _.sample_track_id }}\"\n  }\n}"
       },
       "parameters": [],
       "headers": [
@@ -601,7 +563,213 @@
         }
       ],
       "authentication": {},
+      "metaSortKey": -1693167199750,
+      "isPrivate": false
+    },
+    {
+      "_id": "req_evidence_update",
+      "parentId": "fld_evidence",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/evidence/{{ _.sample_evidence_id }}",
+      "name": "Update Evidence",
+      "description": "Update existing evidence",
+      "method": "PUT",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"uri\": \"https://docs.company.com/security/architecture-v2.pdf\",\n  \"type\": \"document\",\n  \"sourceSystem\": \"confluence\",\n  \"submittedBy\": \"security-team\",\n  \"validFrom\": \"2025-08-28T10:00:00Z\",\n  \"validUntil\": \"2026-08-28T10:00:00Z\",\n  \"status\": \"active\",\n  \"reviewedBy\": \"compliance-team\",\n  \"tags\": \"security,compliance,encryption,updated\",\n  \"documentId\": \"{{ _.sample_document_id }}\",\n  \"docVersionId\": \"{{ _.sample_doc_version_id }}\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693167199500,
+      "isPrivate": false
+    },
+    {
+      "_id": "req_evidence_get",
+      "parentId": "fld_evidence",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/evidence/{{ _.sample_evidence_id }}",
+      "name": "Get Evidence by ID",
+      "description": "Get evidence details by ID",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693167199000,
+      "isPrivate": false
+    },
+    {
+      "_id": "req_evidence_list_app",
+      "parentId": "fld_evidence",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/apps/{{ _.sample_app_id }}/evidence",
+      "name": "List Evidence for App",
+      "description": "List evidence for an application with pagination",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        {
+          "id": "param_page",
+          "name": "page",
+          "value": "1",
+          "description": "Page number (1-based)"
+        },
+        {
+          "id": "param_pageSize",
+          "name": "pageSize",
+          "value": "10",
+          "description": "Number of items per page"
+        }
+      ],
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693167198000,
+      "isPrivate": false
+    },
+    {
+      "_id": "req_evidence_list_profile_field",
+      "parentId": "fld_evidence",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/profile-fields/{{ _.sample_profile_field_id }}/evidence",
+      "name": "List Evidence for Profile Field",
+      "description": "List evidence for a profile field with pagination",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        {
+          "id": "param_page",
+          "name": "page",
+          "value": "1",
+          "description": "Page number (1-based)"
+        },
+        {
+          "id": "param_pageSize",
+          "name": "pageSize",
+          "value": "10",
+          "description": "Number of items per page"
+        }
+      ],
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693167197500,
+      "isPrivate": false
+    },
+    {
+      "_id": "req_evidence_list_claim",
+      "parentId": "fld_evidence",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/claims/{{ _.sample_claim_id }}/evidence",
+      "name": "List Evidence for Claim",
+      "description": "List evidence for a claim with pagination",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        {
+          "id": "param_page",
+          "name": "page",
+          "value": "1",
+          "description": "Page number (1-based)"
+        },
+        {
+          "id": "param_pageSize",
+          "name": "pageSize",
+          "value": "10",
+          "description": "Number of items per page"
+        }
+      ],
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
       "metaSortKey": -1693167197000,
+      "isPrivate": false
+    },
+    {
+      "_id": "req_evidence_list_track",
+      "parentId": "fld_evidence",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/tracks/{{ _.sample_track_id }}/evidence",
+      "name": "List Evidence for Track",
+      "description": "List evidence for a track with pagination",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        {
+          "id": "param_page",
+          "name": "page",
+          "value": "1",
+          "description": "Page number (1-based)"
+        },
+        {
+          "id": "param_pageSize",
+          "name": "pageSize",
+          "value": "10",
+          "description": "Number of items per page"
+        }
+      ],
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693167196500,
+      "isPrivate": false
+    },
+    {
+      "_id": "req_evidence_revoke",
+      "parentId": "fld_evidence",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/evidence/{{ _.sample_evidence_id }}/revoke",
+      "name": "Revoke Evidence",
+      "description": "Revoke evidence with reviewer information",
+      "method": "POST",
+      "body": {},
+      "parameters": [
+        {
+          "id": "param_reviewed_by",
+          "name": "reviewedBy",
+          "value": "compliance-team",
+          "description": "User/team who reviewed and revoked the evidence"
+        }
+      ],
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693167196000,
       "isPrivate": false
     },
     {
@@ -652,6 +820,353 @@
       ],
       "authentication": {},
       "metaSortKey": -1693167099000,
+      "isPrivate": false
+    },
+    {
+      "_id": "fld_tracks",
+      "parentId": "wrk_main",
+      "_type": "request_group",
+      "name": "🎯 Tracks",
+      "description": "Track management endpoints for compliance work tracking",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1693166900000
+    },
+    {
+      "_id": "req_track_create",
+      "parentId": "fld_tracks",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/apps/{{ _.sample_app_id }}/tracks",
+      "name": "Create Track",
+      "description": "Create a new track for compliance work",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"title\": \"Security Compliance Review\",\n  \"intent\": \"compliance\",\n  \"provider\": \"jira\",\n  \"resourceType\": \"epic\",\n  \"resourceId\": \"PROJ-123\",\n  \"uri\": \"https://company.atlassian.net/browse/PROJ-123\",\n  \"attributes\": {\n    \"priority\": \"High\",\n    \"assignee\": \"security-team\"\n  },\n  \"openedAt\": \"2025-08-28T10:00:00Z\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693166900000,
+      "isPrivate": false
+    },
+    {
+      "_id": "req_track_upsert",
+      "parentId": "fld_tracks",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/apps/{{ _.sample_app_id }}/tracks",
+      "name": "Create or Get Existing Track (Upsert)",
+      "description": "Create new track or return existing track for same resource (idempotent)",
+      "method": "PUT",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"title\": \"Security Compliance Review - Upsert\",\n  \"intent\": \"compliance\",\n  \"provider\": \"jira\",\n  \"resourceType\": \"epic\",\n  \"resourceId\": \"PROJ-456\",\n  \"uri\": \"https://company.atlassian.net/browse/PROJ-456\",\n  \"attributes\": {\n    \"priority\": \"Medium\",\n    \"assignee\": \"compliance-team\"\n  },\n  \"openedAt\": \"2025-08-28T10:00:00Z\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693166898500,
+      "isPrivate": false
+    },
+    {
+      "_id": "req_track_update",
+      "parentId": "fld_tracks",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/tracks/{{ _.sample_track_id }}",
+      "name": "Update Track",
+      "description": "Update an existing track status, result, or title",
+      "method": "PUT",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"title\": \"Security Compliance Review - Updated\",\n  \"status\": \"closed\",\n  \"result\": \"pass\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693166899000,
+      "isPrivate": false
+    },
+    {
+      "_id": "req_track_get",
+      "parentId": "fld_tracks",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/tracks/{{ _.sample_track_id }}",
+      "name": "Get Track by ID",
+      "description": "Get detailed track information by track ID",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693166898000,
+      "isPrivate": false
+    },
+    {
+      "_id": "req_tracks_list",
+      "parentId": "fld_tracks",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/apps/{{ _.sample_app_id }}/tracks?page=1&pageSize=10",
+      "name": "List Tracks for App",
+      "description": "Get paginated list of tracks for an application",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        {
+          "id": "param_track_page",
+          "name": "page",
+          "value": "1",
+          "description": "Page number (1-based)"
+        },
+        {
+          "id": "param_track_pagesize",
+          "name": "pageSize",
+          "value": "10",
+          "description": "Number of tracks per page"
+        }
+      ],
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693166897000,
+      "isPrivate": false
+    },
+    {
+      "_id": "req_track_by_resource",
+      "parentId": "fld_tracks",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/tracks/by-resource?provider=jira&resourceType=epic&resourceId=PROJ-123",
+      "name": "Get Track by Resource Reference",
+      "description": "Find track by provider, resource type, and resource ID (e.g., Jira epic key)",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        {
+          "id": "param_track_provider",
+          "name": "provider",
+          "value": "jira",
+          "description": "Provider system (jira, snow, gitlab, manual, policy)"
+        },
+        {
+          "id": "param_track_resource_type",
+          "name": "resourceType",
+          "value": "epic",
+          "description": "Resource type (epic, change, mr, note, control)"
+        },
+        {
+          "id": "param_track_resource_id",
+          "name": "resourceId", 
+          "value": "PROJ-123",
+          "description": "External resource ID (e.g., Jira epic key)"
+        }
+      ],
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693166896000,
+      "isPrivate": false
+    },
+    {
+      "_id": "fld_claims",
+      "parentId": "wrk_main",
+      "_type": "request_group",
+      "name": "⚖️ Claims",
+      "description": "Control claim management endpoints for track-based compliance",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1693166850000
+    },
+    {
+      "_id": "req_claim_ensure",
+      "parentId": "fld_claims",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/apps/{{ _.sample_app_id }}/tracks/{{ _.sample_track_id }}/claims/ensure",
+      "name": "Ensure Claim Exists",
+      "description": "Idempotent endpoint to ensure a claim exists for given profile field + track",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"fieldKey\": \"encryption_at_rest\",\n  \"method\": \"manual\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693166850000,
+      "isPrivate": false
+    },
+    {
+      "_id": "req_claim_ensure_put",
+      "parentId": "fld_claims",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/apps/{{ _.sample_app_id }}/tracks/{{ _.sample_track_id }}/claims/ensure",
+      "name": "Ensure Claim (Idempotent PUT)",
+      "description": "PUT version for idempotent claim creation",
+      "method": "PUT",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"fieldKey\": \"security_vision\",\n  \"method\": \"auto\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693166849000,
+      "isPrivate": false
+    },
+    {
+      "_id": "req_claim_get",
+      "parentId": "fld_claims",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/claims/{{ _.sample_claim_id }}",
+      "name": "Get Claim with Evidence",
+      "description": "Get full claim details with all attached evidence",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693166848000,
+      "isPrivate": false
+    },
+    {
+      "_id": "req_track_claims_list",
+      "parentId": "fld_claims",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/tracks/{{ _.sample_track_id }}/claims?page=1&pageSize=10",
+      "name": "List Claims for Track",
+      "description": "Get paginated list of claims for a track",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        {
+          "id": "param_claims_page",
+          "name": "page",
+          "value": "1",
+          "description": "Page number (1-based)"
+        },
+        {
+          "id": "param_claims_pagesize",
+          "name": "pageSize",
+          "value": "10",
+          "description": "Number of claims per page"
+        }
+      ],
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693166847000,
+      "isPrivate": false
+    },
+    {
+      "_id": "req_evidence_attach",
+      "parentId": "fld_claims",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/claims/{{ _.sample_claim_id }}/evidence/{{ _.sample_evidence_id }}/attach",
+      "name": "Attach Evidence to Claim",
+      "description": "Link existing evidence to an existing claim with optional document references",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"documentId\": \"{{ _.sample_document_id }}\",\n  \"docVersionId\": \"{{ _.sample_doc_version_id }}\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693166846000,
+      "isPrivate": false
+    },
+    {
+      "_id": "req_evidence_detach",
+      "parentId": "fld_claims",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/evidence/{{ _.sample_evidence_id }}/claim",
+      "name": "Detach Evidence from Claim",
+      "description": "Remove evidence attachment from claim",
+      "method": "DELETE",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693166845000,
       "isPrivate": false
     },
     {

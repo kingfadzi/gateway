@@ -110,7 +110,7 @@ public class DocumentService {
                         .orElseThrow(() -> new RuntimeException("Failed to retrieve updated document"));
             } else {
                 log.debug("No new version for document {}, returning existing", existingDoc.documentId());
-                // Update tags if needed
+                // Update related evidence fields if needed
                 documentRepository.addDocumentTags(existingDoc.documentId(), validFieldTypes);
                 return existingDoc;
             }
@@ -134,7 +134,7 @@ public class DocumentService {
                 null  // health will be set during metadata extraction
         );
         
-        // Add tags for field types
+        // Add related evidence fields for field types
         documentRepository.addDocumentTags(documentId, validFieldTypes);
         
         // Extract metadata synchronously to include version details in response
@@ -177,7 +177,7 @@ public class DocumentService {
                     versionId, documentId, metadata.getVersionId());
         }
         
-        // Update tags if needed
+        // Update related evidence fields if needed
         documentRepository.addDocumentTags(documentId, validFieldTypes);
         
         log.info("Successfully updated existing document {} with new version", documentId);

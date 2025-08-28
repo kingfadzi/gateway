@@ -85,9 +85,9 @@ public class DocumentRepository {
             DocumentResponse doc = jdbc.queryForObject(docSql, Map.of("appId", appId, "url", canonicalUrl), (rs, rowNum) -> {
                 String documentId = rs.getString("document_id");
                 
-                // Get tags for this document
-                String tagSql = "SELECT tag_key FROM document_tag WHERE document_id = :docId";
-                List<String> tags = jdbc.queryForList(tagSql, Map.of("docId", documentId), String.class);
+                // Get related evidence fields for this document
+                String tagSql = "SELECT field_key FROM document_related_evidence_field WHERE document_id = :docId";
+                List<String> relatedEvidenceFields = jdbc.queryForList(tagSql, Map.of("docId", documentId), String.class);
                 
                 // Get latest version for this document
                 String versionSql = """
@@ -121,7 +121,7 @@ public class DocumentRepository {
                         rs.getString("source_type"),
                         rs.getString("owners"),
                         (Integer) rs.getObject("link_health"),
-                        tags,
+                        relatedEvidenceFields,
                         versionInfo,
                         rs.getObject("created_at", OffsetDateTime.class),
                         rs.getObject("updated_at", OffsetDateTime.class)
@@ -171,24 +171,24 @@ public class DocumentRepository {
     }
     
     /**
-     * Add tags to a document
+     * Add related evidence fields to a document
      */
-    public void addDocumentTags(String documentId, List<String> tagKeys) {
-        if (tagKeys == null || tagKeys.isEmpty()) {
+    public void addDocumentTags(String documentId, List<String> fieldKeys) {
+        if (fieldKeys == null || fieldKeys.isEmpty()) {
             return;
         }
         
-        // First, remove existing tags
-        jdbc.update("DELETE FROM document_tag WHERE document_id = :docId", 
+        // First, remove existing related evidence fields
+        jdbc.update("DELETE FROM document_related_evidence_field WHERE document_id = :docId", 
                    Map.of("docId", documentId));
         
-        // Insert new tags
-        String sql = "INSERT INTO document_tag (document_id, tag_key) VALUES (:docId, :tag)";
+        // Insert new related evidence fields
+        String sql = "INSERT INTO document_related_evidence_field (document_id, field_key) VALUES (:docId, :fieldKey)";
         
-        for (String tagKey : tagKeys) {
+        for (String fieldKey : fieldKeys) {
             jdbc.update(sql, new MapSqlParameterSource()
                     .addValue("docId", documentId)
-                    .addValue("tag", tagKey));
+                    .addValue("fieldKey", fieldKey));
         }
     }
     
@@ -200,13 +200,13 @@ public class DocumentRepository {
             SELECT d.*,
                    dv.doc_version_id, dv.version_id, dv.url_at_version, dv.author, dv.source_date, 
                    dv.created_at as version_created_at,
-                   ARRAY_AGG(DISTINCT dt.tag_key) as tags
+                   ARRAY_AGG(DISTINCT dt.field_key) as related_evidence_fields
             FROM document d
             LEFT JOIN document_version dv ON d.document_id = dv.document_id
                                          AND dv.created_at = (SELECT MAX(created_at) 
                                                              FROM document_version 
                                                              WHERE document_id = d.document_id)
-            LEFT JOIN document_tag dt ON d.document_id = dt.document_id
+            LEFT JOIN document_related_evidence_field dt ON d.document_id = dt.document_id
             WHERE d.app_id = :appId
             GROUP BY d.document_id, d.app_id, d.title, d.canonical_url, d.source_type, d.owners,
                      d.link_health, d.created_at, d.updated_at,
@@ -217,8 +217,8 @@ public class DocumentRepository {
         
         return jdbc.query(sql, Map.of("appId", appId, "limit", limit, "offset", offset), (rs, rowNum) -> {
             @SuppressWarnings("unchecked")
-            String[] tags = (String[]) rs.getArray("tags").getArray();
-            List<String> tagList = tags != null ? List.of(tags) : List.of();
+            String[] relatedFields = (String[]) rs.getArray("related_evidence_fields").getArray();
+            List<String> relatedEvidenceFields = relatedFields != null ? List.of(relatedFields) : List.of();
             
             DocumentVersionInfo versionInfo = null;
             String docVersionId = rs.getString("doc_version_id");
@@ -241,7 +241,7 @@ public class DocumentRepository {
                     rs.getString("source_type"),
                     rs.getString("owners"),
                     (Integer) rs.getObject("link_health"),
-                    tagList,
+                    relatedEvidenceFields,
                     versionInfo,
                     rs.getObject("created_at", OffsetDateTime.class),
                     rs.getObject("updated_at", OffsetDateTime.class)
@@ -271,9 +271,9 @@ public class DocumentRepository {
             SELECT d.*,
                    dv.doc_version_id, dv.version_id, dv.url_at_version, dv.author, dv.source_date, 
                    dv.created_at as version_created_at,
-                   ARRAY_AGG(DISTINCT dt.tag_key) as tags
+                   ARRAY_AGG(DISTINCT dt.field_key) as related_evidence_fields
             FROM document d
-            JOIN document_tag dt ON d.document_id = dt.document_id AND dt.tag_key = :fieldKey
+            JOIN document_related_evidence_field dt ON d.document_id = dt.document_id AND dt.field_key = :fieldKey
             LEFT JOIN document_version dv ON d.document_id = dv.document_id
                                          AND dv.created_at = (SELECT MAX(created_at) 
                                                              FROM document_version 
@@ -289,8 +289,8 @@ public class DocumentRepository {
                 .addValue("appId", appId)
                 .addValue("fieldKey", fieldKey), (rs, rowNum) -> {
             @SuppressWarnings("unchecked")
-            String[] tags = (String[]) rs.getArray("tags").getArray();
-            List<String> tagList = tags != null ? List.of(tags) : List.of();
+            String[] relatedFields = (String[]) rs.getArray("related_evidence_fields").getArray();
+            List<String> relatedEvidenceFields = relatedFields != null ? List.of(relatedFields) : List.of();
             
             DocumentVersionInfo versionInfo = null;
             String docVersionId = rs.getString("doc_version_id");
@@ -313,7 +313,7 @@ public class DocumentRepository {
                     rs.getString("source_type"),
                     rs.getString("owners"),
                     (Integer) rs.getObject("link_health"),
-                    tagList,
+                    relatedEvidenceFields,
                     versionInfo,
                     rs.getObject("created_at", OffsetDateTime.class),
                     rs.getObject("updated_at", OffsetDateTime.class)
@@ -327,10 +327,10 @@ public class DocumentRepository {
     public Optional<DocumentResponse> getDocumentById(String documentId) {
         String sql = """
             SELECT d.*, 
-                   ARRAY_AGG(DISTINCT dt.tag_key) as tags,
+                   ARRAY_AGG(DISTINCT dt.field_key) as related_evidence_fields,
                    dv.doc_version_id, dv.version_id, dv.url_at_version, dv.author, dv.source_date, dv.created_at as version_created_at
             FROM document d
-            LEFT JOIN document_tag dt ON d.document_id = dt.document_id
+            LEFT JOIN document_related_evidence_field dt ON d.document_id = dt.document_id
             LEFT JOIN document_version dv ON d.document_id = dv.document_id
                                          AND dv.created_at = (SELECT MAX(created_at) 
                                                              FROM document_version 
@@ -344,8 +344,8 @@ public class DocumentRepository {
         try {
             return Optional.of(jdbc.queryForObject(sql, Map.of("docId", documentId), (rs, rowNum) -> {
                 @SuppressWarnings("unchecked")
-                String[] tags = (String[]) rs.getArray("tags").getArray();
-                List<String> tagList = tags != null ? List.of(tags) : List.of();
+                String[] relatedFields = (String[]) rs.getArray("related_evidence_fields").getArray();
+                List<String> relatedEvidenceFields = relatedFields != null ? List.of(relatedFields) : List.of();
                 
                 DocumentVersionInfo versionInfo = null;
                 String docVersionId = rs.getString("doc_version_id");
@@ -368,7 +368,7 @@ public class DocumentRepository {
                         rs.getString("source_type"),
                         rs.getString("owners"),
                         (Integer) rs.getObject("link_health"),
-                        tagList,
+                        relatedEvidenceFields,
                         versionInfo,
                         rs.getObject("created_at", OffsetDateTime.class),
                         rs.getObject("updated_at", OffsetDateTime.class)

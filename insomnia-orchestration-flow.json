@@ -1,0 +1,320 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2025-08-28T21:50:00.000Z",
+  "__export_source": "insomnia.desktop.app:v2023.5.8",
+  "resources": [
+    {
+      "_id": "req_env_orchestration",
+      "parentId": "wrk_orchestration",
+      "_type": "environment",
+      "name": "Orchestration Environment",
+      "data": {
+        "base_url": "http://localhost:8080",
+        "test_app_id": "CORR-12356"
+      },
+      "dataPropertyOrder": {
+        "&": ["base_url", "test_app_id"]
+      },
+      "color": null,
+      "isPrivate": false,
+      "metaSortKey": 1693167600000
+    },
+    {
+      "_id": "wrk_orchestration",
+      "_type": "workspace",
+      "name": "🔄 Full Flow Orchestration",
+      "description": "Complete end-to-end flow with request chaining: Rebuild Profile → Create Evidence with Document → Attach to Claim. Portable across any app ID.",
+      "scope": null
+    },
+    {
+      "_id": "fld_orchestration_flow",
+      "parentId": "wrk_orchestration",
+      "_type": "request_group",
+      "name": "🎯 Full Flow Sequence",
+      "description": "Execute requests in order using request chaining. Each step automatically extracts data from previous responses (no manual copying needed). Fully portable across environments and app IDs.",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1693167600000
+    },
+    {
+      "_id": "req_01_create_app",
+      "parentId": "fld_orchestration_flow",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/apps/{{ _.test_app_id }}/auto-profile:rebuild",
+      "name": "01. Rebuild App Profile",
+      "description": "Rebuilds profile for existing app CORR-12356 (ensures fresh state with default track)",
+      "method": "POST",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693167599900,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_02_get_tracks",
+      "parentId": "fld_orchestration_flow", 
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/apps/{{ _.test_app_id }}/tracks",
+      "name": "02. Get Tracks (Extract Track ID)",
+      "description": "Gets the default track created in step 1. The trackId will be automatically extracted from response.items[0].trackId using request chaining.",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693167599850,
+      "isPrivate": false
+    },
+    {
+      "_id": "req_03_get_profile",
+      "parentId": "fld_orchestration_flow",
+      "_type": "request", 
+      "url": "{{ _.base_url }}/internal/apps/{{ _.test_app_id }}/field-id?key=encryption_at_rest",
+      "name": "03. Get Profile Field ID",
+      "description": "Gets the profileFieldId for encryption_at_rest field. The fieldId will be automatically extracted from the response using request chaining.",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693167599800,
+      "isPrivate": false
+    },
+    {
+      "_id": "req_03_5_get_full_profile",
+      "parentId": "fld_orchestration_flow",
+      "_type": "request", 
+      "url": "{{ _.base_url }}/api/apps/{{ _.test_app_id }}/profile",
+      "name": "03.5 Get Full Profile (Reference)",
+      "description": "Optional: View the complete profile structure to understand field hierarchy and IDs.",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693167599750,
+      "isPrivate": false
+    },
+    {
+      "_id": "req_04_create_evidence_with_document",
+      "parentId": "fld_orchestration_flow",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/apps/{{ _.test_app_id }}/evidence/with-document",
+      "name": "04. Create Evidence with New Document",
+      "description": "Creates evidence and document in single operation. The evidenceId and document.documentId will be automatically extracted for subsequent requests.",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"profileFieldId\": \"{% response 'body', 'req_03_get_profile', 'b64::JC5maWVsZElk' %}\",\n  \"document\": {\n    \"title\": \"Security Architecture Document - {{ _.test_app_id }}\",\n    \"url\": \"https://docs.company.com/security/{{ _.test_app_id | lower }}/architecture.pdf\",\n    \"fieldTypes\": [\"encryption_at_rest\", \"security_vision\"]\n  },\n  \"evidence\": {\n    \"type\": \"document\",\n    \"sourceSystem\": \"confluence\",\n    \"submittedBy\": \"security-team@company.com\",\n    \"validFrom\": \"2025-08-28T18:30:00Z\",\n    \"validUntil\": \"2026-08-28T18:30:00Z\",\n    \"tags\": \"security,architecture,encryption,orchestrated-flow\",\n    \"trackId\": \"{% response 'body', 'req_02_get_tracks', 'b64::JC5pdGVtc1swXS50cmFja0lk' %}\"\n  }\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693167599700,
+      "isPrivate": false
+    },
+    {
+      "_id": "req_05_ensure_claim",
+      "parentId": "fld_orchestration_flow",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/apps/{{ _.test_app_id }}/tracks/{% response 'body', 'req_02_get_tracks', 'b64::JC5pdGVtc1swXS50cmFja0lk' %}/claims/ensure",
+      "name": "05. Ensure Claim Exists", 
+      "description": "Creates a claim for the profile field if it doesn't exist. The claimId will be automatically extracted from the response for subsequent requests.",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"fieldKey\": \"encryption_at_rest\",\n  \"method\": \"evidence\",\n  \"scopeType\": \"application\",\n  \"scopeId\": \"{{ _.test_app_id }}\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Accept", 
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693167599600,
+      "isPrivate": false
+    },
+    {
+      "_id": "req_06_attach_evidence_to_claim",
+      "parentId": "fld_orchestration_flow",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/claims/{% response 'body', 'req_05_ensure_claim', 'b64::JC5jbGFpbUlk' %}/evidence/{% response 'body', 'req_04_create_evidence_with_document', 'b64::JC5ldmlkZW5jZUlk' %}/attach",
+      "name": "06. Attach Evidence to Claim",
+      "description": "Final step: Attaches evidence to claim using request chaining to extract the claimId and evidenceId from previous requests.",
+      "method": "POST", 
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"documentId\": \"{% response 'body', 'req_04_create_evidence_with_document', 'b64::JC5kb2N1bWVudC5kb2N1bWVudElk' %}\",\n  \"docVersionId\": null\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693167599500,
+      "isPrivate": false
+    },
+    {
+      "_id": "fld_verification",
+      "parentId": "wrk_orchestration",
+      "_type": "request_group", 
+      "name": "✅ Verification Requests",
+      "description": "Verify the complete flow worked correctly",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1693167590000
+    },
+    {
+      "_id": "req_verify_evidence",
+      "parentId": "fld_verification",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/evidence/{% response 'body', 'req_04_create_evidence_with_document', 'b64::JC5ldmlkZW5jZUlk' %}",
+      "name": "Verify Evidence Details",
+      "description": "Check that evidence was created with correct claim attachment",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693167599400,
+      "isPrivate": false
+    },
+    {
+      "_id": "req_verify_claim_with_evidence",
+      "parentId": "fld_verification",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/claims/{% response 'body', 'req_05_ensure_claim', 'b64::JC5jbGFpbUlk' %}",
+      "name": "Verify Claim with Evidence",
+      "description": "Check that claim shows attached evidence",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Accept", 
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693167599300,
+      "isPrivate": false
+    },
+    {
+      "_id": "req_verify_app_evidence",
+      "parentId": "fld_verification",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/apps/{{ _.test_app_id }}/evidence",
+      "name": "Verify App Evidence List", 
+      "description": "Check that evidence appears in app's evidence list",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        {
+          "name": "page",
+          "value": "1",
+          "disabled": false
+        },
+        {
+          "name": "pageSize", 
+          "value": "10",
+          "disabled": false
+        }
+      ],
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693167599200,
+      "isPrivate": false
+    },
+    {
+      "_id": "fld_cleanup",
+      "parentId": "wrk_orchestration",
+      "_type": "request_group",
+      "name": "🧹 Cleanup (Optional)",
+      "description": "Clean up test data if needed",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1693167580000
+    },
+    {
+      "_id": "req_cleanup_app",
+      "parentId": "fld_cleanup",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/apps/{{ _.test_app_id }}",
+      "name": "Delete Test Application",
+      "description": "Removes the test application (cascades to delete all related data)",
+      "method": "DELETE",
+      "body": {},
+      "parameters": [
+        {
+          "name": "soft",
+          "value": "false",
+          "disabled": false
+        }
+      ],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -1693167599100,
+      "isPrivate": false
+    }
+  ]
+}

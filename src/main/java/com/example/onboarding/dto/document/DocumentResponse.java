@@ -11,7 +11,7 @@ public record DocumentResponse(
         String sourceType,    // "gitlab" | "confluence" | "other"
         String owners,
         Integer linkHealth,   // HTTP status or health indicator
-        List<String> tags,    // Field types this document can be used for
+        List<String> relatedEvidenceFields,    // Field types this document can be used for
         DocumentVersionInfo latestVersion,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt

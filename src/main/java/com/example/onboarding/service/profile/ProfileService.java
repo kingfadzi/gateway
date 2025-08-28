@@ -1,13 +1,13 @@
 package com.example.onboarding.service.profile;
 
 import com.example.onboarding.dto.PageResponse;
-import com.example.onboarding.dto.evidence.CreateEvidenceRequest;
-import com.example.onboarding.dto.evidence.Evidence;
 import com.example.onboarding.dto.profile.DomainGraphPayload;
 import com.example.onboarding.dto.profile.PatchProfileRequest;
 import com.example.onboarding.dto.profile.PatchProfileResponse;
+import com.example.onboarding.dto.profile.ProfileFieldContext;
 import com.example.onboarding.dto.profile.ProfilePayload;
 import com.example.onboarding.dto.profile.ProfileSnapshotDto;
+import com.example.onboarding.dto.profile.SuggestedEvidence;
 
 public interface ProfileService {
     ProfileSnapshotDto getProfile(String appId);
@@ -16,11 +16,10 @@ public interface ProfileService {
     
     DomainGraphPayload getProfileDomainGraph(String appId);
 
+    ProfileFieldContext getProfileFieldContext(String appId, String fieldKey);
+
+    SuggestedEvidence getSuggestedEvidence(String appId, String fieldKey);
+
     PatchProfileResponse patchProfile(String appId, PatchProfileRequest req);
 
-    PageResponse<Evidence> listEvidence(String appId, String fieldKey, int page, int pageSize);
-
-    Evidence addEvidence(String appId, CreateEvidenceRequest req);
-
-    void deleteEvidence(String appId, String evidenceId);
 }
