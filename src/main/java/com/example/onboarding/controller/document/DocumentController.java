@@ -43,9 +43,9 @@ public class DocumentController {
     
     /**
      * Get all documents for an application with pagination
-     * GET /api/apps/{appId}/documents?page=1&pageSize=10
+     * GET /api/apps/{appId}/docs?page=1&pageSize=10
      */
-    @GetMapping("/apps/{appId}/documents")
+    @GetMapping("/apps/{appId}/docs")
     public ResponseEntity<PageResponse<DocumentSummary>> getDocuments(
             @PathVariable String appId,
             @RequestParam(defaultValue = "1") int page,
