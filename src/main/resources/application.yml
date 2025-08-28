@@ -51,6 +51,14 @@ opa:
   read-timeout-ms: 5000
   # auth-header: "Bearer xxx"   # optional
 
+app:
+  external-apis:
+    gitlab:
+      token: ${GITLAB_API_TOKEN:}
+    confluence:
+      username: ${CONFLUENCE_USERNAME:}
+      token: ${CONFLUENCE_API_TOKEN:}
+
 autoprofile:
   enabled: true
   registryPath: classpath:profile-fields.registry.yaml
@@ -58,6 +66,53 @@ autoprofile:
 
 features:
   reuseSuggestions: true
+
+# Document URL validation configuration
+document-validation:
+  allowed-domains:
+    # Official GitLab domains
+    gitlab:
+      - "gitlab.com"
+      - "gitlab.io"
+    # Official Confluence/Atlassian domains  
+    confluence:
+      - "atlassian.net"
+      - "atlassian.com"
+    # Corporate self-hosted domains (configurable per environment)
+    corporate:
+      - "butterflycluster.com"
+      - "corp.company.org" 
+      - "internal.enterprise.net"
+  
+  # Domains that are always rejected
+  blocked-domains:
+    - "example.com"
+    - "example.org" 
+    - "example.net"
+    - "test.com"
+    - "localhost"
+    - "127.0.0.1"
+    - "0.0.0.0"
+  
+  # Patterns that indicate fake/test domains
+  blocked-patterns:
+    - "example"
+    - "test" 
+    - "fake"
+    - "mock"
+    - "dummy"
+    - "placeholder"
+    - "demo"
+  
+  # Response validation settings
+  response-validation:
+    # Minimum content requirements for valid responses
+    min-title-length: 3
+    min-content-size: 100
+    # Required HTTP status codes that indicate valid content
+    valid-status-codes: [200, 302]
+    # Timeout for validation requests (ms)
+    validation-timeout: 30000
 
 
 

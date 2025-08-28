@@ -35,6 +35,22 @@ erDiagram
     timestamptz updated_at
   }
 
+%% NEW: bounded governance/compliance engagement
+  TRACK {
+    text track_id PK
+    text app_id FK
+    text title
+    text intent        "compliance|risk|security|architecture"
+    text status        "open|in_review|closed"
+    text result        "pass|fail|waived|abandoned"
+    timestamptz opened_at
+    timestamptz closed_at
+    text source_system "jira|snow|gitlab|manual|policy"
+    text source_ref
+    timestamptz created_at
+    timestamptz updated_at
+  }
+
   SERVICE_INSTANCES {
     text it_service_instance_sysid PK
     text app_id FK
@@ -75,6 +91,7 @@ erDiagram
   CONTROL_CLAIM {
     text claim_id PK
     text app_id FK
+    text track_id FK
     text field_key
     text method
     text status
@@ -92,6 +109,7 @@ erDiagram
   EVIDENCE {
     text evidence_id PK
     text app_id FK
+    text track_id FK
     text profile_field_id FK
     text claim_id FK
     text uri
@@ -139,13 +157,15 @@ erDiagram
     text tag_key
   }
 
-  %% Relationships
+%% Relationships (key ones only; everything rolls up to TRACK until closed)
+  APPLICATION ||--o{ TRACK : has
+
   APPLICATION ||--o{ SERVICE_INSTANCES : has
   APPLICATION ||--o{ PROFILE : has
   PROFILE ||--o{ PROFILE_FIELD : has
 
-  APPLICATION ||--o{ CONTROL_CLAIM : owns
-  APPLICATION ||--o{ EVIDENCE : owns
+  TRACK ||--o{ CONTROL_CLAIM : creates
+  TRACK ||--o{ EVIDENCE : collects
 
   PROFILE_FIELD ||--o{ EVIDENCE : supported_by
   CONTROL_CLAIM ||--o{ EVIDENCE : substantiated_by

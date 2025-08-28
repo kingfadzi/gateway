@@ -72,12 +72,8 @@ public class KpiRepository {
 
     /** Risk Blocked = all open risks (portfolio-wide) */
     public int riskBlocked() {
-        final String sql = """
-            SELECT COUNT(*) AS riskBlocked
-            FROM risk_story r
-            WHERE r.status = 'open'
-            """;
-        return jdbc.queryForObject(sql, Map.of(), Integer.class);
+        // Risk story functionality removed - returning 0
+        return 0;
     }
 
     /** App-specific: Compliant = count of profile fields that have at least one active evidence (latest version only) */
@@ -146,13 +142,7 @@ public class KpiRepository {
 
     /** App-specific: Risk Blocked = count of open risks for this specific app */
     public int riskBlockedForApp(String appId) {
-        final String sql = """
-            SELECT COUNT(*) AS riskBlocked
-            FROM risk_story r
-            WHERE r.status = 'open'
-            AND r.app_id = :appId
-            AND r.scope_id = :appId
-            """;
-        return jdbc.queryForObject(sql, Map.of("appId", appId), Integer.class);
+        // Risk story functionality removed - returning 0
+        return 0;
     }
 }

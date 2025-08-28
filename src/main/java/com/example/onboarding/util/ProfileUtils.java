@@ -6,7 +6,6 @@ import com.example.onboarding.dto.evidence.Evidence;
 import com.example.onboarding.dto.profile.FieldRow;
 import com.example.onboarding.dto.profile.ProfileField;
 import com.example.onboarding.dto.profile.ProfileMeta;
-import com.example.onboarding.dto.risk.RiskStory;
 import org.springframework.jdbc.core.RowMapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -116,19 +115,6 @@ public final class ProfileUtils {
         );
     }
     
-    public static RiskStory mapRiskStory(ResultSet rs, int rowNum) throws SQLException {
-        return new RiskStory(
-                rs.getString("risk_key"),
-                rs.getString("domain"),
-                rs.getString("status"),
-                rs.getString("scope_type"),
-                rs.getString("scope_id"),
-                rs.getString("release_id"),
-                rs.getObject("sla_due", java.time.OffsetDateTime.class),
-                rs.getObject("created_at", java.time.OffsetDateTime.class),
-                rs.getObject("updated_at", java.time.OffsetDateTime.class)
-        );
-    }
     
     public static ServiceInstanceRow mapServiceInstance(ResultSet rs, int rowNum) throws SQLException {
         return new ServiceInstanceRow(

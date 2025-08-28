@@ -1,0 +1,728 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2025-08-27T22:45:00.000Z",
+  "__export_source": "insomnia.desktop.app:v2023.5.8",
+  "resources": [
+    {
+      "_id": "req_env",
+      "parentId": "wrk_main",
+      "_type": "environment",
+      "name": "Base Environment",
+      "data": {
+        "base_url": "http://localhost:8080",
+        "sample_app_id": "app-sample-001",
+        "sample_document_id": "doc_123456789"
+      },
+      "dataPropertyOrder": {
+        "&": ["base_url", "sample_app_id", "sample_document_id"]
+      },
+      "color": null,
+      "isPrivate": false,
+      "metaSortKey": 1693167600000
+    },
+    {
+      "_id": "wrk_main",
+      "_type": "workspace",
+      "name": "Delivery Unit Backend API",
+      "description": "API endpoints for the delivery unit backend application",
+      "scope": null
+    },
+    {
+      "_id": "fld_applications",
+      "parentId": "wrk_main",
+      "_type": "request_group",
+      "name": "📱 Applications",
+      "description": "Application management endpoints",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1693167600000
+    },
+    {
+      "_id": "req_app_search",
+      "parentId": "fld_applications",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/apps",
+      "name": "Search Applications",
+      "description": "Search for applications with optional query parameters",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        {
+          "id": "param_search_name",
+          "name": "name",
+          "value": "",
+          "description": "Filter by application name",
+          "disabled": true
+        },
+        {
+          "id": "param_search_owner",
+          "name": "owner",
+          "value": "",
+          "description": "Filter by owner",
+          "disabled": true
+        }
+      ],
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693167600000,
+      "isPrivate": false
+    },
+    {
+      "_id": "req_app_get",
+      "parentId": "fld_applications",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/apps/{{ _.sample_app_id }}",
+      "name": "Get Application",
+      "description": "Get application details by ID",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693167599000,
+      "isPrivate": false
+    },
+    {
+      "_id": "req_app_create",
+      "parentId": "fld_applications",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/apps",
+      "name": "Create Application",
+      "description": "Create a new application - server will fetch CIA+S+R and build profile",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"appId\": \"{{ _.sample_app_id }}\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693167598000,
+      "isPrivate": false
+    },
+    {
+      "_id": "req_app_children",
+      "parentId": "fld_applications",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/apps/{{ _.sample_app_id }}/children",
+      "name": "Get Child Applications",
+      "description": "Get child applications for a parent app",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693167597000,
+      "isPrivate": false
+    },
+    {
+      "_id": "req_app_rebuild",
+      "parentId": "fld_applications",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/apps/{{ _.sample_app_id }}/auto-profile:rebuild",
+      "name": "Rebuild Application Profile",
+      "description": "Rebuild application profile (idempotent)",
+      "method": "POST",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693167596000,
+      "isPrivate": false
+    },
+    {
+      "_id": "fld_app_metadata",
+      "parentId": "wrk_main",
+      "_type": "request_group",
+      "name": "📊 Application Metadata",
+      "description": "Application metadata and environment endpoints",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1693167500000
+    },
+    {
+      "_id": "req_app_details",
+      "parentId": "fld_app_metadata",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/app-metadata/{{ _.sample_app_id }}",
+      "name": "Get Application Details",
+      "description": "Get detailed application metadata",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693167500000,
+      "isPrivate": false
+    },
+    {
+      "_id": "req_app_environments",
+      "parentId": "fld_app_metadata",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/app-metadata/{{ _.sample_app_id }}/environments",
+      "name": "Get Application Environments",
+      "description": "Get environments for an application",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693167499000,
+      "isPrivate": false
+    },
+    {
+      "_id": "fld_profiles",
+      "parentId": "wrk_main",
+      "_type": "request_group",
+      "name": "👤 Profiles",
+      "description": "Application profile management endpoints",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1693167400000
+    },
+    {
+      "_id": "req_profile_get",
+      "parentId": "fld_profiles",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/apps/{{ _.sample_app_id }}/profile",
+      "name": "Get Application Profile",
+      "description": "Get the complete profile for an application",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693167400000,
+      "isPrivate": false
+    },
+    {
+      "_id": "req_profile_evidence",
+      "parentId": "fld_profiles",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/apps/{{ _.sample_app_id }}/evidence",
+      "name": "List Profile Evidence",
+      "description": "List evidence for an application profile",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        {
+          "id": "param_page",
+          "name": "page",
+          "value": "0",
+          "description": "Page number (0-based)"
+        },
+        {
+          "id": "param_size",
+          "name": "size",
+          "value": "10",
+          "description": "Page size"
+        }
+      ],
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693167399000,
+      "isPrivate": false
+    },
+    {
+      "_id": "req_field_keys",
+      "parentId": "fld_profiles",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/apps/{{ _.sample_app_id }}/field-keys",
+      "name": "List Field Keys",
+      "description": "List field keys for the app's latest profile",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693167398000,
+      "isPrivate": false
+    },
+    {
+      "_id": "req_field_id_resolve",
+      "parentId": "fld_profiles",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/apps/{{ _.sample_app_id }}/field-id",
+      "name": "Resolve Field ID",
+      "description": "Resolve fieldKey to profile_field.id for the app's latest profile",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        {
+          "id": "param_key",
+          "name": "key",
+          "value": "security_vision",
+          "description": "Field key to resolve"
+        }
+      ],
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693167397000,
+      "isPrivate": false
+    },
+    {
+      "_id": "fld_documents",
+      "parentId": "wrk_main",
+      "_type": "request_group",
+      "name": "📄 Documents",
+      "description": "Document management endpoints with GitLab/Confluence integration",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1693167300000
+    },
+    {
+      "_id": "req_document_create",
+      "parentId": "fld_documents",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/apps/{{ _.sample_app_id }}/documents",
+      "name": "Create Document",
+      "description": "Create a new document with GitLab/Confluence metadata extraction",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"title\": \"Security Architecture Document\",\n  \"url\": \"https://gitlab.com/example/project/-/blob/main/docs/security.md\",\n  \"fieldTypes\": [\"security_vision\", \"encryption_at_rest\", \"security_testing\"]\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693167300000,
+      "isPrivate": false
+    },
+    {
+      "_id": "req_documents_list",
+      "parentId": "fld_documents",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/apps/{{ _.sample_app_id }}/documents",
+      "name": "List Documents",
+      "description": "Get all documents for an application with complete version info including sourceDate",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693167299000,
+      "isPrivate": false
+    },
+    {
+      "_id": "req_documents_by_field",
+      "parentId": "fld_documents",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/apps/{{ _.sample_app_id }}/documents/by-field/security_vision",
+      "name": "Get Documents by Field Type", 
+      "description": "Get documents that can be used as evidence for a specific field with complete version info including sourceDate",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693167298000,
+      "isPrivate": false
+    },
+    {
+      "_id": "req_document_get",
+      "parentId": "fld_documents",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/documents/{{ _.sample_document_id }}",
+      "name": "Get Document by ID",
+      "description": "Get detailed document information by document ID",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693167297000,
+      "isPrivate": false
+    },
+    {
+      "_id": "req_profile_field_types",
+      "parentId": "fld_documents",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/profile-field-types",
+      "name": "Get Profile Field Types",
+      "description": "Get all available profile field types",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693167296000,
+      "isPrivate": false
+    },
+    {
+      "_id": "req_profile_field_types_by_domain",
+      "parentId": "fld_documents",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/profile-field-types/by-domain",
+      "name": "Get Profile Field Types by Domain",
+      "description": "Get profile field types grouped by domain",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693167295000,
+      "isPrivate": false
+    },
+    {
+      "_id": "fld_evidence",
+      "parentId": "wrk_main",
+      "_type": "request_group",
+      "name": "🗂️ Evidence",
+      "description": "Evidence management endpoints",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1693167200000
+    },
+    {
+      "_id": "req_evidence_create_json",
+      "parentId": "fld_evidence",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/apps/{{ _.sample_app_id }}/evidence",
+      "name": "Create Evidence (JSON)",
+      "description": "Create URI/link evidence",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"fieldKey\": \"security_vision\",\n  \"description\": \"Security architecture document\",\n  \"uri\": \"https://docs.company.com/security/architecture\",\n  \"metadata\": {\n    \"source\": \"confluence\",\n    \"lastUpdated\": \"2023-08-27\"\n  }\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693167200000,
+      "isPrivate": false
+    },
+    {
+      "_id": "req_evidence_create_multipart",
+      "parentId": "fld_evidence",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/apps/{{ _.sample_app_id }}/evidence",
+      "name": "Create Evidence (File Upload)",
+      "description": "Create file evidence with multipart form data",
+      "method": "POST",
+      "body": {
+        "mimeType": "multipart/form-data",
+        "params": [
+          {
+            "id": "param_field_key",
+            "name": "fieldKey",
+            "value": "security_testing",
+            "description": "Profile field key"
+          },
+          {
+            "id": "param_description",
+            "name": "description",
+            "value": "Security test results",
+            "description": "Evidence description"
+          },
+          {
+            "id": "param_file",
+            "name": "file",
+            "type": "file",
+            "fileName": "",
+            "description": "File to upload"
+          }
+        ]
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693167199000,
+      "isPrivate": false
+    },
+    {
+      "_id": "req_evidence_list",
+      "parentId": "fld_evidence",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/apps/{{ _.sample_app_id }}/evidence",
+      "name": "List Evidence",
+      "description": "List evidence for an application",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        {
+          "id": "param_field_key",
+          "name": "fieldKey",
+          "value": "",
+          "description": "Filter by field key",
+          "disabled": true
+        },
+        {
+          "id": "param_page",
+          "name": "page",
+          "value": "0",
+          "description": "Page number"
+        },
+        {
+          "id": "param_size",
+          "name": "size",
+          "value": "20",
+          "description": "Page size"
+        }
+      ],
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693167198000,
+      "isPrivate": false
+    },
+    {
+      "_id": "req_evidence_review",
+      "parentId": "fld_evidence",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/evidence/evidence-123/review",
+      "name": "Review Evidence",
+      "description": "Submit a review for evidence",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"decision\": \"APPROVED\",\n  \"comments\": \"Evidence meets requirements\",\n  \"reviewerId\": \"reviewer-001\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693167197000,
+      "isPrivate": false
+    },
+    {
+      "_id": "fld_kpis",
+      "parentId": "wrk_main",
+      "_type": "request_group",
+      "name": "📈 KPIs",
+      "description": "Key Performance Indicator endpoints",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1693167100000
+    },
+    {
+      "_id": "req_portfolio_kpis",
+      "parentId": "fld_kpis",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/kpis",
+      "name": "Get Portfolio KPIs",
+      "description": "Get KPIs for the entire portfolio",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693167100000,
+      "isPrivate": false
+    },
+    {
+      "_id": "req_app_kpis",
+      "parentId": "fld_kpis",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/apps/{{ _.sample_app_id }}/kpis",
+      "name": "Get Application KPIs",
+      "description": "Get KPIs for a specific application",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693167099000,
+      "isPrivate": false
+    },
+    {
+      "_id": "fld_tools",
+      "parentId": "wrk_main",
+      "_type": "request_group",
+      "name": "🔧 Tools",
+      "description": "Tool integration endpoints (Jira, Repos, Services)",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1693167000000
+    },
+    {
+      "_id": "req_jira_tools",
+      "parentId": "fld_tools",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/tools/jira/by-app/{{ _.sample_app_id }}",
+      "name": "Get Jira Projects by App",
+      "description": "Get Jira projects associated with an application",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693167000000,
+      "isPrivate": false
+    },
+    {
+      "_id": "req_repo_tools",
+      "parentId": "fld_tools",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/tools/repos/by-app/{{ _.sample_app_id }}",
+      "name": "Get Repositories by App",
+      "description": "Get repositories associated with an application",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693166999000,
+      "isPrivate": false
+    },
+    {
+      "_id": "req_service_tools",
+      "parentId": "fld_tools",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/tools/service/by-app/{{ _.sample_app_id }}",
+      "name": "Get Services by App",
+      "description": "Get services associated with an application",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693166998000,
+      "isPrivate": false
+    }
+  ]
+}

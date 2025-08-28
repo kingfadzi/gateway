@@ -4,7 +4,6 @@ import com.example.onboarding.dto.evidence.Evidence;
 import com.example.onboarding.dto.profile.FieldRow;
 import com.example.onboarding.dto.profile.ProfileField;
 import com.example.onboarding.dto.profile.ProfileMeta;
-import com.example.onboarding.dto.risk.RiskStory;
 import com.example.onboarding.util.ProfileUtils;
 import com.example.onboarding.config.FieldRegistryConfig;
 import org.springframework.dao.EmptyResultDataAccessException;
@@ -262,14 +261,6 @@ public class ProfileRepository {
         """, new MapSqlParameterSource().addValue("fieldIds", fieldIds), ProfileUtils::mapEvidence);
     }
 
-    public List<RiskStory> getRisks(String appId) {
-        return jdbc.query("""
-            SELECT risk_key, domain, status, scope_type, scope_id, release_id, sla_due, created_at, updated_at
-            FROM risk_story
-            WHERE app_id = :appId
-            ORDER BY created_at DESC
-        """, new MapSqlParameterSource().addValue("appId", appId), ProfileUtils::mapRiskStory);
-    }
 
     public Map<String, Object> getApplication(String appId) {
         return queryOneAsMap(

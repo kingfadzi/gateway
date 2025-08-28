@@ -5,7 +5,6 @@ import com.example.onboarding.dto.PageResponse;
 import com.example.onboarding.dto.evidence.CreateEvidenceRequest;
 import com.example.onboarding.dto.evidence.Evidence;
 import com.example.onboarding.dto.profile.*;
-import com.example.onboarding.dto.risk.RiskStory;
 import com.example.onboarding.repository.profile.ProfileRepository;
 import com.example.onboarding.util.ProfileUtils;
 import org.springframework.stereotype.Service;
@@ -103,7 +102,6 @@ public class ProfileServiceImpl implements ProfileService {
         List<String> fieldIds = fields.stream().map(ProfileField::fieldId).collect(Collectors.toList());
         
         List<Evidence> evidenceList = profileRepository.getEvidence(fieldIds);
-        List<RiskStory> riskList = profileRepository.getRisks(appId);
         
         // Build drivers map
         Map<String, String> drivers = new HashMap<>();
@@ -139,16 +137,8 @@ public class ProfileServiceImpl implements ProfileService {
                 ))
                 .collect(Collectors.toList());
         
-        // Convert RiskStory to RiskPayload - using riskKey as risk_id and domain as title for now
-        List<RiskPayload> riskPayloads = riskList.stream()
-                .map(risk -> new RiskPayload(
-                        risk.riskKey(),
-                        getProfileFieldIdForDomain(risk.domain(), fieldPayloads), // Map domain to field
-                        risk.domain(), // Using domain as title for now
-                        "Medium", // Default severity since not in RiskStory
-                        risk.status()
-                ))
-                .collect(Collectors.toList());
+        // Risk functionality removed
+        List<RiskPayload> riskPayloads = Collections.emptyList();
         
         return new ProfilePayload(
                 (String) appData.get("app_id"),
@@ -174,15 +164,10 @@ public class ProfileServiceImpl implements ProfileService {
         List<String> fieldIds = fields.stream().map(ProfileField::fieldId).collect(Collectors.toList());
         
         List<Evidence> evidenceList = profileRepository.getEvidence(fieldIds);
-        List<RiskStory> riskList = profileRepository.getRisks(appId);
         
         // Group evidence by field ID
         Map<String, List<Evidence>> evidenceByField = evidenceList.stream()
                 .collect(Collectors.groupingBy(Evidence::profileFieldId));
-        
-        // Group risks by domain (simplified - associate by domain matching)
-        Map<String, List<RiskStory>> risksByDomain = riskList.stream()
-                .collect(Collectors.groupingBy(RiskStory::domain));
         
         // Group fields by derived_from (domain)
         Map<String, List<ProfileField>> fieldsByDomain = fields.stream()
@@ -209,16 +194,8 @@ public class ProfileServiceImpl implements ProfileService {
                         ))
                         .collect(Collectors.toList());
                 
-                // Get risks for this domain (simplified mapping)
-                List<RiskStory> risksForDomain = risksByDomain.getOrDefault(domainKey.replace("_rating", ""), Collections.emptyList());
-                List<RiskGraphPayload> riskGraphPayloads = risksForDomain.stream()
-                        .map(risk -> new RiskGraphPayload(
-                                risk.riskKey(),
-                                risk.domain(), // Using domain as title for now
-                                "Medium", // Default severity
-                                risk.status()
-                        ))
-                        .collect(Collectors.toList());
+                // Risk functionality removed
+                List<RiskGraphPayload> riskGraphPayloads = Collections.emptyList();
                 
                 fieldPayloads.add(new FieldGraphPayload(
                         field.fieldKey(),
