@@ -35,250 +35,250 @@ fields:
     label: Encryption at Rest
     derived_from: security_rating
     rule:
-      A1: { value: required, ttl: 90d }
-      A2: { value: required, ttl: 90d }
-      B:  { value: required, ttl: 180d }
-      C:  { value: required, ttl: 365d }
-      D:  { value: optional, ttl: 365d }
+      A1: { value: required, label: "Required", ttl: 90d }
+      A2: { value: required, label: "Required", ttl: 90d }
+      B:  { value: required, label: "Required", ttl: 180d }
+      C:  { value: required, label: "Required", ttl: 365d }
+      D:  { value: optional, label: "Optional", ttl: 365d }
 
   - key: encryption_in_transit
     label: Encryption in Transit
     derived_from: security_rating
     rule:
-      A1: { value: required, ttl: 90d }
-      A2: { value: required, ttl: 90d }
-      B:  { value: required, ttl: 180d }
-      C:  { value: recommended, ttl: 365d }
-      D:  { value: recommended, ttl: 365d }
+      A1: { value: required,    label: "Required",    ttl: 90d }
+      A2: { value: required,    label: "Required",    ttl: 90d }
+      B:  { value: required,    label: "Required",    ttl: 180d }
+      C:  { value: recommended, label: "Recommended", ttl: 365d }
+      D:  { value: recommended, label: "Recommended", ttl: 365d }
 
   - key: security_testing
     label: Security Testing
     derived_from: security_rating
     rule:
-      A1: { value: external_pentest_annual+continuous_scans, ttl: 365d }
-      A2: { value: internal_pentest_annual+continuous_scans, ttl: 365d }
-      B:  { value: sast+dast_quarterly_scan, ttl: 90d }
-      C:  { value: sast_on_release, ttl: 180d }
-      D:  { value: sast_optional, ttl: 365d }
+      A1: { value: external_pentest_annual+continuous_scans, label: "External pentest (annual) + continuous scans", ttl: 365d }
+      A2: { value: internal_pentest_annual+continuous_scans, label: "Internal pentest (annual) + continuous scans", ttl: 365d }
+      B:  { value: sast+dast_quarterly_scan,                  label: "SAST + quarterly DAST",                         ttl: 90d }
+      C:  { value: sast_on_release,                           label: "SAST on release",                               ttl: 180d }
+      D:  { value: sast_optional,                             label: "SAST optional",                                 ttl: 365d }
 
   - key: secrets_management
     label: Secrets Management
     derived_from: security_rating
     rule:
-      A1: { value: centralized_required, ttl: 90d }
-      A2: { value: centralized_required, ttl: 90d }
-      B:  { value: centralized_recommended, ttl: 180d }
-      C:  { value: centralized_recommended, ttl: 365d }
-      D:  { value: minimal_ok, ttl: 365d }
+      A1: { value: centralized_required,    label: "Centralized (required)",    ttl: 90d }
+      A2: { value: centralized_required,    label: "Centralized (required)",    ttl: 90d }
+      B:  { value: centralized_recommended, label: "Centralized (recommended)", ttl: 180d }
+      C:  { value: centralized_recommended, label: "Centralized (recommended)", ttl: 365d }
+      D:  { value: minimal_ok,              label: "Minimal acceptable",        ttl: 365d }
 
   - key: key_rotation_max
     label: Key Rotation Max
     derived_from: security_rating
     rule:
-      A1: { value: 90d,  ttl: 90d }
-      A2: { value: 180d, ttl: 180d }
-      B:  { value: 365d, ttl: 365d }
-      C:  { value: 365d, ttl: 365d }
-      D:  { value: n/a,  ttl: 0d }
+      A1: { value: 90d,  label: "Rotate ≤ 90 days",  ttl: 90d }
+      A2: { value: 180d, label: "Rotate ≤ 180 days", ttl: 180d }
+      B:  { value: 365d, label: "Rotate ≤ 365 days", ttl: 365d }
+      C:  { value: 365d, label: "Rotate ≤ 365 days", ttl: 365d }
+      D:  { value: n/a,  label: "Not applicable",    ttl: 0d }
 
   # ---- Integrity
   - key: data_validation
     label: Data Validation
     derived_from: integrity_rating
     rule:
-      A: { value: dual_control,        ttl: 90d }
-      B: { value: strong_validation,   ttl: 90d }
-      C: { value: standard_validation, ttl: 180d }
-      D: { value: minimal_validation,  ttl: 365d }
+      A: { value: dual_control,        label: "Dual control",        ttl: 90d }
+      B: { value: strong_validation,   label: "Strong validation",   ttl: 90d }
+      C: { value: standard_validation, label: "Standard validation", ttl: 180d }
+      D: { value: minimal_validation,  label: "Minimal validation",  ttl: 365d }
 
   - key: reconciliation_frequency
     label: Reconciliation Frequency
     derived_from: integrity_rating
     rule:
-      A: { value: daily,   ttl: 90d }
-      B: { value: weekly,  ttl: 30d }
-      C: { value: per_release, ttl: 180d }
-      D: { value: ad_hoc, ttl: 180d }
+      A: { value: daily,       label: "Daily",        ttl: 90d }
+      B: { value: weekly,      label: "Weekly",       ttl: 30d }
+      C: { value: per_release, label: "Per release",  ttl: 180d }
+      D: { value: ad_hoc,      label: "Ad hoc",       ttl: 180d }
 
   - key: audit_logging
     label: Audit Logging
     derived_from: integrity_rating
     rule:
-      A: { value: full_with_daily_review, ttl: 90d }
-      B: { value: full_with_periodic_review, ttl: 90d }
-      C: { value: logging_enabled+sampled_review, ttl: 180d }
-      D: { value: basic_logging, ttl: 365d }
+      A: { value: full_with_daily_review,      label: "Full logging + daily review",      ttl: 90d }
+      B: { value: full_with_periodic_review,   label: "Full logging + periodic review",   ttl: 90d }
+      C: { value: logging_enabled+sampled_review, label: "Logging enabled + sampled review", ttl: 180d }
+      D: { value: basic_logging,               label: "Basic logging",                    ttl: 365d }
 
   - key: change_control
     label: Change Control
     derived_from: integrity_rating
     rule:
-      A: { value: independent_review+regression_suite, ttl: 90d }
-      B: { value: peer_review+regression_suite, ttl: 90d }
-      C: { value: peer_review+unit_tests, ttl: 90d }
-      D: { value: optional_peer_review, ttl: 180d }
+      A: { value: independent_review+regression_suite, label: "Independent review + regression suite", ttl: 90d }
+      B: { value: peer_review+regression_suite,        label: "Peer review + regression suite",        ttl: 90d }
+      C: { value: peer_review+unit_tests,              label: "Peer review + unit tests",              ttl: 90d }
+      D: { value: optional_peer_review,                label: "Optional peer review",                  ttl: 180d }
 
   - key: immutability_required
     label: Immutability Required
     derived_from: integrity_rating
     rule:
-      A: { value: yes, ttl: 90d }
-      B: { value: yes, ttl: 90d }
-      C: { value: no,  ttl: 180d }
-      D: { value: no,  ttl: 365d }
+      A: { value: yes, label: "Yes", ttl: 90d }
+      B: { value: yes, label: "Yes", ttl: 90d }
+      C: { value: no,  label: "No",  ttl: 180d }
+      D: { value: no,  label: "No",  ttl: 365d }
 
   # ---- Availability
   - key: rto_hours
     label: RTO (hours)
     derived_from: availability_rating
     rule:
-      A: { value: 1, ttl: 90d }
-      B: { value: 4, ttl: 90d }
-      C: { value: 24, ttl: 180d }
-      D: { value: best_effort, ttl: 365d }
+      A: { value: 1,          label: "≤ 1 hour",          ttl: 90d }
+      B: { value: 4,          label: "≤ 4 hours",         ttl: 90d }
+      C: { value: 24,         label: "≤ 24 hours",        ttl: 180d }
+      D: { value: best_effort,label: "Best effort",       ttl: 365d }
 
   - key: rpo_minutes
     label: RPO (minutes)
     derived_from: availability_rating
     rule:
-      A: { value: 5, ttl: 90d }
-      B: { value: 60, ttl: 90d }
-      C: { value: 240, ttl: 180d }
-      D: { value: best_effort, ttl: 365d }
+      A: { value: 5,          label: "≤ 5 minutes",       ttl: 90d }
+      B: { value: 60,         label: "≤ 60 minutes",      ttl: 90d }
+      C: { value: 240,        label: "≤ 240 minutes",     ttl: 180d }
+      D: { value: best_effort,label: "Best effort",       ttl: 365d }
 
   - key: ha_topology
     label: HA Topology
     derived_from: availability_rating
     rule:
-      A: { value: active_active,  ttl: 90d }
-      B: { value: active_passive, ttl: 90d }
-      C: { value: backup_restore, ttl: 180d }
-      D: { value: none, ttl: 365d }
+      A: { value: active_active,  label: "Active-Active",  ttl: 90d }
+      B: { value: active_passive, label: "Active-Passive", ttl: 90d }
+      C: { value: backup_restore, label: "Backup/Restore", ttl: 180d }
+      D: { value: none,           label: "None",           ttl: 365d }
 
   - key: monitoring_slos
     label: Monitoring SLOs
     derived_from: availability_rating
     rule:
-      A: { value: "99.9+_with_alerting", ttl: 90d }
-      B: { value: "99.5_with_alerting",  ttl: 90d }
-      C: { value: "99.0", ttl: 180d }
-      D: { value: none, ttl: 365d }
+      A: { value: "99.9+_with_alerting", label: "≥99.9% with alerting", ttl: 90d }
+      B: { value: "99.5_with_alerting",  label: "≥99.5% with alerting", ttl: 90d }
+      C: { value: "99.0",                label: "≥99.0%",               ttl: 180d }
+      D: { value: none,                  label: "None",                  ttl: 365d }
 
   - key: oncall_coverage
     label: On-call Coverage
     derived_from: availability_rating
     rule:
-      A: { value: "24x7", ttl: 90d }
-      B: { value: "16x5", ttl: 90d }
-      C: { value: "business_hours", ttl: 90d }
-      D: { value: none, ttl: 365d }
+      A: { value: "24x7",           label: "24×7",           ttl: 90d }
+      B: { value: "16x5",           label: "16×5",           ttl: 90d }
+      C: { value: "business_hours", label: "Business hours", ttl: 90d }
+      D: { value: none,             label: "None",           ttl: 365d }
 
   # ---- Resilience
   - key: dr_test_frequency
     label: DR Test Frequency
     derived_from: resilience_rating
     rule:
-      "0": { value: semi_annual_live, ttl: 180d }
-      "1": { value: annual_live,      ttl: 365d }
-      "2": { value: annual_tabletop,  ttl: 180d }
-      "3": { value: ad_hoc_tabletop,  ttl: 365d }
-      "4": { value: none,             ttl: 0d }
+      "0": { value: semi_annual_live, ttl: 180d, label: "Semi-annual live" }
+      "1": { value: annual_live,      ttl: 365d, label: "Annual live" }
+      "2": { value: annual_tabletop,  ttl: 180d, label: "Annual tabletop" }
+      "3": { value: ad_hoc_tabletop,  ttl: 365d, label: "Ad-hoc tabletop" }
+      "4": { value: none,             ttl: 0d,   label: "None" }
 
   - key: backup_policy
     label: Backup Policy
     derived_from: resilience_rating
     rule:
-      "0": { value: encrypted_geo_redundant+tested_restores, ttl: 90d }
-      "1": { value: encrypted+tested_restores, ttl: 90d }
-      "2": { value: standard_backups+periodic_restore_test, ttl: 180d }
-      "3": { value: standard_backups, ttl: 365d }
-      "4": { value: optional, ttl: 0d }
+      "0": { value: encrypted_geo_redundant+tested_restores, label: "Encrypted geo-redundant + tested restores", ttl: 90d }
+      "1": { value: encrypted+tested_restores,                label: "Encrypted + tested restores",              ttl: 90d }
+      "2": { value: standard_backups+periodic_restore_test,   label: "Standard + periodic restore test",         ttl: 180d }
+      "3": { value: standard_backups,                         label: "Standard backups",                          ttl: 365d }
+      "4": { value: optional,                                 label: "Optional",                                  ttl: 0d }
 
   - key: failover_automation
     label: Failover Automation
     derived_from: resilience_rating
     rule:
-      "0": { value: automatic, ttl: 90d }
-      "1": { value: semi_automatic, ttl: 90d }
-      "2": { value: manual, ttl: 180d }
-      "3": { value: manual, ttl: 365d }
-      "4": { value: best_effort, ttl: 0d }
+      "0": { value: automatic,      label: "Automatic",      ttl: 90d }
+      "1": { value: semi_automatic, label: "Semi-automatic", ttl: 90d }
+      "2": { value: manual,         label: "Manual",         ttl: 180d }
+      "3": { value: manual,         label: "Manual",         ttl: 365d }
+      "4": { value: best_effort,    label: "Best effort",    ttl: 0d }
 
   - key: runbook_maturity
     label: Runbook Maturity
     derived_from: resilience_rating
     rule:
-      "0": { value: certified, ttl: 90d }
-      "1": { value: approved,  ttl: 90d }
-      "2": { value: draft,     ttl: 30d }
-      "3": { value: draft,     ttl: 30d }
-      "4": { value: none,      ttl: 0d }
+      "0": { value: certified, label: "Certified", ttl: 90d }
+      "1": { value: approved,  label: "Approved",  ttl: 90d }
+      "2": { value: draft,     label: "Draft",     ttl: 30d }
+      "3": { value: draft,     label: "Draft",     ttl: 30d }
+      "4": { value: none,      label: "None",      ttl: 0d }
 
   - key: chaos_testing
     label: Chaos Testing
     derived_from: resilience_rating
     rule:
-      "0": { value: required,    ttl: 90d }
-      "1": { value: recommended, ttl: 180d }
-      "2": { value: optional,    ttl: 365d }
-      "3": { value: none,        ttl: 0d }
-      "4": { value: none,        ttl: 0d }
+      "0": { value: required,    label: "Required",    ttl: 90d }
+      "1": { value: recommended, label: "Recommended", ttl: 180d }
+      "2": { value: optional,    label: "Optional",    ttl: 365d }
+      "3": { value: none,        label: "None",        ttl: 0d }
+      "4": { value: none,        label: "None",        ttl: 0d }
 
-  # ---- App Criticality
+  # ---- App Criticality (remapped to CIA+S: using Confidentiality as the driver)
   - key: materiality
     label: Materiality
-    derived_from: app_criticality
+    derived_from: confidentiality_rating
     rule:
-      A: { value: crown_jewel, ttl: 365d }
-      B: { value: high,        ttl: 365d }
-      C: { value: medium,      ttl: 365d }
-      D: { value: low,         ttl: 365d }
+      A: { value: crown_jewel, label: "Crown jewel", ttl: 365d }
+      B: { value: high,        label: "High",        ttl: 365d }
+      C: { value: medium,      label: "Medium",      ttl: 365d }
+      D: { value: low,         label: "Low",         ttl: 365d }
 
   - key: review_depth
     label: Review Depth
-    derived_from: app_criticality
+    derived_from: confidentiality_rating
     rule:
-      A: { value: full_review,    ttl: 365d }
-      B: { value: scoped_review,  ttl: 365d }
-      C: { value: express_review, ttl: 365d }
-      D: { value: self_attested,  ttl: 365d }
+      A: { value: full_review,    label: "Full review",    ttl: 365d }
+      B: { value: scoped_review,  label: "Scoped review",  ttl: 365d }
+      C: { value: express_review, label: "Express review", ttl: 365d }
+      D: { value: self_attested,  label: "Self-attested",  ttl: 365d }
 
-  # ---- Governance Artifacts
+  # ---- Governance Artifacts (remapped to Security rating)
   - key: product_vision
     label: Product Vision
     derived_from: artifact
     rule:
-      required: { value: required, ttl: 90d }
+      required: { value: required, label: "Required", ttl: 90d }
 
   - key: product_roadmap
     label: Product Roadmap
     derived_from: artifact
     rule:
-      required: { value: required, ttl: 90d }
+      required: { value: required, label: "Required", ttl: 90d }
 
   - key: architecture_vision
     label: Architecture Vision
     derived_from: artifact
     rule:
-      required: { value: required, ttl: 90d }
+      required: { value: required, label: "Required", ttl: 90d }
 
   - key: service_vision
     label: Service Vision
     derived_from: artifact
     rule:
-      required: { value: required, ttl: 90d }
+      required: { value: required, label: "Required", ttl: 90d }
 
   - key: security_vision
     label: Security Vision
     derived_from: artifact
     rule:
-      required: { value: required, ttl: 90d }
+      required: { value: required, label: "Required", ttl: 90d }
 
   - key: test_vision
     label: Test Vision
     derived_from: artifact
     rule:
-      required: { value: required, ttl: 90d }
+      required: { value: required, label: "Required", ttl: 90d }
 
   # =========================
   # NEW: Identity & Access Mgmt
@@ -287,30 +287,30 @@ fields:
     label: Multi-Factor Authentication
     derived_from: security_rating
     rule:
-      A1: { value: required,   ttl: 90d }
-      A2: { value: required,   ttl: 90d }
-      B:  { value: recommended, ttl: 180d }
-      C:  { value: optional,   ttl: 365d }
-      D:  { value: n/a,        ttl: 0d }
+      A1: { value: required,    label: "Required",    ttl: 90d }
+      A2: { value: required,    label: "Required",    ttl: 90d }
+      B:  { value: recommended, label: "Recommended", ttl: 180d }
+      C:  { value: optional,    label: "Optional",    ttl: 365d }
+      D:  { value: n/a,         label: "Not applicable", ttl: 0d }
 
   - key: access_review
     label: Access Review Cadence
-    derived_from: app_criticality
+    derived_from: confidentiality_rating
     rule:
-      A: { value: quarterly,   ttl: 90d }
-      B: { value: semi_annual, ttl: 180d }
-      C: { value: annual,      ttl: 365d }
-      D: { value: n/a,         ttl: 0d }
+      A: { value: quarterly,   label: "Quarterly",    ttl: 90d }
+      B: { value: semi_annual, label: "Semi-annual",  ttl: 180d }
+      C: { value: annual,      label: "Annual",       ttl: 365d }
+      D: { value: n/a,         label: "Not applicable", ttl: 0d }
 
   - key: privileged_access_mgmt
     label: Privileged Access Management
     derived_from: security_rating
     rule:
-      A1: { value: centralized_required, ttl: 90d }
-      A2: { value: centralized_required, ttl: 90d }
-      B:  { value: centralized_recommended, ttl: 180d }
-      C:  { value: manual_ok, ttl: 365d }
-      D:  { value: n/a, ttl: 0d }
+      A1: { value: centralized_required,    label: "Centralized (required)",    ttl: 90d }
+      A2: { value: centralized_required,    label: "Centralized (required)",    ttl: 90d }
+      B:  { value: centralized_recommended, label: "Centralized (recommended)", ttl: 180d }
+      C:  { value: manual_ok,               label: "Manual OK",                 ttl: 365d }
+      D:  { value: n/a,                     label: "Not applicable",            ttl: 0d }
 
   # =========================
   # NEW: Vulnerability & Patch Management
@@ -319,42 +319,44 @@ fields:
     label: Patch Remediation SLA
     derived_from: security_rating
     rule:
-      A1: { value: critical_30d, ttl: 90d }
-      A2: { value: critical_30d, ttl: 90d }
-      B:  { value: critical_60d, ttl: 180d }
-      C:  { value: best_effort,  ttl: 365d }
-      D:  { value: n/a,          ttl: 0d }
+      A1: { value: critical_30d, label: "Critical ≤30 days", ttl: 90d }
+      A2: { value: critical_30d, label: "Critical ≤30 days", ttl: 90d }
+      B:  { value: critical_60d, label: "Critical ≤60 days", ttl: 180d }
+      C:  { value: best_effort,  label: "Best effort",       ttl: 365d }
+      D:  { value: n/a,          label: "Not applicable",    ttl: 0d }
 
   - key: dependency_management
     label: Dependency / SBOM Management
     derived_from: security_rating
     rule:
-      A1: { value: sbom_required, ttl: 90d }
-      A2: { value: sbom_required, ttl: 180d }
-      B:  { value: sbom_recommended, ttl: 365d }
-      C:  { value: optional, ttl: 365d }
-      D:  { value: n/a, ttl: 0d }
+      A1: { value: sbom_required,     label: "SBOM required",     ttl: 90d }
+      A2: { value: sbom_required,     label: "SBOM required",     ttl: 180d }
+      B:  { value: sbom_recommended,  label: "SBOM recommended",  ttl: 365d }
+      C:  { value: optional,          label: "Optional",          ttl: 365d }
+      D:  { value: n/a,               label: "Not applicable",    ttl: 0d }
 
   # =========================
   # NEW: Incident Response
   # =========================
   - key: ir_plan
     label: Incident Response Plan
-    derived_from: app_criticality
+    derived_from: resilience_rating
     rule:
-      A: { value: tested_quarterly, ttl: 90d }
-      B: { value: tested_annually,  ttl: 365d }
-      C: { value: documented,       ttl: 365d }
-      D: { value: n/a,              ttl: 0d }
+      "0": { value: tested_quarterly, label: "Tested quarterly", ttl: 90d }
+      "1": { value: tested_annually,  label: "Tested annually",  ttl: 365d }
+      "2": { value: documented,       label: "Documented",       ttl: 365d }
+      "3": { value: n/a,              label: "Not applicable",   ttl: 0d }
+      "4": { value: n/a,              label: "Not applicable",   ttl: 0d }
 
   - key: ir_exercise
     label: Incident Response Exercise
-    derived_from: app_criticality
+    derived_from: resilience_rating
     rule:
-      A: { value: annual_live, ttl: 365d }
-      B: { value: tabletop,    ttl: 365d }
-      C: { value: optional,    ttl: 365d }
-      D: { value: n/a,         ttl: 0d }
+      "0": { value: annual_live, label: "Annual live", ttl: 365d }
+      "1": { value: tabletop,    label: "Tabletop",    ttl: 365d }
+      "2": { value: optional,    label: "Optional",    ttl: 365d }
+      "3": { value: n/a,         label: "Not applicable", ttl: 0d }
+      "4": { value: n/a,         label: "Not applicable", ttl: 0d }
 
   # =========================
   # NEW: Third-Party / TPSP Risk (PCI-relevant)
@@ -363,10 +365,10 @@ fields:
     label: Third-Party Service Provider Attestation
     derived_from: confidentiality_rating
     rule:
-      A: { value: required, ttl: 365d }
-      B: { value: required, ttl: 365d }
-      C: { value: recommended, ttl: 365d }
-      D: { value: n/a, ttl: 0d }
+      A: { value: required,    label: "Required",    ttl: 365d }
+      B: { value: required,    label: "Required",    ttl: 365d }
+      C: { value: recommended, label: "Recommended", ttl: 365d }
+      D: { value: n/a,         label: "Not applicable", ttl: 0d }
 
   # =========================
   # NEW: Data Lifecycle & Privacy
@@ -375,40 +377,42 @@ fields:
     label: Data Retention Policy
     derived_from: confidentiality_rating
     rule:
-      A: { value: defined+enforced, ttl: 365d }
-      B: { value: defined,          ttl: 365d }
-      C: { value: recommended,      ttl: 365d }
-      D: { value: n/a,              ttl: 0d }
+      A: { value: defined+enforced, label: "Defined & enforced", ttl: 365d }
+      B: { value: defined,          label: "Defined",            ttl: 365d }
+      C: { value: recommended,      label: "Recommended",        ttl: 365d }
+      D: { value: n/a,              label: "Not applicable",     ttl: 0d }
 
   - key: data_deletion_evidence
     label: Secure Data Deletion Evidence
     derived_from: confidentiality_rating
     rule:
-      A: { value: required, ttl: 365d }
-      B: { value: required, ttl: 365d }
-      C: { value: optional, ttl: 365d }
-      D: { value: n/a,      ttl: 0d }
+      A: { value: required, label: "Required", ttl: 365d }
+      B: { value: required, label: "Required", ttl: 365d }
+      C: { value: optional, label: "Optional", ttl: 365d }
+      D: { value: n/a,      label: "Not applicable", ttl: 0d }
 
   # =========================
   # NEW: Network Security (internet-grade for A1/A2)
   # =========================
   - key: network_segmentation
     label: Network Segmentation Evidence
-    derived_from: app_criticality
+    derived_from: security_rating
     rule:
-      A: { value: pci_cde_required, ttl: 365d }
-      B: { value: segmentation_required, ttl: 365d }
-      C: { value: recommended, ttl: 365d }
-      D: { value: n/a, ttl: 0d }
+      A1: { value: pci_cde_required,     label: "PCI/CDE segmentation required", ttl: 365d }
+      A2: { value: segmentation_required,label: "Segmentation required",         ttl: 365d }
+      B:  { value: segmentation_required,label: "Segmentation required",         ttl: 365d }
+      C:  { value: recommended,          label: "Recommended",                   ttl: 365d }
+      D:  { value: n/a,                  label: "Not applicable",                ttl: 0d }
 
   - key: waf_protection
     label: Web Application Firewall Evidence
-    derived_from: app_criticality
+    derived_from: security_rating
     rule:
-      A: { value: required, ttl: 90d }
-      B: { value: required, ttl: 90d }
-      C: { value: recommended, ttl: 180d }
-      D: { value: n/a, ttl: 0d }
+      A1: { value: required,    label: "Required",    ttl: 90d }
+      A2: { value: required,    label: "Required",    ttl: 90d }
+      B:  { value: required,    label: "Required",    ttl: 90d }
+      C:  { value: recommended, label: "Recommended", ttl: 180d }
+      D:  { value: n/a,         label: "Not applicable", ttl: 0d }
 
   # =========================
   # NEW: Logging & Monitoring (extended)
@@ -417,16 +421,17 @@ fields:
     label: Log Retention Period
     derived_from: integrity_rating
     rule:
-      A: { value: ">=1y", ttl: 365d }
-      B: { value: ">=6m", ttl: 365d }
-      C: { value: ">=90d", ttl: 365d }
-      D: { value: n/a, ttl: 0d }
+      A: { value: ">=1y",  label: "≥ 1 year", ttl: 365d }
+      B: { value: ">=6m",  label: "≥ 6 months", ttl: 365d }
+      C: { value: ">=90d", label: "≥ 90 days", ttl: 365d }
+      D: { value: n/a,     label: "Not applicable", ttl: 0d }
 
   - key: siem_integration
     label: SIEM / Central Log Integration
-    derived_from: app_criticality
+    derived_from: security_rating
     rule:
-      A: { value: required, ttl: 365d }
-      B: { value: required, ttl: 365d }
-      C: { value: recommended, ttl: 365d }
-      D: { value: n/a, ttl: 0d }
+      A1: { value: required,    label: "Required",    ttl: 365d }
+      A2: { value: required,    label: "Required",    ttl: 365d }
+      B:  { value: required,    label: "Required",    ttl: 365d }
+      C:  { value: recommended, label: "Recommended", ttl: 365d }
+      D:  { value: n/a,         label: "Not applicable", ttl: 0d }

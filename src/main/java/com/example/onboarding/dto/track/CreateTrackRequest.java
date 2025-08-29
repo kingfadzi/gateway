@@ -1,5 +1,8 @@
 package com.example.onboarding.dto.track;
 
+import com.example.onboarding.util.FlexibleOffsetDateTimeDeserializer;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+
 import java.time.OffsetDateTime;
 import java.util.Map;
 
@@ -14,5 +17,6 @@ public record CreateTrackRequest(
         String resourceId,    // native external key
         String uri,           // canonical link
         Map<String, Object> attributes,  // raw payload/fields
+        @JsonDeserialize(using = FlexibleOffsetDateTimeDeserializer.class)
         OffsetDateTime openedAt
 ) {}

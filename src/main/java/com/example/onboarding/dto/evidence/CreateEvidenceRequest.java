@@ -1,5 +1,8 @@
 package com.example.onboarding.dto.evidence;
 
+import com.example.onboarding.util.FlexibleOffsetDateTimeDeserializer;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+
 import java.time.OffsetDateTime;
 
 /**
@@ -11,7 +14,9 @@ public record CreateEvidenceRequest(
         String type,                // optional - evidence type (file, link, etc.)
         String sourceSystem,        // optional - source system identifier
         String submittedBy,         // optional - who submitted the evidence
+        @JsonDeserialize(using = FlexibleOffsetDateTimeDeserializer.class)
         OffsetDateTime validFrom,   // optional - validity start (defaults to now)
+        @JsonDeserialize(using = FlexibleOffsetDateTimeDeserializer.class)
         OffsetDateTime validUntil,  // optional - validity end
         String relatedEvidenceFields, // optional - related evidence fields for categorization
         String trackId,             // optional - link to track
