@@ -3,10 +3,13 @@ package com.example.onboarding.service.evidence;
 import com.example.onboarding.dto.PageResponse;
 import com.example.onboarding.dto.document.CreateDocumentRequest;
 import com.example.onboarding.dto.document.DocumentResponse;
+import com.example.onboarding.dto.document.DocumentVersionInfo;
+import com.example.onboarding.dto.document.EnhancedDocumentResponse;
 import com.example.onboarding.dto.evidence.AttachDocumentRequest;
 import com.example.onboarding.dto.evidence.AttachedDocumentInfo;
 import com.example.onboarding.dto.evidence.AttachedDocumentsResponse;
 import com.example.onboarding.dto.evidence.CreateEvidenceRequest;
+import com.example.onboarding.dto.evidence.EnhancedAttachedDocumentsResponse;
 import com.example.onboarding.dto.evidence.CreateEvidenceWithDocumentRequest;
 import com.example.onboarding.dto.evidence.Evidence;
 import com.example.onboarding.dto.evidence.EvidenceSummary;
@@ -21,9 +24,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class EvidenceServiceImpl implements EvidenceService {
@@ -334,6 +336,19 @@ public class EvidenceServiceImpl implements EvidenceService {
     }
 
     @Override
+    public EnhancedAttachedDocumentsResponse getEnhancedAttachedDocuments(String appId, String profileFieldId) {
+        log.debug("Getting enhanced attached documents for profile field {} in app {}", profileFieldId, appId);
+        
+        List<Map<String, Object>> results = evidenceRepository.findEnhancedAttachedDocuments(appId, profileFieldId);
+        
+        List<EnhancedDocumentResponse> enhancedDocs = results.stream()
+            .map(this::mapToEnhancedDocumentResponse)
+            .collect(Collectors.toList());
+        
+        return new EnhancedAttachedDocumentsResponse(profileFieldId, appId, enhancedDocs);
+    }
+
+    @Override
     @Transactional
     @Audited(action = "ATTACH_DOCUMENT_TO_FIELD", subjectType = "profile_field", subject = "#profileFieldId",
              context = {"appId=#appId", "documentId=#request.documentId"})
@@ -383,5 +398,112 @@ public class EvidenceServiceImpl implements EvidenceService {
         
         log.debug("Deleted {} evidence records linking document {} to profile field {}", 
             deletedCount, documentId, profileFieldId);
+    }
+
+    /**
+     * Map database result to EnhancedDocumentResponse with attachment info
+     */
+    private EnhancedDocumentResponse mapToEnhancedDocumentResponse(Map<String, Object> row) {
+        // Parse related_evidence_fields from PostgreSQL array
+        List<String> relatedFields = parseRelatedEvidenceFieldsArray(row.get("related_evidence_fields"));
+        
+        // Create version info if available
+        DocumentVersionInfo versionInfo = null;
+        if (row.get("doc_version_id") != null) {
+            versionInfo = new DocumentVersionInfo(
+                (String) row.get("doc_version_id"),
+                (String) row.get("version_id"),
+                (String) row.get("url_at_version"),
+                (String) row.get("author"),
+                convertToOffsetDateTime(row.get("version_source_date")),
+                convertToOffsetDateTime(row.get("version_created_at"))
+            );
+        }
+        
+        return new EnhancedDocumentResponse(
+            (String) row.get("document_id"),
+            (String) row.get("app_id"),
+            (String) row.get("title"),
+            (String) row.get("canonical_url"),
+            (String) row.get("source_type"),
+            (String) row.get("owners"),
+            (Integer) row.get("link_health"),
+            relatedFields,
+            versionInfo,
+            convertToOffsetDateTime(row.get("doc_created_at")),
+            convertToOffsetDateTime(row.get("doc_updated_at")),
+            true, // isAttachedToField - this method is only called for attached docs
+            convertToOffsetDateTime(row.get("attached_at")),
+            (String) row.get("evidence_id"),
+            (String) row.get("source_system"),
+            (String) row.get("submitted_by")
+        );
+    }
+
+    /**
+     * Parse related evidence fields from PostgreSQL array
+     */
+    private List<String> parseRelatedEvidenceFieldsArray(Object arrayObj) {
+        if (arrayObj == null) {
+            return List.of();
+        }
+        try {
+            if (arrayObj instanceof String[] stringArray) {
+                return List.of(stringArray);
+            } else if (arrayObj instanceof java.sql.Array sqlArray) {
+                String[] stringArray = (String[]) sqlArray.getArray();
+                return stringArray != null ? List.of(stringArray) : List.of();
+            }
+            return List.of();
+        } catch (Exception e) {
+            log.warn("Failed to parse related evidence fields array: {}", arrayObj, e);
+            return List.of();
+        }
+    }
+
+    /**
+     * Parse related evidence fields JSON string to list (kept for backward compatibility)
+     */
+    private List<String> parseRelatedEvidenceFields(String jsonStr) {
+        if (jsonStr == null || jsonStr.isBlank()) {
+            return List.of();
+        }
+        try {
+            // Simple JSON array parsing - could use ObjectMapper for more complex cases
+            jsonStr = jsonStr.trim();
+            if (jsonStr.startsWith("[") && jsonStr.endsWith("]")) {
+                String content = jsonStr.substring(1, jsonStr.length() - 1);
+                if (content.isBlank()) {
+                    return List.of();
+                }
+                return Arrays.stream(content.split(","))
+                    .map(s -> s.trim().replaceAll("^\"|\"$", ""))
+                    .collect(Collectors.toList());
+            }
+            return List.of();
+        } catch (Exception e) {
+            log.warn("Failed to parse related evidence fields: {}", jsonStr, e);
+            return List.of();
+        }
+    }
+
+    /**
+     * Convert database timestamp objects to OffsetDateTime
+     */
+    private OffsetDateTime convertToOffsetDateTime(Object timestampObj) {
+        if (timestampObj == null) {
+            return null;
+        }
+        if (timestampObj instanceof OffsetDateTime offsetDateTime) {
+            return offsetDateTime;
+        }
+        if (timestampObj instanceof java.sql.Timestamp timestamp) {
+            return timestamp.toInstant().atOffset(java.time.ZoneOffset.UTC);
+        }
+        if (timestampObj instanceof java.time.LocalDateTime localDateTime) {
+            return localDateTime.atOffset(java.time.ZoneOffset.UTC);
+        }
+        log.warn("Unexpected timestamp type: {}", timestampObj.getClass());
+        return null;
     }
 }

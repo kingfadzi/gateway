@@ -4,6 +4,7 @@ import com.example.onboarding.dto.PageResponse;
 import com.example.onboarding.dto.evidence.AttachDocumentRequest;
 import com.example.onboarding.dto.evidence.AttachedDocumentsResponse;
 import com.example.onboarding.dto.evidence.CreateEvidenceRequest;
+import com.example.onboarding.dto.evidence.EnhancedAttachedDocumentsResponse;
 import com.example.onboarding.dto.evidence.CreateEvidenceWithDocumentRequest;
 import com.example.onboarding.dto.evidence.Evidence;
 import com.example.onboarding.dto.evidence.EvidenceSummary;
@@ -209,13 +210,15 @@ public class EvidenceController {
      * GET /api/apps/{appId}/profile/field/{profileFieldId}/attached-documents
      */
     @GetMapping("/apps/{appId}/profile/field/{profileFieldId}/attached-documents")
-    public ResponseEntity<AttachedDocumentsResponse> getAttachedDocuments(
+    public ResponseEntity<EnhancedAttachedDocumentsResponse> getAttachedDocuments(
             @PathVariable String appId,
-            @PathVariable String profileFieldId) {
-        log.info("Getting attached documents for profile field {} in app {}", profileFieldId, appId);
+            @PathVariable String profileFieldId,
+            @RequestParam(defaultValue = "false") boolean enhanced) {
+        log.info("Getting {} attached documents for profile field {} in app {}", 
+            enhanced ? "enhanced" : "basic", profileFieldId, appId);
         
         try {
-            AttachedDocumentsResponse response = evidenceService.getAttachedDocuments(appId, profileFieldId);
+            EnhancedAttachedDocumentsResponse response = evidenceService.getEnhancedAttachedDocuments(appId, profileFieldId);
             log.debug("Found {} attached documents for profile field {}", response.documents().size(), profileFieldId);
             return ResponseEntity.ok(response);
         } catch (Exception e) {

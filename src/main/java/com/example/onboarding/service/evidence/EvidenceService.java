@@ -4,6 +4,7 @@ import com.example.onboarding.dto.PageResponse;
 import com.example.onboarding.dto.evidence.AttachDocumentRequest;
 import com.example.onboarding.dto.evidence.AttachedDocumentsResponse;
 import com.example.onboarding.dto.evidence.CreateEvidenceRequest;
+import com.example.onboarding.dto.evidence.EnhancedAttachedDocumentsResponse;
 import com.example.onboarding.dto.evidence.CreateEvidenceWithDocumentRequest;
 import com.example.onboarding.dto.evidence.Evidence;
 import com.example.onboarding.dto.evidence.EvidenceSummary;
@@ -63,6 +64,11 @@ public interface EvidenceService {
      * Get all documents currently attached as evidence to a profile field
      */
     AttachedDocumentsResponse getAttachedDocuments(String appId, String profileFieldId);
+    
+    /**
+     * Get enhanced attached documents with full document metadata
+     */
+    EnhancedAttachedDocumentsResponse getEnhancedAttachedDocuments(String appId, String profileFieldId);
     
     /**
      * Attach an existing document as evidence to a profile field

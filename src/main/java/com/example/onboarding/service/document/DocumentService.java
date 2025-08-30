@@ -4,6 +4,8 @@ import com.example.onboarding.dto.PageResponse;
 import com.example.onboarding.dto.document.CreateDocumentRequest;
 import com.example.onboarding.dto.document.DocumentResponse;
 import com.example.onboarding.dto.document.DocumentSummary;
+import com.example.onboarding.dto.document.DocumentVersionInfo;
+import com.example.onboarding.dto.document.EnhancedDocumentResponse;
 import com.example.onboarding.repository.document.DocumentRepository;
 import com.example.onboarding.service.profile.ProfileFieldRegistryService;
 import org.slf4j.Logger;
@@ -13,8 +15,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.List;
-import java.util.Optional;
+import java.time.OffsetDateTime;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class DocumentService {
@@ -271,5 +274,139 @@ public class DocumentService {
             // Re-throw the exception to propagate to caller
             throw e;
         }
+    }
+
+    /**
+     * Get documents with attachment status for a specific profile field
+     */
+    public PageResponse<EnhancedDocumentResponse> getDocumentsWithAttachmentStatus(
+            String appId, String profileFieldId, int page, int pageSize) {
+        log.debug("Getting documents with attachment status for app {} and profile field {}", appId, profileFieldId);
+        
+        // Validate pagination parameters
+        int safePage = Math.max(page, 1);
+        int safePageSize = Math.max(pageSize, 1);
+        int offset = (safePage - 1) * safePageSize;
+        
+        // Get total count and paginated results
+        long total = documentRepository.countDocumentsForAttachmentStatus(appId);
+        List<Map<String, Object>> results = documentRepository.findDocumentsWithAttachmentStatus(
+            appId, profileFieldId, offset, safePageSize);
+        
+        List<EnhancedDocumentResponse> enhancedDocs = results.stream()
+            .map(this::mapToEnhancedDocumentResponseFromDb)
+            .collect(Collectors.toList());
+        
+        return new PageResponse<>(safePage, safePageSize, total, enhancedDocs);
+    }
+
+    /**
+     * Map database result to EnhancedDocumentResponse
+     */
+    private EnhancedDocumentResponse mapToEnhancedDocumentResponseFromDb(Map<String, Object> row) {
+        // Parse related_evidence_fields from PostgreSQL array
+        List<String> relatedFields = parseRelatedEvidenceFieldsArray(row.get("related_evidence_fields"));
+        
+        // Create version info if available
+        DocumentVersionInfo versionInfo = null;
+        if (row.get("doc_version_id") != null) {
+            versionInfo = new DocumentVersionInfo(
+                (String) row.get("doc_version_id"),
+                (String) row.get("version_id"),
+                (String) row.get("url_at_version"),
+                (String) row.get("author"),
+                convertToOffsetDateTime(row.get("version_source_date")),
+                convertToOffsetDateTime(row.get("version_created_at"))
+            );
+        }
+        
+        // Check if document is attached to the field
+        boolean isAttached = Boolean.TRUE.equals(row.get("is_attached_to_field"));
+        
+        return new EnhancedDocumentResponse(
+            (String) row.get("document_id"),
+            (String) row.get("app_id"),
+            (String) row.get("title"),
+            (String) row.get("canonical_url"),
+            (String) row.get("source_type"),
+            (String) row.get("owners"),
+            (Integer) row.get("link_health"),
+            relatedFields,
+            versionInfo,
+            convertToOffsetDateTime(row.get("doc_created_at")),
+            convertToOffsetDateTime(row.get("doc_updated_at")),
+            isAttached,
+            isAttached ? convertToOffsetDateTime(row.get("attached_at")) : null,
+            isAttached ? (String) row.get("evidence_id") : null,
+            isAttached ? (String) row.get("source_system") : null,
+            isAttached ? (String) row.get("submitted_by") : null
+        );
+    }
+
+    /**
+     * Parse related evidence fields from PostgreSQL array
+     */
+    private List<String> parseRelatedEvidenceFieldsArray(Object arrayObj) {
+        if (arrayObj == null) {
+            return List.of();
+        }
+        try {
+            if (arrayObj instanceof String[] stringArray) {
+                return List.of(stringArray);
+            } else if (arrayObj instanceof java.sql.Array sqlArray) {
+                String[] stringArray = (String[]) sqlArray.getArray();
+                return stringArray != null ? List.of(stringArray) : List.of();
+            }
+            return List.of();
+        } catch (Exception e) {
+            log.warn("Failed to parse related evidence fields array: {}", arrayObj, e);
+            return List.of();
+        }
+    }
+
+    /**
+     * Parse related evidence fields JSON string to list (kept for backward compatibility)
+     */
+    private List<String> parseRelatedEvidenceFields(String jsonStr) {
+        if (jsonStr == null || jsonStr.isBlank()) {
+            return List.of();
+        }
+        try {
+            // Simple JSON array parsing - could use ObjectMapper for more complex cases
+            jsonStr = jsonStr.trim();
+            if (jsonStr.startsWith("[") && jsonStr.endsWith("]")) {
+                String content = jsonStr.substring(1, jsonStr.length() - 1);
+                if (content.isBlank()) {
+                    return List.of();
+                }
+                return Arrays.stream(content.split(","))
+                    .map(s -> s.trim().replaceAll("^\"|\"$", ""))
+                    .collect(Collectors.toList());
+            }
+            return List.of();
+        } catch (Exception e) {
+            log.warn("Failed to parse related evidence fields: {}", jsonStr, e);
+            return List.of();
+        }
+    }
+
+    /**
+     * Convert database timestamp objects to OffsetDateTime
+     */
+    private OffsetDateTime convertToOffsetDateTime(Object timestampObj) {
+        if (timestampObj == null) {
+            return null;
+        }
+        if (timestampObj instanceof OffsetDateTime offsetDateTime) {
+            return offsetDateTime;
+        }
+        if (timestampObj instanceof java.sql.Timestamp timestamp) {
+            return timestamp.toInstant().atOffset(java.time.ZoneOffset.UTC);
+        }
+        if (timestampObj instanceof java.time.LocalDateTime localDateTime) {
+            return localDateTime.atOffset(java.time.ZoneOffset.UTC);
+        }
+        log.warn("Unexpected timestamp type: {}", timestampObj.getClass());
+        return null;
     }
 }

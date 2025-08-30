@@ -398,4 +398,69 @@ public class DocumentRepository {
                            .addValue("owners", owners)
                            .addValue("docId", documentId));
     }
+
+    /**
+     * Find documents with attachment status for a specific profile field
+     */
+    public List<java.util.Map<String, Object>> findDocumentsWithAttachmentStatus(String appId, String profileFieldId, int offset, int limit) {
+        String sql = """
+            SELECT 
+                d.document_id,
+                d.app_id,
+                d.title,
+                d.canonical_url,
+                d.source_type,
+                d.owners,
+                d.link_health,
+                ARRAY_AGG(DISTINCT dt.field_key) as related_evidence_fields,
+                d.created_at as doc_created_at,
+                d.updated_at as doc_updated_at,
+                e.evidence_id,
+                e.created_at as attached_at,
+                e.source_system,
+                e.submitted_by,
+                CASE WHEN e.evidence_id IS NOT NULL THEN true ELSE false END as is_attached_to_field,
+                dv.doc_version_id,
+                dv.version_id,
+                dv.url_at_version,
+                dv.author,
+                dv.source_date as version_source_date,
+                dv.created_at as version_created_at
+            FROM document d
+            LEFT JOIN document_related_evidence_field dt ON d.document_id = dt.document_id
+            LEFT JOIN evidence e ON d.document_id = e.document_id 
+                AND e.profile_field_id = :profileFieldId 
+                AND e.revoked_at IS NULL
+            LEFT JOIN document_version dv ON d.document_id = dv.document_id 
+                AND dv.doc_version_id = (
+                    SELECT doc_version_id 
+                    FROM document_version dv2 
+                    WHERE dv2.document_id = d.document_id 
+                    ORDER BY dv2.source_date DESC 
+                    LIMIT 1
+                )
+            WHERE d.app_id = :appId
+            GROUP BY d.document_id, d.app_id, d.title, d.canonical_url, d.source_type, d.owners,
+                     d.link_health, d.created_at, d.updated_at,
+                     e.evidence_id, e.created_at, e.source_system, e.submitted_by,
+                     dv.doc_version_id, dv.version_id, dv.url_at_version, dv.author, dv.source_date, dv.created_at
+            ORDER BY d.updated_at DESC
+            LIMIT :limit OFFSET :offset
+            """;
+
+        return jdbc.queryForList(sql, 
+            new MapSqlParameterSource()
+                .addValue("appId", appId)
+                .addValue("profileFieldId", profileFieldId)
+                .addValue("offset", offset)
+                .addValue("limit", limit));
+    }
+
+    /**
+     * Count documents for pagination when checking attachment status
+     */
+    public int countDocumentsForAttachmentStatus(String appId) {
+        String sql = "SELECT COUNT(*) FROM document WHERE app_id = :appId";
+        return jdbc.queryForObject(sql, new MapSqlParameterSource("appId", appId), Integer.class);
+    }
 }

@@ -4,6 +4,7 @@ import com.example.onboarding.dto.PageResponse;
 import com.example.onboarding.dto.document.CreateDocumentRequest;
 import com.example.onboarding.dto.document.DocumentResponse;
 import com.example.onboarding.dto.document.DocumentSummary;
+import com.example.onboarding.dto.document.EnhancedDocumentResponse;
 import com.example.onboarding.dto.profile.ProfileFieldTypeInfo;
 import com.example.onboarding.service.document.DocumentService;
 import com.example.onboarding.service.profile.ProfileFieldRegistryService;
@@ -43,15 +44,27 @@ public class DocumentController {
     
     /**
      * Get all documents for an application with pagination
+     * Enhanced (add attachment info when profileFieldId query param provided)
      * GET /api/apps/{appId}/documents?page=1&pageSize=10
+     * GET /api/apps/{appId}/documents?page=1&pageSize=10&profileFieldId={profileFieldId}
      */
     @GetMapping("/apps/{appId}/documents")
-    public ResponseEntity<PageResponse<DocumentSummary>> getDocuments(
+    public ResponseEntity<?> getDocuments(
             @PathVariable String appId,
             @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "10") int pageSize) {
-        PageResponse<DocumentSummary> documents = documentService.getDocumentsByApp(appId, page, pageSize);
-        return ResponseEntity.ok(documents);
+            @RequestParam(defaultValue = "10") int pageSize,
+            @RequestParam(required = false) String profileFieldId) {
+        
+        if (profileFieldId != null) {
+            // Return enhanced response with attachment status
+            PageResponse<EnhancedDocumentResponse> documents = 
+                documentService.getDocumentsWithAttachmentStatus(appId, profileFieldId, page, pageSize);
+            return ResponseEntity.ok(documents);
+        } else {
+            // Return basic response
+            PageResponse<DocumentSummary> documents = documentService.getDocumentsByApp(appId, page, pageSize);
+            return ResponseEntity.ok(documents);
+        }
     }
     
     /**
