@@ -115,4 +115,10 @@ document-validation:
     validation-timeout: 30000
 
 
+audit:
+  enabled: true
+  producer-id: po-service
+  sink:
+    url: http://localhost:8081/audit/events
+  api-key: dev-key
 

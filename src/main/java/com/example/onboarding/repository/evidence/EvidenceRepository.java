@@ -288,4 +288,55 @@ public class EvidenceRepository {
             rs.getObject("updated_at", OffsetDateTime.class)
         );
     }
+
+    /**
+     * Find all documents attached as evidence to a specific profile field
+     */
+    public List<com.example.onboarding.dto.evidence.AttachedDocumentInfo> findAttachedDocuments(String appId, String profileFieldId) {
+        String sql = """
+            SELECT 
+                e.evidence_id,
+                e.document_id,
+                d.title,
+                d.canonical_url as url,
+                e.created_at as attached_at,
+                e.source_system,
+                e.submitted_by
+            FROM evidence e
+            JOIN document d ON e.document_id = d.document_id
+            WHERE e.app_id = ? 
+              AND e.profile_field_id = ?
+              AND e.document_id IS NOT NULL
+              AND e.revoked_at IS NULL
+            ORDER BY e.created_at DESC
+            """;
+        
+        return jdbc.getJdbcTemplate().query(sql, this::mapAttachedDocumentInfo, appId, profileFieldId);
+    }
+
+    /**
+     * Delete evidence records by app, profile field, and document ID
+     */
+    public int deleteByAppIdProfileFieldIdAndDocumentId(String appId, String profileFieldId, String documentId) {
+        String sql = """
+            DELETE FROM evidence 
+            WHERE app_id = ? 
+              AND profile_field_id = ? 
+              AND document_id = ?
+            """;
+        
+        return jdbc.getJdbcTemplate().update(sql, appId, profileFieldId, documentId);
+    }
+
+    private com.example.onboarding.dto.evidence.AttachedDocumentInfo mapAttachedDocumentInfo(ResultSet rs, int rowNum) throws SQLException {
+        return new com.example.onboarding.dto.evidence.AttachedDocumentInfo(
+            rs.getString("document_id"),
+            rs.getString("evidence_id"),
+            rs.getString("title"),
+            rs.getString("url"),
+            rs.getObject("attached_at", OffsetDateTime.class),
+            rs.getString("source_system"),
+            rs.getString("submitted_by")
+        );
+    }
 }

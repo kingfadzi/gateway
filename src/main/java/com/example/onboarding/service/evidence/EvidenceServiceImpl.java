@@ -3,6 +3,9 @@ package com.example.onboarding.service.evidence;
 import com.example.onboarding.dto.PageResponse;
 import com.example.onboarding.dto.document.CreateDocumentRequest;
 import com.example.onboarding.dto.document.DocumentResponse;
+import com.example.onboarding.dto.evidence.AttachDocumentRequest;
+import com.example.onboarding.dto.evidence.AttachedDocumentInfo;
+import com.example.onboarding.dto.evidence.AttachedDocumentsResponse;
 import com.example.onboarding.dto.evidence.CreateEvidenceRequest;
 import com.example.onboarding.dto.evidence.CreateEvidenceWithDocumentRequest;
 import com.example.onboarding.dto.evidence.Evidence;
@@ -11,6 +14,7 @@ import com.example.onboarding.dto.evidence.EvidenceWithDocumentResponse;
 import com.example.onboarding.dto.evidence.UpdateEvidenceRequest;
 import com.example.onboarding.repository.evidence.EvidenceRepository;
 import com.example.onboarding.service.document.DocumentService;
+import dev.controlplane.auditkit.annotations.Audited;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -216,6 +220,8 @@ public class EvidenceServiceImpl implements EvidenceService {
     
     @Override
     @Transactional
+    @Audited(action = "CREATE_EVIDENCE_WITH_DOCUMENT", subjectType = "profile_field", subject = "#request.profileFieldId",
+             context = {"appId=#appId", "evidenceId=#result.evidenceId", "documentUrl=#request.document.url"})
     public EvidenceWithDocumentResponse createEvidenceWithDocument(String appId, CreateEvidenceWithDocumentRequest request) {
         log.debug("Creating evidence with document for app {}: {}", appId, request);
         
@@ -315,5 +321,67 @@ public class EvidenceServiceImpl implements EvidenceService {
         if (request.status() != null && !VALID_STATUSES.contains(request.status())) {
             throw new IllegalArgumentException("Invalid status. Valid values: " + VALID_STATUSES);
         }
+    }
+
+    @Override
+    public AttachedDocumentsResponse getAttachedDocuments(String appId, String profileFieldId) {
+        log.debug("Getting attached documents for profile field {} in app {}", profileFieldId, appId);
+        
+        // Get evidence linked to this profile field and that has document references
+        List<AttachedDocumentInfo> attachedDocs = evidenceRepository.findAttachedDocuments(appId, profileFieldId);
+        
+        return new AttachedDocumentsResponse(profileFieldId, appId, attachedDocs);
+    }
+
+    @Override
+    @Transactional
+    @Audited(action = "ATTACH_DOCUMENT_TO_FIELD", subjectType = "profile_field", subject = "#profileFieldId",
+             context = {"appId=#appId", "documentId=#request.documentId"})
+    public Evidence attachDocumentToField(String appId, String profileFieldId, AttachDocumentRequest request) {
+        log.debug("Attaching document {} to profile field {} in app {}", request.documentId(), profileFieldId, appId);
+        
+        // Validate that the document exists and belongs to this app
+        DocumentResponse document = documentService.getDocumentById(request.documentId())
+            .orElseThrow(() -> new IllegalArgumentException("Document not found: " + request.documentId()));
+        
+        if (!appId.equals(document.appId())) {
+            throw new IllegalArgumentException("Document does not belong to app: " + appId);
+        }
+        
+        // Create evidence linking the document to the profile field
+        CreateEvidenceRequest evidenceRequest = new CreateEvidenceRequest(
+            profileFieldId,
+            document.canonicalUrl(),
+            "document",
+            "manual",
+            null, // submittedBy - could be extracted from security context
+            OffsetDateTime.now(),
+            null, // validUntil
+            null, // relatedEvidenceFields
+            null, // trackId
+            document.documentId(),
+            null  // docVersionId
+        );
+        
+        return createEvidence(appId, evidenceRequest);
+    }
+
+    @Override
+    @Transactional
+    @Audited(action = "DETACH_DOCUMENT_FROM_FIELD", subjectType = "profile_field", subject = "#profileFieldId",
+             context = {"appId=#appId", "documentId=#documentId"})
+    public void detachDocumentFromField(String appId, String profileFieldId, String documentId) {
+        log.debug("Detaching document {} from profile field {} in app {}", documentId, profileFieldId, appId);
+        
+        // Find evidence records that link this document to this profile field
+        int deletedCount = evidenceRepository.deleteByAppIdProfileFieldIdAndDocumentId(appId, profileFieldId, documentId);
+        
+        if (deletedCount == 0) {
+            throw new IllegalArgumentException("No evidence found linking document " + documentId + 
+                " to profile field " + profileFieldId + " in app " + appId);
+        }
+        
+        log.debug("Deleted {} evidence records linking document {} to profile field {}", 
+            deletedCount, documentId, profileFieldId);
     }
 }

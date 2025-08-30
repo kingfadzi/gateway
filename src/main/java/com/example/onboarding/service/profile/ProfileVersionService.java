@@ -6,6 +6,7 @@ import com.example.onboarding.repository.profile.ProfileRepository;
 import com.example.onboarding.repository.profile.ProfileFieldRepository;
 import com.example.onboarding.util.HashIds;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.controlplane.auditkit.annotations.Audited;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -52,6 +53,8 @@ public class ProfileVersionService {
      * Create the initial profile version (version 1)
      */
     @Transactional
+    @Audited(action = "CREATE_INITIAL_PROFILE", subjectType = "profile", subject = "#result.profileId", 
+             context = {"appId=#appId", "version=#result.version"})
     public ProfileSnapshot createInitialProfile(String appId, String scopeType, Map<String, Object> derivedFields) {
         int version = 1;
         ProfileMeta meta = profileRepository.createProfile(appId, version);
@@ -71,6 +74,8 @@ public class ProfileVersionService {
      * Create a new profile version with merged fields
      */
     @Transactional
+    @Audited(action = "CREATE_PROFILE_VERSION", subjectType = "profile", subject = "#result.profileId",
+             context = {"appId=#appId", "version=#result.version", "previousVersion=#currentVersion.version"})
     public ProfileSnapshot createNewProfileVersion(String appId, String scopeType, 
                                                    ProfileVersion currentVersion, 
                                                    ProfileChangeAnalysis analysis,
