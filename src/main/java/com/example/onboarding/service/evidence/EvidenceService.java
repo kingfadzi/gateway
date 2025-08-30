@@ -1,7 +1,6 @@
 package com.example.onboarding.service.evidence;
 
 import com.example.onboarding.dto.PageResponse;
-import com.example.onboarding.dto.evidence.AttachDocumentRequest;
 import com.example.onboarding.dto.evidence.AttachedDocumentsResponse;
 import com.example.onboarding.dto.evidence.CreateEvidenceRequest;
 import com.example.onboarding.dto.evidence.EnhancedAttachedDocumentsResponse;
@@ -10,6 +9,7 @@ import com.example.onboarding.dto.evidence.Evidence;
 import com.example.onboarding.dto.evidence.EvidenceSummary;
 import com.example.onboarding.dto.evidence.EvidenceWithDocumentResponse;
 import com.example.onboarding.dto.evidence.UpdateEvidenceRequest;
+import com.example.onboarding.dto.document.DocumentResponse;
 
 import java.util.Optional;
 
@@ -73,10 +73,10 @@ public interface EvidenceService {
     /**
      * Attach an existing document as evidence to a profile field
      */
-    Evidence attachDocumentToField(String appId, String profileFieldId, AttachDocumentRequest request);
+    EvidenceWithDocumentResponse attachDocumentToField(String appId, String profileFieldId, DocumentResponse document);
     
     /**
      * Detach a document from a profile field by removing the evidence link
      */
-    void detachDocumentFromField(String appId, String profileFieldId, String documentId);
+    EvidenceWithDocumentResponse detachDocumentFromField(String appId, String profileFieldId, DocumentResponse document);
 }

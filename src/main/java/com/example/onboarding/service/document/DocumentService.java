@@ -67,7 +67,7 @@ public class DocumentService {
         
         // Validate field types against registry
         List<String> validFieldTypes = profileFieldRegistryService.validateFieldKeys(
-                request.fieldTypes() != null ? request.fieldTypes() : List.of()
+                request.relatedEvidenceFields() != null ? request.relatedEvidenceFields() : List.of()
         );
         
         // Detect platform type using enhanced detection service
@@ -137,7 +137,7 @@ public class DocumentService {
                 null  // health will be set during metadata extraction
         );
         
-        // Add related evidence fields for field types
+        // Add related evidence fields 
         documentRepository.addDocumentTags(documentId, validFieldTypes);
         
         // Extract metadata synchronously to include version details in response

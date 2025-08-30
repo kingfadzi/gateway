@@ -21,7 +21,7 @@ public record CreateEvidenceWithDocumentRequest(
     public record CreateDocumentRequest(
             String title,                   // required - document title
             String url,                     // required - document URL
-            List<String> fieldTypes         // optional - field types this document supports
+            List<String> relatedEvidenceFields  // optional - field types this document supports
     ) {}
     
     /**

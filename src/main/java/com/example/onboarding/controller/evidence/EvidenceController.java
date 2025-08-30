@@ -1,7 +1,6 @@
 package com.example.onboarding.controller.evidence;
 
 import com.example.onboarding.dto.PageResponse;
-import com.example.onboarding.dto.evidence.AttachDocumentRequest;
 import com.example.onboarding.dto.evidence.AttachedDocumentsResponse;
 import com.example.onboarding.dto.evidence.CreateEvidenceRequest;
 import com.example.onboarding.dto.evidence.EnhancedAttachedDocumentsResponse;
@@ -11,6 +10,8 @@ import com.example.onboarding.dto.evidence.EvidenceSummary;
 import com.example.onboarding.dto.evidence.EvidenceWithDocumentResponse;
 import com.example.onboarding.dto.evidence.UpdateEvidenceRequest;
 import com.example.onboarding.service.evidence.EvidenceService;
+import com.example.onboarding.service.document.DocumentService;
+import com.example.onboarding.dto.document.DocumentResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -23,9 +24,11 @@ public class EvidenceController {
     private static final Logger log = LoggerFactory.getLogger(EvidenceController.class);
     
     private final EvidenceService evidenceService;
+    private final DocumentService documentService;
     
-    public EvidenceController(EvidenceService evidenceService) {
+    public EvidenceController(EvidenceService evidenceService, DocumentService documentService) {
         this.evidenceService = evidenceService;
+        this.documentService = documentService;
     }
     
     /**
@@ -229,25 +232,29 @@ public class EvidenceController {
 
     /**
      * Attach an existing document as evidence to a profile field
-     * POST /api/apps/{appId}/profile/field/{profileFieldId}/attach-document
+     * POST /api/apps/{appId}/profile/field/{profileFieldId}/attach-document/{documentId}
      */
-    @PostMapping("/apps/{appId}/profile/field/{profileFieldId}/attach-document")
-    public ResponseEntity<Evidence> attachDocumentToField(
+    @PostMapping("/apps/{appId}/profile/field/{profileFieldId}/attach-document/{documentId}")
+    public ResponseEntity<EvidenceWithDocumentResponse> attachDocumentToField(
             @PathVariable String appId,
             @PathVariable String profileFieldId,
-            @RequestBody AttachDocumentRequest request) {
-        log.info("Attaching document {} to profile field {} in app {}", request.documentId(), profileFieldId, appId);
+            @PathVariable String documentId) {
+        log.info("Attaching document {} to profile field {} in app {}", documentId, profileFieldId, appId);
         
         try {
-            Evidence evidence = evidenceService.attachDocumentToField(appId, profileFieldId, request);
+            // Fetch document details
+            DocumentResponse document = documentService.getDocumentById(documentId)
+                .orElseThrow(() -> new IllegalArgumentException("Document not found: " + documentId));
+            
+            EvidenceWithDocumentResponse response = evidenceService.attachDocumentToField(appId, profileFieldId, document);
             log.info("Successfully attached document {} to profile field {} as evidence {}", 
-                request.documentId(), profileFieldId, evidence.evidenceId());
-            return ResponseEntity.status(201).body(evidence);
+                documentId, profileFieldId, response.evidenceId());
+            return ResponseEntity.status(201).body(response);
         } catch (IllegalArgumentException e) {
-            log.error("Validation error attaching document {} to profile field {}: {}", request.documentId(), profileFieldId, e.getMessage(), e);
+            log.error("Validation error attaching document {} to profile field {}: {}", documentId, profileFieldId, e.getMessage(), e);
             return ResponseEntity.badRequest().build();
         } catch (Exception e) {
-            log.error("Unexpected error attaching document {} to profile field {}: {}", request.documentId(), profileFieldId, e.getMessage(), e);
+            log.error("Unexpected error attaching document {} to profile field {}: {}", documentId, profileFieldId, e.getMessage(), e);
             return ResponseEntity.internalServerError().build();
         }
     }
@@ -257,16 +264,20 @@ public class EvidenceController {
      * DELETE /api/apps/{appId}/profile/field/{profileFieldId}/detach-document/{documentId}
      */
     @DeleteMapping("/apps/{appId}/profile/field/{profileFieldId}/detach-document/{documentId}")
-    public ResponseEntity<Void> detachDocumentFromField(
+    public ResponseEntity<EvidenceWithDocumentResponse> detachDocumentFromField(
             @PathVariable String appId,
             @PathVariable String profileFieldId,
             @PathVariable String documentId) {
         log.info("Detaching document {} from profile field {} in app {}", documentId, profileFieldId, appId);
         
         try {
-            evidenceService.detachDocumentFromField(appId, profileFieldId, documentId);
+            // Fetch document details
+            DocumentResponse document = documentService.getDocumentById(documentId)
+                .orElseThrow(() -> new IllegalArgumentException("Document not found: " + documentId));
+            
+            EvidenceWithDocumentResponse response = evidenceService.detachDocumentFromField(appId, profileFieldId, document);
             log.info("Successfully detached document {} from profile field {}", documentId, profileFieldId);
-            return ResponseEntity.noContent().build();
+            return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             log.error("Validation error detaching document {} from profile field {}: {}", documentId, profileFieldId, e.getMessage(), e);
             return ResponseEntity.badRequest().build();

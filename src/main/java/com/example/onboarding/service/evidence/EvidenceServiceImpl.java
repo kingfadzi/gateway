@@ -5,7 +5,6 @@ import com.example.onboarding.dto.document.CreateDocumentRequest;
 import com.example.onboarding.dto.document.DocumentResponse;
 import com.example.onboarding.dto.document.DocumentVersionInfo;
 import com.example.onboarding.dto.document.EnhancedDocumentResponse;
-import com.example.onboarding.dto.evidence.AttachDocumentRequest;
 import com.example.onboarding.dto.evidence.AttachedDocumentInfo;
 import com.example.onboarding.dto.evidence.AttachedDocumentsResponse;
 import com.example.onboarding.dto.evidence.CreateEvidenceRequest;
@@ -235,7 +234,7 @@ public class EvidenceServiceImpl implements EvidenceService {
             CreateDocumentRequest documentRequest = new CreateDocumentRequest(
                 request.document().title(),
                 request.document().url(),
-                request.document().fieldTypes()
+                request.document().relatedEvidenceFields()
             );
             
             DocumentResponse document = documentService.createDocument(appId, documentRequest);
@@ -351,13 +350,9 @@ public class EvidenceServiceImpl implements EvidenceService {
     @Override
     @Transactional
     @Audited(action = "ATTACH_DOCUMENT_TO_FIELD", subjectType = "profile_field", subject = "#profileFieldId",
-             context = {"appId=#appId", "documentId=#request.documentId"})
-    public Evidence attachDocumentToField(String appId, String profileFieldId, AttachDocumentRequest request) {
-        log.debug("Attaching document {} to profile field {} in app {}", request.documentId(), profileFieldId, appId);
-        
-        // Validate that the document exists and belongs to this app
-        DocumentResponse document = documentService.getDocumentById(request.documentId())
-            .orElseThrow(() -> new IllegalArgumentException("Document not found: " + request.documentId()));
+             context = {"appId=#appId"})
+    public EvidenceWithDocumentResponse attachDocumentToField(String appId, String profileFieldId, DocumentResponse document) {
+        log.debug("Attaching document {} to profile field {} in app {}", document.documentId(), profileFieldId, appId);
         
         if (!appId.equals(document.appId())) {
             throw new IllegalArgumentException("Document does not belong to app: " + appId);
@@ -378,26 +373,93 @@ public class EvidenceServiceImpl implements EvidenceService {
             null  // docVersionId
         );
         
-        return createEvidence(appId, evidenceRequest);
+        Evidence evidence = createEvidence(appId, evidenceRequest);
+        
+        // Return response with both evidence and document for audit persistence
+        return new EvidenceWithDocumentResponse(
+            evidence.evidenceId(),
+            evidence.appId(),
+            evidence.profileFieldId(),
+            evidence.claimId(),
+            evidence.uri(),
+            evidence.type(),
+            evidence.sha256(),
+            evidence.sourceSystem(),
+            evidence.submittedBy(),
+            evidence.validFrom(),
+            evidence.validUntil(),
+            evidence.status(),
+            evidence.revokedAt(),
+            evidence.reviewedBy(),
+            evidence.reviewedAt(),
+            evidence.relatedEvidenceFields(),
+            evidence.trackId(),
+            evidence.documentId(),
+            evidence.docVersionId(),
+            evidence.addedAt(),
+            evidence.createdAt(),
+            evidence.updatedAt(),
+            document
+        );
     }
 
     @Override
     @Transactional
     @Audited(action = "DETACH_DOCUMENT_FROM_FIELD", subjectType = "profile_field", subject = "#profileFieldId",
-             context = {"appId=#appId", "documentId=#documentId"})
-    public void detachDocumentFromField(String appId, String profileFieldId, String documentId) {
-        log.debug("Detaching document {} from profile field {} in app {}", documentId, profileFieldId, appId);
+             context = {"appId=#appId"})
+    public EvidenceWithDocumentResponse detachDocumentFromField(String appId, String profileFieldId, DocumentResponse document) {
+        log.debug("Detaching document {} from profile field {} in app {}", document.documentId(), profileFieldId, appId);
         
-        // Find evidence records that link this document to this profile field
-        int deletedCount = evidenceRepository.deleteByAppIdProfileFieldIdAndDocumentId(appId, profileFieldId, documentId);
+        if (!appId.equals(document.appId())) {
+            throw new IllegalArgumentException("Document does not belong to app: " + appId);
+        }
         
-        if (deletedCount == 0) {
-            throw new IllegalArgumentException("No evidence found linking document " + documentId + 
+        // Find and store evidence information before deletion
+        List<EvidenceSummary> existingEvidence = evidenceRepository.findEvidenceByProfileField(profileFieldId, 100, 0)
+            .stream()
+            .filter(e -> document.documentId().equals(e.documentId()))
+            .toList();
+        
+        if (existingEvidence.isEmpty()) {
+            throw new IllegalArgumentException("No evidence found linking document " + document.documentId() + 
                 " to profile field " + profileFieldId + " in app " + appId);
         }
         
+        // Use the first evidence record for response (there should typically be only one)
+        EvidenceSummary evidenceToDelete = existingEvidence.get(0);
+        
+        // Delete evidence records that link this document to this profile field
+        int deletedCount = evidenceRepository.deleteByAppIdProfileFieldIdAndDocumentId(appId, profileFieldId, document.documentId());
+        
         log.debug("Deleted {} evidence records linking document {} to profile field {}", 
-            deletedCount, documentId, profileFieldId);
+            deletedCount, document.documentId(), profileFieldId);
+        
+        // Return response with evidence and document information for audit
+        return new EvidenceWithDocumentResponse(
+            evidenceToDelete.evidenceId(),
+            evidenceToDelete.appId(),
+            evidenceToDelete.profileFieldId(),
+            evidenceToDelete.claimId(),
+            evidenceToDelete.uri(),
+            evidenceToDelete.type(),
+            null, // sha256 not available in summary
+            null, // sourceSystem not available in summary  
+            evidenceToDelete.submittedBy(),
+            evidenceToDelete.validFrom(),
+            evidenceToDelete.validUntil(),
+            evidenceToDelete.status(),
+            null, // revokedAt
+            null, // reviewedBy
+            null, // reviewedAt
+            null, // relatedEvidenceFields not available in summary
+            evidenceToDelete.trackId(),
+            evidenceToDelete.documentId(),
+            null, // docVersionId not available in summary
+            null, // addedAt not available in summary
+            evidenceToDelete.createdAt(),
+            evidenceToDelete.updatedAt(),
+            document
+        );
     }
 
     /**
