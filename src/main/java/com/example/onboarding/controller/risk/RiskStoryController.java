@@ -43,4 +43,30 @@ public class RiskStoryController {
         riskStoryService.detachEvidence(riskId, evidenceId);
         return ResponseEntity.noContent().build();
     }
+
+    @GetMapping("/apps/{appId}/risks")
+    public ResponseEntity<java.util.List<RiskStoryResponse>> getAppRisks(@PathVariable String appId) {
+        java.util.List<RiskStoryResponse> risks = riskStoryService.getRisksByAppId(appId);
+        return ResponseEntity.ok(risks);
+    }
+    
+    @GetMapping("/risks/{riskId}")
+    public ResponseEntity<RiskStoryResponse> getRiskById(@PathVariable String riskId) {
+        RiskStoryResponse risk = riskStoryService.getRiskById(riskId);
+        return ResponseEntity.ok(risk);
+    }
+    
+    @GetMapping("/apps/{appId}/fields/{fieldKey}/risks")
+    public ResponseEntity<java.util.List<RiskStoryResponse>> getRisksByFieldKey(
+            @PathVariable String appId,
+            @PathVariable String fieldKey) {
+        java.util.List<RiskStoryResponse> risks = riskStoryService.getRisksByAppIdAndFieldKey(appId, fieldKey);
+        return ResponseEntity.ok(risks);
+    }
+    
+    @GetMapping("/profile-fields/{profileFieldId}/risks")
+    public ResponseEntity<java.util.List<RiskStoryResponse>> getRisksByProfileFieldId(@PathVariable String profileFieldId) {
+        java.util.List<RiskStoryResponse> risks = riskStoryService.getRisksByProfileFieldId(profileFieldId);
+        return ResponseEntity.ok(risks);
+    }
 }

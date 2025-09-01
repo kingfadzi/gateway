@@ -9,6 +9,9 @@ import com.example.onboarding.dto.evidence.Evidence;
 import com.example.onboarding.dto.evidence.EvidenceSummary;
 import com.example.onboarding.dto.evidence.EvidenceWithDocumentResponse;
 import com.example.onboarding.dto.evidence.UpdateEvidenceRequest;
+import com.example.onboarding.dto.evidence.AttachEvidenceToFieldRequest;
+import com.example.onboarding.dto.evidence.EvidenceFieldLinkResponse;
+import com.example.onboarding.dto.evidence.EvidenceUsageResponse;
 import com.example.onboarding.dto.document.DocumentResponse;
 
 import java.util.Optional;
@@ -79,4 +82,26 @@ public interface EvidenceService {
      * Detach a document from a profile field by removing the evidence link
      */
     EvidenceWithDocumentResponse detachDocumentFromField(String appId, String profileFieldId, DocumentResponse document);
+    
+    /**
+     * Attach evidence to a profile field with workflow management
+     */
+    EvidenceFieldLinkResponse attachEvidenceToProfileField(String evidenceId, String profileFieldId, 
+                                                          String appId, AttachEvidenceToFieldRequest request);
+    
+    /**
+     * Detach evidence from a profile field
+     */
+    void detachEvidenceFromProfileField(String evidenceId, String profileFieldId);
+    
+    /**
+     * Get evidence usage across fields and risks
+     */
+    EvidenceUsageResponse getEvidenceUsage(String evidenceId);
+    
+    /**
+     * Review an evidence-field link
+     */
+    EvidenceFieldLinkResponse reviewEvidenceFieldLink(String evidenceId, String profileFieldId, 
+                                                     String reviewedBy, String comment, boolean approved);
 }

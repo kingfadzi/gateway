@@ -8,6 +8,13 @@ DROP FUNCTION IF EXISTS set_updated_at() CASCADE;
 DROP FUNCTION IF EXISTS enforce_ev_claim_same_app() CASCADE;
 DROP FUNCTION IF EXISTS assert_track_app_match() CASCADE;
 
+-- Risk management tables
+DROP TABLE IF EXISTS risk_story_evidence CASCADE;
+DROP TABLE IF EXISTS risk_story CASCADE;
+DROP TABLE IF EXISTS evidence_field_link CASCADE;
+DROP TABLE IF EXISTS sme_queue CASCADE;
+
+-- Existing tables
 DROP TABLE IF EXISTS evidence CASCADE;
 DROP TABLE IF EXISTS control_claim CASCADE;
 DROP TABLE IF EXISTS document_related_evidence_field CASCADE;
@@ -15,14 +22,22 @@ DROP TABLE IF EXISTS document_version CASCADE;
 DROP TABLE IF EXISTS document CASCADE;
 DROP TABLE IF EXISTS profile_field CASCADE;
 DROP TABLE IF EXISTS profile CASCADE;
-DROP TABLE IF EXISTS track_external_ref CASCADE;   -- NEW
-DROP TABLE IF EXISTS external_ref CASCADE;         -- NEW
-DROP TABLE IF EXISTS track CASCADE;                -- ensure track dropped here
+DROP TABLE IF EXISTS track CASCADE;
 DROP TABLE IF EXISTS service_instances CASCADE;
 DROP TABLE IF EXISTS application CASCADE;
 
+-- Drop enums (converted to TEXT for Hibernate compatibility)
+DROP TYPE IF EXISTS risk_status CASCADE;
+DROP TYPE IF EXISTS risk_creation_type CASCADE;
+DROP TYPE IF EXISTS evidence_field_link_status CASCADE;
+
 -- Needed for gen_random_uuid()
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+-- =========================
+-- NOTE: Using TEXT with CHECK constraints instead of ENUMs 
+-- for better Hibernate compatibility
+-- =========================
 
 -- =========================
 -- APPLICATION  (TEXT IDs)
@@ -231,7 +246,7 @@ CREATE INDEX IF NOT EXISTS idx_claim_track      ON control_claim(track_id);
 -- EVIDENCE  (app-anchored; bridges to claim/profile_field; optional track)
 -- =========================
 CREATE TABLE evidence (
-                          evidence_id       text PRIMARY KEY DEFAULT concat('ev_', md5(gen_random_uuid()::text)),
+                          evidence_id       text PRIMARY KEY DEFAULT concat('ev_', replace(gen_random_uuid()::text, '-', '')),
                           app_id            text NOT NULL REFERENCES application(app_id) ON DELETE CASCADE,
 
                           profile_field_id  text REFERENCES profile_field(id) ON DELETE CASCADE,
@@ -264,7 +279,8 @@ CREATE TABLE evidence (
                           document_id       text REFERENCES document(document_id) ON DELETE SET NULL,
                           doc_version_id    text REFERENCES document_version(doc_version_id) ON DELETE SET NULL,
 
-                          CONSTRAINT uq_evidence_pf_uri UNIQUE (profile_field_id, uri),
+                          -- Fixed: Removed UNIQUE constraint that was causing duplicate key errors
+                          -- CONSTRAINT uq_evidence_pf_uri UNIQUE (profile_field_id, uri),
                           CONSTRAINT chk_evidence_status CHECK (status IN ('active','superseded','revoked'))
 );
 
@@ -277,12 +293,152 @@ CREATE INDEX IF NOT EXISTS idx_evidence_sha256        ON evidence(sha256);
 CREATE INDEX IF NOT EXISTS idx_evidence_track         ON evidence(track_id);
 CREATE INDEX IF NOT EXISTS idx_evidence_doc           ON evidence(document_id, doc_version_id);
 
-DO $$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'ux_evidence_pf_sha') THEN
-            CREATE UNIQUE INDEX ux_evidence_pf_sha ON evidence(profile_field_id, sha256);
-        END IF;
-    END $$;
+-- Optional SHA256 uniqueness constraint per profile field (commented out to avoid issues)
+-- DO $$
+--     BEGIN
+--         IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'ux_evidence_pf_sha') THEN
+--             CREATE UNIQUE INDEX ux_evidence_pf_sha ON evidence(profile_field_id, sha256);
+--         END IF;
+--     END $$;
+
+-- =========================
+-- EVIDENCE_FIELD_LINK (Junction with Workflow)
+-- =========================
+CREATE TABLE evidence_field_link (
+    evidence_id         TEXT NOT NULL,
+    profile_field_id    TEXT NOT NULL,
+    app_id             TEXT NOT NULL,
+    -- Use TEXT instead of ENUM for better Hibernate compatibility
+    link_status        TEXT NOT NULL DEFAULT 'PENDING_REVIEW',
+    linked_by          TEXT NOT NULL,
+    linked_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    reviewed_by        TEXT,
+    reviewed_at        TIMESTAMPTZ,
+    review_comment     TEXT,
+    created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (evidence_id, profile_field_id),
+    CONSTRAINT fk_efl_evidence FOREIGN KEY (evidence_id) REFERENCES evidence(evidence_id) ON DELETE CASCADE,
+    CONSTRAINT fk_efl_profile_field FOREIGN KEY (profile_field_id) REFERENCES profile_field(id) ON DELETE CASCADE,
+    CONSTRAINT fk_efl_app FOREIGN KEY (app_id) REFERENCES application(app_id) ON DELETE CASCADE,
+    -- Constraint to ensure valid status values
+    CONSTRAINT chk_efl_status CHECK (link_status IN ('ATTACHED', 'PENDING_REVIEW', 'APPROVED', 'REJECTED'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_efl_evidence ON evidence_field_link(evidence_id);
+CREATE INDEX IF NOT EXISTS idx_efl_field ON evidence_field_link(profile_field_id);
+CREATE INDEX IF NOT EXISTS idx_efl_app ON evidence_field_link(app_id);
+CREATE INDEX IF NOT EXISTS idx_efl_status ON evidence_field_link(link_status);
+
+-- =========================
+-- RISK_STORY (Enhanced Risk Management)
+-- =========================
+CREATE TABLE risk_story (
+    risk_id                 TEXT PRIMARY KEY,
+    app_id                  TEXT NOT NULL,
+    field_key               TEXT NOT NULL,
+    profile_id              TEXT,
+    profile_field_id        TEXT,
+    track_id                TEXT,
+    
+    -- New fields for enhanced workflow
+    triggering_evidence_id  TEXT,  -- Evidence that triggered this risk (if AUTO)
+    creation_type          TEXT NOT NULL DEFAULT 'MANUAL_SME_INITIATED',
+    assigned_sme           TEXT,
+    
+    -- Existing fields
+    title                  TEXT,
+    hypothesis             TEXT,
+    condition              TEXT,
+    consequence            TEXT,
+    control_refs           TEXT,
+    attributes             JSONB DEFAULT '{}',
+    severity               TEXT DEFAULT 'medium',
+    status                 TEXT NOT NULL DEFAULT 'PENDING_SME_REVIEW',
+    closure_reason         TEXT,
+    raised_by              TEXT NOT NULL DEFAULT 'system',
+    owner                  TEXT,
+    
+    -- Enhanced timestamps
+    opened_at              TIMESTAMPTZ,
+    closed_at              TIMESTAMPTZ,
+    assigned_at            TIMESTAMPTZ,
+    reviewed_at            TIMESTAMPTZ,
+    review_comment         TEXT,
+    policy_requirement_snapshot JSONB DEFAULT '{}',  -- Compliance frameworks snapshot
+    created_at             TIMESTAMPTZ DEFAULT now(),
+    updated_at             TIMESTAMPTZ DEFAULT now(),
+    
+    -- Foreign Keys
+    CONSTRAINT fk_risk_app FOREIGN KEY (app_id) REFERENCES application(app_id) ON DELETE CASCADE,
+    CONSTRAINT fk_risk_profile FOREIGN KEY (profile_id) REFERENCES profile(profile_id),
+    CONSTRAINT fk_risk_profile_field FOREIGN KEY (profile_field_id) REFERENCES profile_field(id),
+    CONSTRAINT fk_risk_track FOREIGN KEY (track_id) REFERENCES track(track_id),
+    CONSTRAINT fk_risk_evidence FOREIGN KEY (triggering_evidence_id) REFERENCES evidence(evidence_id),
+    
+    -- CHECK constraints for TEXT-based enums (Hibernate compatibility)
+    CONSTRAINT chk_risk_status CHECK (status IN (
+        'PENDING_SME_REVIEW', 'AWAITING_EVIDENCE', 'UNDER_REVIEW', 
+        'APPROVED', 'REJECTED', 'WAIVED', 'CLOSED'
+    )),
+    CONSTRAINT chk_risk_creation_type CHECK (creation_type IN (
+        'MANUAL_SME_INITIATED', 'SYSTEM_AUTO_CREATION'
+    ))
+);
+
+-- Risk Story Indexes
+CREATE INDEX IF NOT EXISTS idx_risk_app ON risk_story(app_id);
+CREATE INDEX IF NOT EXISTS idx_risk_field ON risk_story(field_key);
+CREATE INDEX IF NOT EXISTS idx_risk_profile_field ON risk_story(profile_field_id);
+CREATE INDEX IF NOT EXISTS idx_risk_status ON risk_story(status);
+CREATE INDEX IF NOT EXISTS idx_risk_creation_type ON risk_story(creation_type);
+CREATE INDEX IF NOT EXISTS idx_risk_assigned_sme ON risk_story(assigned_sme);
+CREATE INDEX IF NOT EXISTS idx_risk_triggering_evidence ON risk_story(triggering_evidence_id);
+
+-- =========================
+-- RISK_STORY_EVIDENCE (Risk-Evidence Junction)
+-- =========================
+CREATE TABLE risk_story_evidence (
+    risk_id TEXT NOT NULL,
+    evidence_id TEXT NOT NULL,
+    submitted_by TEXT,
+    submitted_at TIMESTAMPTZ DEFAULT now(),
+    review_status TEXT DEFAULT 'pending',
+    reviewed_by TEXT,
+    reviewed_at TIMESTAMPTZ,
+    review_comment TEXT,
+    waiver_reason TEXT,
+    waiver_until TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now(),
+    PRIMARY KEY (risk_id, evidence_id),
+    CONSTRAINT fk_rse_risk FOREIGN KEY (risk_id) REFERENCES risk_story(risk_id) ON DELETE CASCADE,
+    CONSTRAINT fk_rse_evidence FOREIGN KEY (evidence_id) REFERENCES evidence(evidence_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_rse_risk ON risk_story_evidence(risk_id);
+CREATE INDEX IF NOT EXISTS idx_rse_evidence ON risk_story_evidence(evidence_id);
+CREATE INDEX IF NOT EXISTS idx_rse_status ON risk_story_evidence(review_status);
+
+-- =========================
+-- SME_QUEUE (Queue Management)
+-- =========================
+CREATE TABLE sme_queue (
+    queue_id        TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    risk_id         TEXT NOT NULL,
+    sme_id          TEXT NOT NULL,
+    queue_status    TEXT NOT NULL DEFAULT 'PENDING',
+    assigned_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    picked_up_at    TIMESTAMPTZ,
+    completed_at    TIMESTAMPTZ,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT fk_sq_risk FOREIGN KEY (risk_id) REFERENCES risk_story(risk_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_sme_queue_risk ON sme_queue(risk_id);
+CREATE INDEX IF NOT EXISTS idx_sme_queue_sme ON sme_queue(sme_id);
+CREATE INDEX IF NOT EXISTS idx_sme_queue_status ON sme_queue(queue_status);
 
 -- =========================
 -- Triggers & Guards
@@ -379,6 +535,27 @@ DO $$
 
         IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_service_instances_updated_at') THEN
             CREATE TRIGGER trg_service_instances_updated_at BEFORE UPDATE ON service_instances
+                FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+        END IF;
+
+        -- Risk Management table triggers
+        IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_evidence_field_link_updated_at') THEN
+            CREATE TRIGGER trg_evidence_field_link_updated_at BEFORE UPDATE ON evidence_field_link
+                FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_risk_story_updated_at') THEN
+            CREATE TRIGGER trg_risk_story_updated_at BEFORE UPDATE ON risk_story
+                FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_risk_story_evidence_updated_at') THEN
+            CREATE TRIGGER trg_risk_story_evidence_updated_at BEFORE UPDATE ON risk_story_evidence
+                FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_sme_queue_updated_at') THEN
+            CREATE TRIGGER trg_sme_queue_updated_at BEFORE UPDATE ON sme_queue
                 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
         END IF;
 

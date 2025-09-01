@@ -1,5 +1,6 @@
 package com.example.onboarding.config;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
@@ -53,6 +54,7 @@ public class FieldRegistryConfig {
         public List<FieldDefinition> fields;
     }
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class FieldDefinition {
         @JsonProperty("key")
         public String key;

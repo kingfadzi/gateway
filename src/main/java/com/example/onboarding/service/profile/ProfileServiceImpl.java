@@ -7,6 +7,8 @@ import com.example.onboarding.dto.evidence.Evidence;
 import com.example.onboarding.dto.profile.*;
 import com.example.onboarding.dto.document.DocumentSummary;
 import com.example.onboarding.repository.profile.ProfileRepository;
+import com.example.onboarding.repository.risk.RiskStoryRepository;
+import com.example.onboarding.model.risk.RiskStory;
 import com.example.onboarding.service.document.DocumentService;
 import com.example.onboarding.service.profile.ProfileFieldRegistryService;
 import com.example.onboarding.util.ProfileUtils;
@@ -30,15 +32,18 @@ public class ProfileServiceImpl implements ProfileService {
     private final FieldRegistryConfig fieldRegistryConfig;
     private final DocumentService documentService;
     private final ProfileFieldRegistryService profileFieldRegistryService;
+    private final RiskStoryRepository riskStoryRepository;
 
     public ProfileServiceImpl(ProfileRepository profileRepository, 
                              FieldRegistryConfig fieldRegistryConfig,
                              DocumentService documentService,
-                             ProfileFieldRegistryService profileFieldRegistryService) {
+                             ProfileFieldRegistryService profileFieldRegistryService,
+                             RiskStoryRepository riskStoryRepository) {
         this.profileRepository = profileRepository;
         this.fieldRegistryConfig = fieldRegistryConfig;
         this.documentService = documentService;
         this.profileFieldRegistryService = profileFieldRegistryService;
+        this.riskStoryRepository = riskStoryRepository;
     }
 
 
@@ -179,6 +184,13 @@ public class ProfileServiceImpl implements ProfileService {
         Map<String, List<Evidence>> evidenceByField = evidenceList.stream()
                 .collect(Collectors.groupingBy(Evidence::profileFieldId));
         
+        // Get risk stories for this application
+        List<RiskStory> riskStories = riskStoryRepository.findByAppId(appId);
+        
+        // Group risks by field key
+        Map<String, List<RiskStory>> risksByFieldKey = riskStories.stream()
+                .collect(Collectors.groupingBy(RiskStory::getFieldKey));
+        
         // Group fields by derived_from (domain)
         Map<String, List<ProfileField>> fieldsByDomain = fields.stream()
                 .collect(Collectors.groupingBy(field -> 
@@ -204,8 +216,18 @@ public class ProfileServiceImpl implements ProfileService {
                         ))
                         .collect(Collectors.toList());
                 
-                // Risk functionality removed
-                List<RiskGraphPayload> riskGraphPayloads = Collections.emptyList();
+                // Get risks for this field
+                List<RiskStory> risksForField = risksByFieldKey.getOrDefault(field.fieldKey(), Collections.emptyList());
+                
+                // Convert risks to graph payload
+                List<RiskGraphPayload> riskGraphPayloads = risksForField.stream()
+                        .map(risk -> new RiskGraphPayload(
+                                risk.getRiskId(),
+                                risk.getTitle(),
+                                risk.getSeverity(),
+                                risk.getStatus().toString()
+                        ))
+                        .collect(Collectors.toList());
                 
                 fieldPayloads.add(new FieldGraphPayload(
                         field.fieldId(),
@@ -272,8 +294,20 @@ public class ProfileServiceImpl implements ProfileService {
         String domain = derivedFrom != null ? derivedFrom : "unknown";
         String assurance = deriveAssurance(evidenceList);
         
-        // Risk functionality removed
-        List<RiskGraphPayload> riskGraphPayloads = Collections.emptyList();
+        // Get risks for this specific field
+        List<RiskStory> risksForField = riskStoryRepository.findByAppId(appId).stream()
+                .filter(risk -> fieldKey.equals(risk.getFieldKey()))
+                .collect(Collectors.toList());
+        
+        // Convert risks to graph payload
+        List<RiskGraphPayload> riskGraphPayloads = risksForField.stream()
+                .map(risk -> new RiskGraphPayload(
+                        risk.getRiskId(),
+                        risk.getTitle(),
+                        risk.getSeverity(),
+                        risk.getStatus().toString()
+                ))
+                .collect(Collectors.toList());
         
         return new ProfileFieldContext(
                 targetField.fieldId(),
@@ -402,6 +436,10 @@ public class ProfileServiceImpl implements ProfileService {
         return new PatchProfileResponse(version, profileId, updated);
     }
 
+    @Override
+    public String getFieldKeyByProfileFieldId(String profileFieldId) {
+        return profileRepository.getFieldKeyByProfileFieldId(profileFieldId);
+    }
 
 
 }

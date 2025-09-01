@@ -14,6 +14,9 @@ import com.example.onboarding.dto.evidence.Evidence;
 import com.example.onboarding.dto.evidence.EvidenceSummary;
 import com.example.onboarding.dto.evidence.EvidenceWithDocumentResponse;
 import com.example.onboarding.dto.evidence.UpdateEvidenceRequest;
+import com.example.onboarding.dto.evidence.AttachEvidenceToFieldRequest;
+import com.example.onboarding.dto.evidence.EvidenceFieldLinkResponse;
+import com.example.onboarding.dto.evidence.EvidenceUsageResponse;
 import com.example.onboarding.repository.evidence.EvidenceRepository;
 import com.example.onboarding.service.document.DocumentService;
 import dev.controlplane.auditkit.annotations.Audited;
@@ -33,13 +36,16 @@ public class EvidenceServiceImpl implements EvidenceService {
     
     private final EvidenceRepository evidenceRepository;
     private final DocumentService documentService;
+    private final EvidenceFieldLinkService evidenceFieldLinkService;
     
     // Valid enum values for validation
     private static final Set<String> VALID_STATUSES = Set.of("active", "superseded", "revoked");
     
-    public EvidenceServiceImpl(EvidenceRepository evidenceRepository, DocumentService documentService) {
+    public EvidenceServiceImpl(EvidenceRepository evidenceRepository, DocumentService documentService,
+                               EvidenceFieldLinkService evidenceFieldLinkService) {
         this.evidenceRepository = evidenceRepository;
         this.documentService = documentService;
+        this.evidenceFieldLinkService = evidenceFieldLinkService;
     }
     
     @Override
@@ -262,7 +268,27 @@ public class EvidenceServiceImpl implements EvidenceService {
             log.info("Successfully created evidence {} with document {} for app {}", 
                 evidence.evidenceId(), document.documentId(), appId);
             
-            // Step 3: Build response with both evidence and document
+            // Step 3: Attach evidence to profile field to trigger auto-risk creation workflow
+            log.debug("Attaching evidence {} to profile field {} for auto-risk evaluation", 
+                evidence.evidenceId(), request.profileFieldId());
+            
+            AttachEvidenceToFieldRequest attachRequest = new AttachEvidenceToFieldRequest(
+                "SYSTEM_EVIDENCE_WITH_DOCUMENT", 
+                "Evidence created with document via frontend"
+            );
+            
+            EvidenceFieldLinkResponse linkResponse = evidenceFieldLinkService.attachEvidenceToField(
+                evidence.evidenceId(), 
+                request.profileFieldId(), 
+                appId, 
+                attachRequest
+            );
+            
+            log.info("Evidence {} attached to field {}. Risk created: {}, Risk ID: {}, Assigned SME: {}", 
+                evidence.evidenceId(), request.profileFieldId(), 
+                linkResponse.riskWasCreated(), linkResponse.autoCreatedRiskId(), linkResponse.assignedSme());
+            
+            // Step 4: Build response with both evidence, document, and auto-risk information
             return new EvidenceWithDocumentResponse(
                 evidence.evidenceId(),
                 evidence.appId(),
@@ -286,7 +312,11 @@ public class EvidenceServiceImpl implements EvidenceService {
                 evidence.addedAt(),
                 evidence.createdAt(),
                 evidence.updatedAt(),
-                document
+                document,
+                // Auto-risk creation fields from evidence-field attachment workflow
+                linkResponse.riskWasCreated(),
+                linkResponse.autoCreatedRiskId(),
+                linkResponse.assignedSme()
             );
             
         } catch (Exception e) {
@@ -375,6 +405,19 @@ public class EvidenceServiceImpl implements EvidenceService {
         
         Evidence evidence = createEvidence(appId, evidenceRequest);
         
+        // Trigger evidence-field attachment workflow for auto-risk creation
+        AttachEvidenceToFieldRequest attachRequest = new AttachEvidenceToFieldRequest(
+            "SYSTEM_DOCUMENT_ATTACHMENT", 
+            "Document attached via frontend"
+        );
+        
+        EvidenceFieldLinkResponse linkResponse = evidenceFieldLinkService.attachEvidenceToField(
+            evidence.evidenceId(), 
+            profileFieldId, 
+            appId, 
+            attachRequest
+        );
+        
         // Return response with both evidence and document for audit persistence
         return new EvidenceWithDocumentResponse(
             evidence.evidenceId(),
@@ -399,7 +442,11 @@ public class EvidenceServiceImpl implements EvidenceService {
             evidence.addedAt(),
             evidence.createdAt(),
             evidence.updatedAt(),
-            document
+            document,
+            // Auto-risk creation fields from evidence-field link workflow
+            linkResponse.riskWasCreated(),
+            linkResponse.autoCreatedRiskId(),
+            linkResponse.assignedSme()
         );
     }
 
@@ -458,8 +505,73 @@ public class EvidenceServiceImpl implements EvidenceService {
             null, // addedAt not available in summary
             evidenceToDelete.createdAt(),
             evidenceToDelete.updatedAt(),
-            document
+            document,
+            // Auto-risk creation fields - not applicable for detachment
+            false,
+            null,
+            null
         );
+    }
+
+    @Override
+    public EvidenceFieldLinkResponse attachEvidenceToProfileField(String evidenceId, String profileFieldId, 
+                                                                 String appId, AttachEvidenceToFieldRequest request) {
+        log.debug("Attaching evidence {} to profile field {} in app {}", evidenceId, profileFieldId, appId);
+        return evidenceFieldLinkService.attachEvidenceToField(evidenceId, profileFieldId, appId, request);
+    }
+
+    @Override
+    public void detachEvidenceFromProfileField(String evidenceId, String profileFieldId) {
+        log.debug("Detaching evidence {} from profile field {}", evidenceId, profileFieldId);
+        evidenceFieldLinkService.detachEvidenceFromField(evidenceId, profileFieldId);
+    }
+
+    @Override
+    public EvidenceUsageResponse getEvidenceUsage(String evidenceId) {
+        log.debug("Getting evidence usage for {}", evidenceId);
+        
+        Evidence evidence = getEvidenceById(evidenceId)
+                .orElseThrow(() -> new RuntimeException("Evidence not found with id: " + evidenceId));
+
+        // Get field links
+        List<EvidenceFieldLinkResponse> fieldLinks = evidenceFieldLinkService.getEvidenceFieldLinks(evidenceId);
+        List<EvidenceUsageResponse.FieldUsage> fieldUsages = fieldLinks.stream()
+                .map(link -> new EvidenceUsageResponse.FieldUsage(
+                        link.profileFieldId(),
+                        extractFieldKeyFromProfileFieldId(link.profileFieldId()),
+                        link.appId(),
+                        link.linkStatus().name(),
+                        link.linkedBy(),
+                        link.linkedAt() != null ? link.linkedAt().toString() : null
+                ))
+                .collect(Collectors.toList());
+
+        // TODO: Get risk usages when risk story evidence repository is available
+        List<EvidenceUsageResponse.RiskUsage> riskUsages = new ArrayList<>();
+
+        return new EvidenceUsageResponse(
+                evidenceId,
+                "Evidence " + evidenceId,  // Evidence record doesn't have title field
+                evidence.uri(),
+                fieldUsages,
+                riskUsages
+        );
+    }
+
+    @Override
+    public EvidenceFieldLinkResponse reviewEvidenceFieldLink(String evidenceId, String profileFieldId, 
+                                                            String reviewedBy, String comment, boolean approved) {
+        log.debug("Reviewing evidence field link: {} -> {}, approved: {}", evidenceId, profileFieldId, approved);
+        return evidenceFieldLinkService.reviewEvidenceFieldLink(evidenceId, profileFieldId, reviewedBy, comment, approved);
+    }
+
+    private String extractFieldKeyFromProfileFieldId(String profileFieldId) {
+        // Extract field key from profile field ID pattern (appId_fieldKey_xxx)
+        String[] parts = profileFieldId.split("_");
+        if (parts.length >= 2) {
+            return parts[1];
+        }
+        return "unknown";
     }
 
     /**

@@ -7,6 +7,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.Map;
 
 @Repository
 public class ApplicationManagementRepository {
@@ -113,6 +114,39 @@ public class ApplicationManagementRepository {
             .addValue("updated_at",                OffsetDateTime.now(ZoneOffset.UTC));
 
         jdbc.update(sql, p);
+    }
+
+    /**
+     * Get a specific rating column value for an application
+     * @param appId Application ID
+     * @param ratingColumn Column name (e.g., "security_rating", "confidentiality_rating")
+     * @return Rating value or null if not found
+     */
+    public String getApplicationRatingByColumn(String appId, String ratingColumn) {
+        // Validate column name to prevent SQL injection
+        if (!isValidRatingColumn(ratingColumn)) {
+            throw new IllegalArgumentException("Invalid rating column: " + ratingColumn);
+        }
+        
+        String sql = "SELECT " + ratingColumn + " FROM application WHERE app_id = :appId";
+        
+        try {
+            return jdbc.queryForObject(sql, Map.of("appId", appId), String.class);
+        } catch (Exception e) {
+            return null; // Application not found or column is null
+        }
+    }
+    
+    private boolean isValidRatingColumn(String columnName) {
+        // Only allow known rating columns
+        return columnName != null && (
+            columnName.equals("security_rating") ||
+            columnName.equals("confidentiality_rating") ||
+            columnName.equals("integrity_rating") ||
+            columnName.equals("availability_rating") ||
+            columnName.equals("resilience_rating") ||
+            columnName.equals("app_criticality_assessment")
+        );
     }
 
     private static String nullIfBlank(String s) {

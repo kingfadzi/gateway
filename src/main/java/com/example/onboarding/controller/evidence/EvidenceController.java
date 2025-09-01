@@ -9,6 +9,9 @@ import com.example.onboarding.dto.evidence.Evidence;
 import com.example.onboarding.dto.evidence.EvidenceSummary;
 import com.example.onboarding.dto.evidence.EvidenceWithDocumentResponse;
 import com.example.onboarding.dto.evidence.UpdateEvidenceRequest;
+import com.example.onboarding.dto.evidence.AttachEvidenceToFieldRequest;
+import com.example.onboarding.dto.evidence.EvidenceFieldLinkResponse;
+import com.example.onboarding.dto.evidence.EvidenceUsageResponse;
 import com.example.onboarding.service.evidence.EvidenceService;
 import com.example.onboarding.service.document.DocumentService;
 import com.example.onboarding.dto.document.DocumentResponse;
@@ -283,6 +286,101 @@ public class EvidenceController {
             return ResponseEntity.badRequest().build();
         } catch (Exception e) {
             log.error("Unexpected error detaching document {} from profile field {}: {}", documentId, profileFieldId, e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    /**
+     * Attach evidence to a profile field with workflow management
+     * POST /api/evidence/{evidenceId}/attach-to-field/{profileFieldId}
+     */
+    @PostMapping("/evidence/{evidenceId}/attach-to-field/{profileFieldId}")
+    public ResponseEntity<EvidenceFieldLinkResponse> attachEvidenceToField(
+            @PathVariable String evidenceId,
+            @PathVariable String profileFieldId,
+            @RequestParam String appId,
+            @RequestBody AttachEvidenceToFieldRequest request) {
+        log.info("Attaching evidence {} to profile field {} in app {}", evidenceId, profileFieldId, appId);
+        
+        try {
+            EvidenceFieldLinkResponse response = evidenceService.attachEvidenceToProfileField(
+                    evidenceId, profileFieldId, appId, request);
+            log.info("Successfully attached evidence {} to profile field {}", evidenceId, profileFieldId);
+            return ResponseEntity.status(201).body(response);
+        } catch (IllegalArgumentException e) {
+            log.error("Validation error attaching evidence {} to field {}: {}", evidenceId, profileFieldId, e.getMessage());
+            return ResponseEntity.badRequest().build();
+        } catch (Exception e) {
+            log.error("Unexpected error attaching evidence {} to field {}: {}", evidenceId, profileFieldId, e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    /**
+     * Detach evidence from a profile field
+     * DELETE /api/evidence/{evidenceId}/detach-from-field/{profileFieldId}
+     */
+    @DeleteMapping("/evidence/{evidenceId}/detach-from-field/{profileFieldId}")
+    public ResponseEntity<Void> detachEvidenceFromField(
+            @PathVariable String evidenceId,
+            @PathVariable String profileFieldId) {
+        log.info("Detaching evidence {} from profile field {}", evidenceId, profileFieldId);
+        
+        try {
+            evidenceService.detachEvidenceFromProfileField(evidenceId, profileFieldId);
+            log.info("Successfully detached evidence {} from profile field {}", evidenceId, profileFieldId);
+            return ResponseEntity.noContent().build();
+        } catch (IllegalArgumentException e) {
+            log.error("Validation error detaching evidence {} from field {}: {}", evidenceId, profileFieldId, e.getMessage());
+            return ResponseEntity.badRequest().build();
+        } catch (Exception e) {
+            log.error("Unexpected error detaching evidence {} from field {}: {}", evidenceId, profileFieldId, e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    /**
+     * Get evidence usage across fields and risks
+     * GET /api/evidence/{evidenceId}/usage
+     */
+    @GetMapping("/evidence/{evidenceId}/usage")
+    public ResponseEntity<EvidenceUsageResponse> getEvidenceUsage(@PathVariable String evidenceId) {
+        log.info("Getting usage information for evidence {}", evidenceId);
+        
+        try {
+            EvidenceUsageResponse response = evidenceService.getEvidenceUsage(evidenceId);
+            log.debug("Found {} field usages and {} risk usages for evidence {}", 
+                    response.fieldUsages().size(), response.riskUsages().size(), evidenceId);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("Error getting usage for evidence {}: {}", evidenceId, e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    /**
+     * Review an evidence-field link
+     * POST /api/evidence/{evidenceId}/field-link/{profileFieldId}/review
+     */
+    @PostMapping("/evidence/{evidenceId}/field-link/{profileFieldId}/review")
+    public ResponseEntity<EvidenceFieldLinkResponse> reviewEvidenceFieldLink(
+            @PathVariable String evidenceId,
+            @PathVariable String profileFieldId,
+            @RequestParam String reviewedBy,
+            @RequestParam String comment,
+            @RequestParam boolean approved) {
+        log.info("Reviewing evidence field link: {} -> {}, approved: {}", evidenceId, profileFieldId, approved);
+        
+        try {
+            EvidenceFieldLinkResponse response = evidenceService.reviewEvidenceFieldLink(
+                    evidenceId, profileFieldId, reviewedBy, comment, approved);
+            log.info("Successfully reviewed evidence field link: {} -> {}", evidenceId, profileFieldId);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            log.error("Validation error reviewing evidence field link {} -> {}: {}", evidenceId, profileFieldId, e.getMessage());
+            return ResponseEntity.badRequest().build();
+        } catch (Exception e) {
+            log.error("Unexpected error reviewing evidence field link {} -> {}: {}", evidenceId, profileFieldId, e.getMessage(), e);
             return ResponseEntity.internalServerError().build();
         }
     }

@@ -29,5 +29,9 @@ public record EvidenceWithDocumentResponse(
         OffsetDateTime addedAt,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt,
-        DocumentResponse document           // Embedded document details
+        DocumentResponse document,          // Embedded document details
+        // Auto-risk creation fields
+        boolean riskWasCreated,
+        String autoCreatedRiskId,
+        String assignedSme
 ) {}

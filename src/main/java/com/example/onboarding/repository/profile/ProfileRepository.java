@@ -297,4 +297,13 @@ public class ProfileRepository {
         
         return jdbc.query(sql, Map.of("pid", profileId), ProfileUtils.FIELD_ROW_MAPPER);
     }
+
+    public String getFieldKeyByProfileFieldId(String profileFieldId) {
+        String sql = "SELECT field_key FROM profile_field WHERE id = :profileFieldId";
+        try {
+            return jdbc.queryForObject(sql, Map.of("profileFieldId", profileFieldId), String.class);
+        } catch (EmptyResultDataAccessException e) {
+            throw new IllegalArgumentException("Profile field not found: " + profileFieldId);
+        }
+    }
 }

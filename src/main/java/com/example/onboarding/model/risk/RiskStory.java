@@ -1,5 +1,7 @@
 package com.example.onboarding.model.risk;
 
+import com.example.onboarding.model.RiskStatus;
+import com.example.onboarding.model.RiskCreationType;
 import jakarta.persistence.*;
 import lombok.Data;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -28,6 +30,15 @@ public class RiskStory {
 
     private String trackId;
 
+    // New fields for enhanced workflow
+    private String triggeringEvidenceId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private RiskCreationType creationType = RiskCreationType.MANUAL_SME_INITIATED;
+
+    private String assignedSme;
+
     private String title;
 
     private String hypothesis;
@@ -44,7 +55,9 @@ public class RiskStory {
 
     private String severity;
 
-    private String status;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private RiskStatus status = RiskStatus.PENDING_SME_REVIEW;
 
     private String closureReason;
 
@@ -56,6 +69,17 @@ public class RiskStory {
     private OffsetDateTime openedAt;
 
     private OffsetDateTime closedAt;
+
+    // Enhanced timestamps
+    private OffsetDateTime assignedAt;
+
+    private OffsetDateTime reviewedAt;
+
+    private String reviewComment;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb")
+    private Map<String, Object> policyRequirementSnapshot;
 
     @Column(insertable = false, updatable = false)
     private OffsetDateTime createdAt;

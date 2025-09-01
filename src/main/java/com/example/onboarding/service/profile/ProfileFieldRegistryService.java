@@ -1,6 +1,9 @@
 package com.example.onboarding.service.profile;
 
 import com.example.onboarding.dto.profile.ProfileFieldTypeInfo;
+import com.example.onboarding.dto.registry.FieldRiskConfig;
+import com.example.onboarding.dto.registry.RiskCreationRule;
+import com.example.onboarding.dto.registry.ComplianceFramework;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import org.slf4j.Logger;
@@ -19,6 +22,7 @@ public class ProfileFieldRegistryService {
     private final ObjectMapper yamlMapper = new ObjectMapper(new YAMLFactory());
     
     private List<ProfileFieldTypeInfo> profileFieldTypes = new ArrayList<>();
+    private Map<String, FieldRiskConfig> fieldRiskConfigs = new HashMap<>();
     
     @PostConstruct
     public void loadProfileFieldRegistry() {
@@ -26,7 +30,8 @@ public class ProfileFieldRegistryService {
             ClassPathResource resource = new ClassPathResource("profile-fields.registry.yaml");
             Map<String, Object> registry = yamlMapper.readValue(resource.getInputStream(), Map.class);
             parseRegistry(registry);
-            log.info("Loaded {} profile field types from registry", profileFieldTypes.size());
+            log.info("Loaded {} profile field types and {} risk configurations from registry", 
+                    profileFieldTypes.size(), fieldRiskConfigs.size());
         } catch (IOException e) {
             log.error("Failed to load profile field registry", e);
             profileFieldTypes = List.of(); // Empty list as fallback
@@ -36,35 +41,116 @@ public class ProfileFieldRegistryService {
     @SuppressWarnings("unchecked")
     private void parseRegistry(Map<String, Object> registry) {
         profileFieldTypes = new ArrayList<>();
+        fieldRiskConfigs = new HashMap<>();
         
-        // Extract domains (security, confidentiality, integrity, etc.)
-        for (Map.Entry<String, Object> domainEntry : registry.entrySet()) {
-            String domain = domainEntry.getKey();
+        // Extract the "fields" array from the registry
+        Object fieldsObj = registry.get("fields");
+        if (fieldsObj instanceof List) {
+            List<Map<String, Object>> fields = (List<Map<String, Object>>) fieldsObj;
             
-            if (domainEntry.getValue() instanceof List) {
-                List<Map<String, Object>> fields = (List<Map<String, Object>>) domainEntry.getValue();
+            for (Map<String, Object> fieldMap : fields) {
+                String fieldKey = getString(fieldMap, "key");
+                String label = getString(fieldMap, "label");
+                String derivedFrom = getString(fieldMap, "derived_from");
                 
-                for (Map<String, Object> fieldMap : fields) {
-                    String fieldKey = getString(fieldMap, "key");
-                    String label = getString(fieldMap, "label");
-                    String derivedFrom = getString(fieldMap, "derived_from");
+                if (fieldKey != null && label != null) {
+                    // Parse compliance frameworks
+                    List<ComplianceFramework> complianceFrameworks = parseComplianceFrameworks(fieldMap);
                     
-                    if (fieldKey != null && label != null) {
-                        profileFieldTypes.add(new ProfileFieldTypeInfo(
-                                fieldKey,
-                                label,
-                                domain,
-                                derivedFrom
-                        ));
+                    // Create ProfileFieldTypeInfo (existing functionality)
+                    profileFieldTypes.add(new ProfileFieldTypeInfo(
+                            fieldKey,
+                            label,
+                            "unknown", // We don't have domain in the new structure
+                            derivedFrom,
+                            complianceFrameworks
+                    ));
+                    
+                    // Parse risk configuration from rules
+                    Object rulesObj = fieldMap.get("rule");
+                    if (rulesObj instanceof Map) {
+                        Map<String, Object> rulesMap = (Map<String, Object>) rulesObj;
+                        Map<String, RiskCreationRule> riskRules = parseRiskRules(rulesMap);
+                        
+                        if (!riskRules.isEmpty()) {
+                            fieldRiskConfigs.put(fieldKey, new FieldRiskConfig(
+                                    fieldKey, label, derivedFrom, riskRules
+                            ));
+                        }
                     }
                 }
             }
         }
     }
     
+    @SuppressWarnings("unchecked")
+    private Map<String, RiskCreationRule> parseRiskRules(Map<String, Object> rulesMap) {
+        Map<String, RiskCreationRule> riskRules = new HashMap<>();
+        
+        for (Map.Entry<String, Object> ruleEntry : rulesMap.entrySet()) {
+            String criticality = ruleEntry.getKey();
+            Object ruleValue = ruleEntry.getValue();
+            
+            if (ruleValue instanceof Map) {
+                Map<String, Object> rule = (Map<String, Object>) ruleValue;
+                
+                String value = getString(rule, "value");
+                String label = getString(rule, "label");
+                String ttl = getString(rule, "ttl");
+                Boolean requiresReview = getBoolean(rule, "requires_review");
+                
+                if (value != null && label != null) {
+                    riskRules.put(criticality, RiskCreationRule.fromRegistryRule(
+                            value, label, ttl, requiresReview
+                    ));
+                }
+            }
+        }
+        
+        return riskRules;
+    }
+    
     private String getString(Map<String, Object> map, String key) {
         Object value = map.get(key);
         return value != null ? value.toString() : null;
+    }
+    
+    private Boolean getBoolean(Map<String, Object> map, String key) {
+        Object value = map.get(key);
+        if (value instanceof Boolean) {
+            return (Boolean) value;
+        }
+        return null;
+    }
+    
+    @SuppressWarnings("unchecked")
+    private List<ComplianceFramework> parseComplianceFrameworks(Map<String, Object> fieldMap) {
+        List<ComplianceFramework> frameworks = new ArrayList<>();
+        
+        Object complianceObj = fieldMap.get("compliance_frameworks");
+        if (complianceObj instanceof List) {
+            List<Map<String, Object>> complianceList = (List<Map<String, Object>>) complianceObj;
+            
+            for (Map<String, Object> frameworkMap : complianceList) {
+                String framework = getString(frameworkMap, "framework");
+                Object controlsObj = frameworkMap.get("controls");
+                
+                if (framework != null && controlsObj instanceof List) {
+                    List<String> controls = new ArrayList<>();
+                    List<?> controlsList = (List<?>) controlsObj;
+                    
+                    for (Object control : controlsList) {
+                        if (control != null) {
+                            controls.add(control.toString());
+                        }
+                    }
+                    
+                    frameworks.add(new ComplianceFramework(framework, controls));
+                }
+            }
+        }
+        
+        return frameworks;
     }
     
     /**
@@ -108,5 +194,47 @@ public class ProfileFieldRegistryService {
         return fieldKeys.stream()
                 .filter(validKeys::contains)
                 .toList();
+    }
+    
+    // =====================
+    // Risk Configuration Methods
+    // =====================
+    
+    /**
+     * Get risk configuration for a field
+     */
+    public Optional<FieldRiskConfig> getFieldRiskConfig(String fieldKey) {
+        return Optional.ofNullable(fieldRiskConfigs.get(fieldKey));
+    }
+    
+    /**
+     * Check if field requires review for given app criticality
+     */
+    public boolean requiresReviewForField(String fieldKey, String appCriticality) {
+        return getFieldRiskConfig(fieldKey)
+                .map(config -> config.requiresReviewForCriticality(appCriticality))
+                .orElse(false);
+    }
+    
+    /**
+     * Get all fields that have risk configurations
+     */
+    public List<String> getFieldsWithRiskConfig() {
+        return new ArrayList<>(fieldRiskConfigs.keySet());
+    }
+    
+    /**
+     * Get all risk configurations
+     */
+    public Map<String, FieldRiskConfig> getAllRiskConfigs() {
+        return Map.copyOf(fieldRiskConfigs);
+    }
+    
+    /**
+     * Get risk creation rule for specific field and criticality
+     */
+    public Optional<RiskCreationRule> getRiskRule(String fieldKey, String appCriticality) {
+        return getFieldRiskConfig(fieldKey)
+                .map(config -> config.getRuleForCriticality(appCriticality));
     }
 }

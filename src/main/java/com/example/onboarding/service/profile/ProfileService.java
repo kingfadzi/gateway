@@ -22,4 +22,6 @@ public interface ProfileService {
 
     PatchProfileResponse patchProfile(String appId, PatchProfileRequest req);
 
+    String getFieldKeyByProfileFieldId(String profileFieldId);
+
 }
