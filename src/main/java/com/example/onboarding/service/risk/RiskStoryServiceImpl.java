@@ -221,10 +221,8 @@ public class RiskStoryServiceImpl implements RiskStoryService {
             (String) row.get("system_architect_brid"),
             (String) row.get("onboarding_status"),
             (String) row.get("owner_id"),
-            row.get("app_created_at") != null ? 
-                ((java.sql.Timestamp) row.get("app_created_at")).toInstant().atOffset(java.time.ZoneOffset.UTC) : null,
-            row.get("app_updated_at") != null ? 
-                ((java.sql.Timestamp) row.get("app_updated_at")).toInstant().atOffset(java.time.ZoneOffset.UTC) : null
+            convertToOffsetDateTime(row.get("app_created_at")),
+            convertToOffsetDateTime(row.get("app_updated_at"))
         );
     }
     
@@ -258,27 +256,41 @@ public class RiskStoryServiceImpl implements RiskStoryService {
         risk.setAttributes(new java.util.HashMap<>());
         risk.setPolicyRequirementSnapshot(new java.util.HashMap<>());
         
-        // Handle timestamps (they come as SQL timestamps from the database)
-        if (row.get("opened_at") != null) {
-            risk.setOpenedAt(((java.sql.Timestamp) row.get("opened_at")).toInstant().atOffset(java.time.ZoneOffset.UTC));
-        }
-        if (row.get("closed_at") != null) {
-            risk.setClosedAt(((java.sql.Timestamp) row.get("closed_at")).toInstant().atOffset(java.time.ZoneOffset.UTC));
-        }
-        if (row.get("assigned_at") != null) {
-            risk.setAssignedAt(((java.sql.Timestamp) row.get("assigned_at")).toInstant().atOffset(java.time.ZoneOffset.UTC));
-        }
-        if (row.get("reviewed_at") != null) {
-            risk.setReviewedAt(((java.sql.Timestamp) row.get("reviewed_at")).toInstant().atOffset(java.time.ZoneOffset.UTC));
-        }
-        if (row.get("created_at") != null) {
-            risk.setCreatedAt(((java.sql.Timestamp) row.get("created_at")).toInstant().atOffset(java.time.ZoneOffset.UTC));
-        }
-        if (row.get("updated_at") != null) {
-            risk.setUpdatedAt(((java.sql.Timestamp) row.get("updated_at")).toInstant().atOffset(java.time.ZoneOffset.UTC));
-        }
+        // Handle timestamps (they can come as various types from the database)
+        risk.setOpenedAt(convertToOffsetDateTime(row.get("opened_at")));
+        risk.setClosedAt(convertToOffsetDateTime(row.get("closed_at")));
+        risk.setAssignedAt(convertToOffsetDateTime(row.get("assigned_at")));
+        risk.setReviewedAt(convertToOffsetDateTime(row.get("reviewed_at")));
+        risk.setCreatedAt(convertToOffsetDateTime(row.get("created_at")));
+        risk.setUpdatedAt(convertToOffsetDateTime(row.get("updated_at")));
         
         return risk;
+    }
+    
+    private OffsetDateTime convertToOffsetDateTime(Object timestamp) {
+        if (timestamp == null) {
+            return null;
+        }
+        
+        if (timestamp instanceof java.sql.Timestamp) {
+            return ((java.sql.Timestamp) timestamp).toInstant().atOffset(java.time.ZoneOffset.UTC);
+        }
+        
+        if (timestamp instanceof java.time.Instant) {
+            return ((java.time.Instant) timestamp).atOffset(java.time.ZoneOffset.UTC);
+        }
+        
+        if (timestamp instanceof java.time.OffsetDateTime) {
+            return (OffsetDateTime) timestamp;
+        }
+        
+        if (timestamp instanceof java.time.LocalDateTime) {
+            return ((java.time.LocalDateTime) timestamp).atOffset(java.time.ZoneOffset.UTC);
+        }
+        
+        // If we can't convert, log and return null
+        System.err.println("Unable to convert timestamp type: " + timestamp.getClass().getName() + " value: " + timestamp);
+        return null;
     }
     
     /**
