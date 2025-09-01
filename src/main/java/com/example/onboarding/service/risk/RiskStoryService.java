@@ -22,4 +22,9 @@ public interface RiskStoryService {
     List<RiskStoryResponse> getRisksByAppIdAndFieldKey(String appId, String fieldKey);
     
     List<RiskStoryResponse> getRisksByProfileFieldId(String profileFieldId);
+    
+    List<RiskStoryResponse> searchRisks(String appId, String assignedSme, String status, 
+                                       String domain, String derivedFrom, String fieldKey, 
+                                       String severity, String creationType, String triggeringEvidenceId,
+                                       String sortBy, String sortOrder, int page, int size);
 }

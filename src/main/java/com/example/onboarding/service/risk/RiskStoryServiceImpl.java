@@ -8,6 +8,7 @@ import com.example.onboarding.dto.track.Track;
 import com.example.onboarding.exception.DataIntegrityException;
 import com.example.onboarding.exception.NotFoundException;
 import com.example.onboarding.model.RiskStatus;
+import com.example.onboarding.model.RiskCreationType;
 import com.example.onboarding.model.risk.RiskStory;
 import com.example.onboarding.model.risk.RiskStoryEvidence;
 import com.example.onboarding.model.risk.RiskStoryEvidenceId;
@@ -24,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -152,6 +154,131 @@ public class RiskStoryServiceImpl implements RiskStoryService {
         return risks.stream()
                 .map(RiskStoryResponse::fromModel)
                 .collect(Collectors.toList());
+    }
+    
+    @Override
+    public List<RiskStoryResponse> searchRisks(String appId, String assignedSme, String status, 
+                                             String domain, String derivedFrom, String fieldKey, 
+                                             String severity, String creationType, String triggeringEvidenceId,
+                                             String sortBy, String sortOrder, int page, int size) {
+        
+        // Convert domain to derivedFrom if domain is provided but derivedFrom is not
+        String finalDerivedFrom = derivedFrom;
+        if (domain != null && derivedFrom == null) {
+            finalDerivedFrom = domain + "_rating";
+        }
+        
+        int offset = page * size;
+        
+        List<Map<String, Object>> results = riskStoryRepository.searchRisks(
+            appId, assignedSme, status, finalDerivedFrom, fieldKey, 
+            severity, creationType, triggeringEvidenceId, sortBy, sortOrder, size, offset);
+        
+        return results.stream()
+                .map(this::mapToRiskStoryResponse)
+                .collect(Collectors.toList());
+    }
+    
+    private RiskStoryResponse mapToRiskStoryResponse(Map<String, Object> row) {
+        // Create a RiskStory from the row data (without app details)
+        RiskStory riskStory = mapToRiskStory(row);
+        
+        // Extract all application details
+        RiskStoryResponse.ApplicationDetails applicationDetails = mapToApplicationDetails(row);
+        
+        return RiskStoryResponse.fromModel(riskStory, applicationDetails);
+    }
+    
+    private RiskStoryResponse.ApplicationDetails mapToApplicationDetails(Map<String, Object> row) {
+        return new RiskStoryResponse.ApplicationDetails(
+            (String) row.get("name"),
+            (String) row.get("scope"),
+            (String) row.get("parent_app_id"),
+            (String) row.get("parent_app_name"),
+            (String) row.get("business_service_name"),
+            (String) row.get("app_criticality_assessment"),
+            (String) row.get("security_rating"),
+            (String) row.get("confidentiality_rating"),
+            (String) row.get("integrity_rating"),
+            (String) row.get("availability_rating"),
+            (String) row.get("resilience_rating"),
+            (String) row.get("business_application_sys_id"),
+            (String) row.get("architecture_hosting"),
+            (String) row.get("jira_backlog_id"),
+            (String) row.get("lean_control_service_id"),
+            (String) row.get("repo_id"),
+            (String) row.get("operational_status"),
+            (String) row.get("transaction_cycle"),
+            (String) row.get("transaction_cycle_id"),
+            (String) row.get("application_type"),
+            (String) row.get("application_tier"),
+            (String) row.get("architecture_type"),
+            (String) row.get("install_type"),
+            (String) row.get("house_position"),
+            (String) row.get("product_owner"),
+            (String) row.get("product_owner_brid"),
+            (String) row.get("system_architect"),
+            (String) row.get("system_architect_brid"),
+            (String) row.get("onboarding_status"),
+            (String) row.get("owner_id"),
+            row.get("app_created_at") != null ? 
+                ((java.sql.Timestamp) row.get("app_created_at")).toInstant().atOffset(java.time.ZoneOffset.UTC) : null,
+            row.get("app_updated_at") != null ? 
+                ((java.sql.Timestamp) row.get("app_updated_at")).toInstant().atOffset(java.time.ZoneOffset.UTC) : null
+        );
+    }
+    
+    private RiskStory mapToRiskStory(Map<String, Object> row) {
+        RiskStory risk = new RiskStory();
+        risk.setRiskId((String) row.get("risk_id"));
+        risk.setAppId((String) row.get("app_id"));
+        risk.setFieldKey((String) row.get("field_key"));
+        risk.setProfileId((String) row.get("profile_id"));
+        risk.setProfileFieldId((String) row.get("profile_field_id"));
+        risk.setTrackId((String) row.get("track_id"));
+        risk.setTriggeringEvidenceId((String) row.get("triggering_evidence_id"));
+        risk.setCreationType(row.get("creation_type") != null ? 
+            RiskCreationType.valueOf((String) row.get("creation_type")) : null);
+        risk.setAssignedSme((String) row.get("assigned_sme"));
+        risk.setTitle((String) row.get("title"));
+        risk.setHypothesis((String) row.get("hypothesis"));
+        risk.setCondition((String) row.get("condition"));
+        risk.setConsequence((String) row.get("consequence"));
+        risk.setControlRefs((String) row.get("control_refs"));
+        risk.setSeverity((String) row.get("severity"));
+        risk.setStatus(row.get("status") != null ? 
+            RiskStatus.valueOf((String) row.get("status")) : null);
+        risk.setClosureReason((String) row.get("closure_reason"));
+        risk.setRaisedBy((String) row.get("raised_by"));
+        risk.setOwner((String) row.get("owner"));
+        risk.setReviewComment((String) row.get("review_comment"));
+        
+        // Handle JSONB fields - these come as PGobject or similar from PostgreSQL
+        // For now, we'll set them to empty maps if they're complex, or parse them if needed
+        risk.setAttributes(new java.util.HashMap<>());
+        risk.setPolicyRequirementSnapshot(new java.util.HashMap<>());
+        
+        // Handle timestamps (they come as SQL timestamps from the database)
+        if (row.get("opened_at") != null) {
+            risk.setOpenedAt(((java.sql.Timestamp) row.get("opened_at")).toInstant().atOffset(java.time.ZoneOffset.UTC));
+        }
+        if (row.get("closed_at") != null) {
+            risk.setClosedAt(((java.sql.Timestamp) row.get("closed_at")).toInstant().atOffset(java.time.ZoneOffset.UTC));
+        }
+        if (row.get("assigned_at") != null) {
+            risk.setAssignedAt(((java.sql.Timestamp) row.get("assigned_at")).toInstant().atOffset(java.time.ZoneOffset.UTC));
+        }
+        if (row.get("reviewed_at") != null) {
+            risk.setReviewedAt(((java.sql.Timestamp) row.get("reviewed_at")).toInstant().atOffset(java.time.ZoneOffset.UTC));
+        }
+        if (row.get("created_at") != null) {
+            risk.setCreatedAt(((java.sql.Timestamp) row.get("created_at")).toInstant().atOffset(java.time.ZoneOffset.UTC));
+        }
+        if (row.get("updated_at") != null) {
+            risk.setUpdatedAt(((java.sql.Timestamp) row.get("updated_at")).toInstant().atOffset(java.time.ZoneOffset.UTC));
+        }
+        
+        return risk;
     }
     
     /**

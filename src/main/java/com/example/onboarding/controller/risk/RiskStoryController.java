@@ -69,4 +69,26 @@ public class RiskStoryController {
         java.util.List<RiskStoryResponse> risks = riskStoryService.getRisksByProfileFieldId(profileFieldId);
         return ResponseEntity.ok(risks);
     }
+    
+    @GetMapping("/risks/search")
+    public ResponseEntity<java.util.List<RiskStoryResponse>> searchRisks(
+            @RequestParam(required = false) String appId,
+            @RequestParam(required = false) String assignedSme,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String domain,
+            @RequestParam(required = false) String derivedFrom,
+            @RequestParam(required = false) String fieldKey,
+            @RequestParam(required = false) String severity,
+            @RequestParam(required = false) String creationType,
+            @RequestParam(required = false) String triggeringEvidenceId,
+            @RequestParam(defaultValue = "assignedAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortOrder,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size) {
+        
+        java.util.List<RiskStoryResponse> risks = riskStoryService.searchRisks(
+            appId, assignedSme, status, domain, derivedFrom, fieldKey, 
+            severity, creationType, triggeringEvidenceId, sortBy, sortOrder, page, size);
+        return ResponseEntity.ok(risks);
+    }
 }

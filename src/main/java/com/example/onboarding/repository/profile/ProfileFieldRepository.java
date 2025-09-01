@@ -3,6 +3,7 @@ package com.example.onboarding.repository.profile;
 import com.example.onboarding.util.Jsons;
 import com.example.onboarding.util.HashIds;
 import com.example.onboarding.config.FieldRegistryConfig;
+import com.example.onboarding.service.profile.ProfileFieldRegistryService;
 import org.springframework.jdbc.core.namedparam.*;
 import org.springframework.stereotype.Repository;
 
@@ -13,9 +14,12 @@ import java.util.*;
 @Repository
 public class ProfileFieldRepository {
     private final NamedParameterJdbcTemplate jdbc;
+    private final ProfileFieldRegistryService profileFieldRegistryService;
 
-    public ProfileFieldRepository(NamedParameterJdbcTemplate jdbc) {
+    public ProfileFieldRepository(NamedParameterJdbcTemplate jdbc, 
+                                 ProfileFieldRegistryService profileFieldRegistryService) {
         this.jdbc = jdbc;
+        this.profileFieldRegistryService = profileFieldRegistryService;
     }
 
     /** Idempotent upsert (by deterministic pf_id) for all key->value entries */
@@ -23,9 +27,10 @@ public class ProfileFieldRepository {
         if (fields == null || fields.isEmpty()) return;
 
         String sql = """
-          INSERT INTO profile_field (id, profile_id, field_key, value, source_system, source_ref, created_at, updated_at)
-          VALUES (:id, :pid, :key, CAST(:val AS jsonb), :srcsys, :srcref, :ts, :ts)
+          INSERT INTO profile_field (id, profile_id, field_key, derived_from, value, source_system, source_ref, created_at, updated_at)
+          VALUES (:id, :pid, :key, :derived_from, CAST(:val AS jsonb), :srcsys, :srcref, :ts, :ts)
           ON CONFLICT (id) DO UPDATE SET
+            derived_from = EXCLUDED.derived_from,
             value = EXCLUDED.value,
             source_system = EXCLUDED.source_system,
             source_ref = EXCLUDED.source_ref,
@@ -35,10 +40,17 @@ public class ProfileFieldRepository {
         var now = OffsetDateTime.now(ZoneOffset.UTC);
         for (var e : fields.entrySet()) {
             String pfId = HashIds.profileFieldId(profileId, e.getKey());
+            
+            // Get derived_from from YAML registry
+            String derivedFrom = profileFieldRegistryService.getFieldTypeInfo(e.getKey())
+                    .map(fieldInfo -> fieldInfo.derivedFrom())
+                    .orElse(null);
+            
             batch.add(new MapSqlParameterSource()
                     .addValue("id", pfId)
                     .addValue("pid", profileId)
                     .addValue("key", e.getKey())
+                    .addValue("derived_from", derivedFrom)
                     .addValue("val", Jsons.toJson(e.getValue()))
                     .addValue("srcsys", sourceSystem)
                     .addValue("srcref", sourceRef)

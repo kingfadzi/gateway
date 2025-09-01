@@ -11,6 +11,7 @@ public record RiskStoryResponse(
     // Core Identifiers
     String riskId,
     String appId,
+    ApplicationDetails applicationDetails,
     String fieldKey,
     String profileId,
     String profileFieldId,
@@ -51,10 +52,15 @@ public record RiskStoryResponse(
     OffsetDateTime updatedAt
 ) {
     public static RiskStoryResponse fromModel(RiskStory model) {
+        return fromModel(model, null);
+    }
+    
+    public static RiskStoryResponse fromModel(RiskStory model, ApplicationDetails applicationDetails) {
         return new RiskStoryResponse(
             // Core Identifiers
             model.getRiskId(),
             model.getAppId(),
+            applicationDetails,
             model.getFieldKey(),
             model.getProfileId(),
             model.getProfileFieldId(),
@@ -95,4 +101,39 @@ public record RiskStoryResponse(
             model.getUpdatedAt()
         );
     }
+    
+    public record ApplicationDetails(
+        String name,
+        String scope,
+        String parentAppId,
+        String parentAppName,
+        String businessServiceName,
+        String appCriticalityAssessment,
+        String securityRating,
+        String confidentialityRating,
+        String integrityRating,
+        String availabilityRating,
+        String resilienceRating,
+        String businessApplicationSysId,
+        String architectureHosting,
+        String jiraBacklogId,
+        String leanControlServiceId,
+        String repoId,
+        String operationalStatus,
+        String transactionCycle,
+        String transactionCycleId,
+        String applicationType,
+        String applicationTier,
+        String architectureType,
+        String installType,
+        String housePosition,
+        String productOwner,
+        String productOwnerBrid,
+        String systemArchitect,
+        String systemArchitectBrid,
+        String onboardingStatus,
+        String ownerId,
+        OffsetDateTime createdAt,
+        OffsetDateTime updatedAt
+    ) {}
 }

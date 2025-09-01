@@ -57,11 +57,14 @@ public class ProfileFieldRegistryService {
                     // Parse compliance frameworks
                     List<ComplianceFramework> complianceFrameworks = parseComplianceFrameworks(fieldMap);
                     
+                    // Calculate domain from derived_from field
+                    String domain = getDomainFromDerivedFrom(derivedFrom);
+                    
                     // Create ProfileFieldTypeInfo (existing functionality)
                     profileFieldTypes.add(new ProfileFieldTypeInfo(
                             fieldKey,
                             label,
-                            "unknown", // We don't have domain in the new structure
+                            domain,
                             derivedFrom,
                             complianceFrameworks
                     ));
@@ -151,6 +154,23 @@ public class ProfileFieldRegistryService {
         }
         
         return frameworks;
+    }
+    
+    /**
+     * Calculate domain from derived_from field by removing _rating suffix
+     */
+    private String getDomainFromDerivedFrom(String derivedFrom) {
+        if (derivedFrom == null || derivedFrom.isEmpty()) {
+            return "unknown";
+        }
+        
+        // Remove _rating suffix to get domain name
+        if (derivedFrom.endsWith("_rating")) {
+            return derivedFrom.substring(0, derivedFrom.length() - 7); // Remove "_rating"
+        }
+        
+        // Handle special cases like "artifact" 
+        return derivedFrom;
     }
     
     /**

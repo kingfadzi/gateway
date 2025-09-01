@@ -7,6 +7,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Map;
 
 @Repository
@@ -147,6 +148,23 @@ public class ApplicationManagementRepository {
             columnName.equals("resilience_rating") ||
             columnName.equals("app_criticality_assessment")
         );
+    }
+
+    /**
+     * Get application names by list of app IDs
+     */
+    public List<Map<String, Object>> getApplicationNamesByIds(List<String> appIds) {
+        if (appIds == null || appIds.isEmpty()) {
+            return List.of();
+        }
+        
+        String sql = """
+            SELECT app_id, name as app_name 
+            FROM application 
+            WHERE app_id IN (:appIds)
+        """;
+        
+        return jdbc.queryForList(sql, Map.of("appIds", appIds));
     }
 
     private static String nullIfBlank(String s) {
