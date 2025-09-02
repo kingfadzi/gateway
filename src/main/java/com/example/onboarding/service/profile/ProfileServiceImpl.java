@@ -11,6 +11,8 @@ import com.example.onboarding.repository.risk.RiskStoryRepository;
 import com.example.onboarding.model.risk.RiskStory;
 import com.example.onboarding.service.document.DocumentService;
 import com.example.onboarding.service.profile.ProfileFieldRegistryService;
+import com.example.onboarding.dto.evidence.EnhancedEvidenceSummary;
+import com.example.onboarding.repository.evidence.EvidenceRepository;
 import com.example.onboarding.util.ProfileUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,17 +35,23 @@ public class ProfileServiceImpl implements ProfileService {
     private final DocumentService documentService;
     private final ProfileFieldRegistryService profileFieldRegistryService;
     private final RiskStoryRepository riskStoryRepository;
+    private final EvidenceStatusCalculator evidenceStatusCalculator;
+    private final EvidenceRepository evidenceRepository;
 
     public ProfileServiceImpl(ProfileRepository profileRepository, 
                              FieldRegistryConfig fieldRegistryConfig,
                              DocumentService documentService,
                              ProfileFieldRegistryService profileFieldRegistryService,
-                             RiskStoryRepository riskStoryRepository) {
+                             RiskStoryRepository riskStoryRepository,
+                             EvidenceStatusCalculator evidenceStatusCalculator,
+                             EvidenceRepository evidenceRepository) {
         this.profileRepository = profileRepository;
         this.fieldRegistryConfig = fieldRegistryConfig;
         this.documentService = documentService;
         this.profileFieldRegistryService = profileFieldRegistryService;
         this.riskStoryRepository = riskStoryRepository;
+        this.evidenceStatusCalculator = evidenceStatusCalculator;
+        this.evidenceRepository = evidenceRepository;
     }
 
 
@@ -125,7 +133,7 @@ public class ProfileServiceImpl implements ProfileService {
         drivers.put("integrity_rating", (String) appData.get("integrity_rating"));
         drivers.put("availability_rating", (String) appData.get("availability_rating"));
         drivers.put("resilience_rating", (String) appData.get("resilience_rating"));
-        drivers.put("app_criticality", (String) appData.get("app_criticality_assessment"));
+        drivers.put("app_criticality_assessment", (String) appData.get("app_criticality_assessment"));
         
         // Convert ProfileFields to ProfileFieldPayloads with derived_from mapping
         List<ProfileFieldPayload> fieldPayloads = fields.stream()
@@ -204,7 +212,13 @@ public class ProfileServiceImpl implements ProfileService {
             List<FieldGraphPayload> fieldPayloads = new ArrayList<>();
             for (ProfileField field : domainFields) {
                 List<Evidence> evForField = evidenceByField.getOrDefault(field.fieldId(), Collections.emptyList());
-                String assurance = deriveAssurance(evForField);
+                
+                // Get enhanced evidence for status calculations
+                List<EnhancedEvidenceSummary> enhancedEvidence = evidenceRepository.findEvidenceByProfileField(field.fieldId(), 100, 0);
+                
+                // Calculate approval and freshness statuses
+                String approvalStatus = evidenceStatusCalculator.calculateApprovalStatus(enhancedEvidence);
+                String freshnessStatus = evidenceStatusCalculator.calculateFreshnessStatus(enhancedEvidence, field.fieldId());
                 
                 // Convert evidence to graph payload
                 List<EvidenceGraphPayload> evidenceGraphPayloads = evForField.stream()
@@ -229,14 +243,28 @@ public class ProfileServiceImpl implements ProfileService {
                         ))
                         .collect(Collectors.toList());
                 
+                // Get attestations (evidence with PENDING_PO_REVIEW status)
+                List<AttestationGraphPayload> attestationGraphPayloads = enhancedEvidence.stream()
+                        .filter(evidence -> evidence.linkStatus() == com.example.onboarding.model.EvidenceFieldLinkStatus.PENDING_PO_REVIEW)
+                        .map(evidence -> new AttestationGraphPayload(
+                                evidence.evidenceId(),
+                                evidence.documentTitle() != null ? evidence.documentTitle() : "Unknown Document",
+                                evidence.documentSourceType() != null ? evidence.documentSourceType() : "unknown",
+                                evidence.linkedAt() != null ? evidence.linkedAt() : evidence.createdAt(),
+                                evidence.submittedBy() != null ? evidence.submittedBy() : "Unknown"
+                        ))
+                        .collect(Collectors.toList());
+                
                 fieldPayloads.add(new FieldGraphPayload(
                         field.fieldId(),
                         field.fieldKey(),
                         getFieldLabel(field.fieldKey()),
                         field.value(),
                         evidenceGraphPayloads,
-                        assurance,
-                        riskGraphPayloads
+                        approvalStatus,
+                        freshnessStatus,
+                        riskGraphPayloads,
+                        attestationGraphPayloads
                 ));
             }
             
@@ -367,7 +395,7 @@ public class ProfileServiceImpl implements ProfileService {
             case "availability_rating" -> "Availability";
             case "resilience_rating" -> "Resilience";
             case "confidentiality_rating" -> "Confidentiality";
-            case "app_criticality" -> "Summary";
+            case "app_criticality_assessment" -> "Summary";
             default -> domainKey;
         };
     }
@@ -378,7 +406,7 @@ public class ProfileServiceImpl implements ProfileService {
             case "integrity_rating" -> "IntegrityIcon";
             case "availability_rating" -> "AvailabilityIcon";
             case "resilience_rating" -> "ResilienceIcon";
-            case "app_criticality" -> "SummaryIcon";
+            case "app_criticality_assessment" -> "SummaryIcon";
             default -> "DefaultIcon";
         };
     }
@@ -390,7 +418,7 @@ public class ProfileServiceImpl implements ProfileService {
             case "integrity_rating" -> (String) appData.get("integrity_rating");
             case "availability_rating" -> (String) appData.get("availability_rating");
             case "resilience_rating" -> (String) appData.get("resilience_rating");
-            case "app_criticality" -> (String) appData.get("app_criticality_assessment");
+            case "app_criticality_assessment" -> (String) appData.get("app_criticality_assessment");
             default -> null;
         };
     }

@@ -1,5 +1,6 @@
 package com.example.onboarding.service.risk;
 
+import com.example.onboarding.dto.PageResponse;
 import com.example.onboarding.dto.risk.AttachEvidenceRequest;
 import com.example.onboarding.dto.risk.CreateRiskStoryRequest;
 import com.example.onboarding.dto.risk.RiskStoryResponse;
@@ -20,6 +21,9 @@ import com.example.onboarding.service.track.TrackService;
 import com.example.onboarding.service.ComplianceContextService;
 import com.example.onboarding.service.profile.ProfileFieldRegistryService;
 import com.example.onboarding.dto.profile.ProfileFieldTypeInfo;
+import dev.controlplane.auditkit.annotations.Audited;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,6 +37,8 @@ import java.util.stream.Collectors;
 @Service
 public class RiskStoryServiceImpl implements RiskStoryService {
 
+    private static final Logger log = LoggerFactory.getLogger(RiskStoryServiceImpl.class);
+
     private final RiskStoryRepository riskStoryRepository;
     private final RiskStoryEvidenceRepository riskStoryEvidenceRepository;
     private final TrackService trackService;
@@ -40,6 +46,7 @@ public class RiskStoryServiceImpl implements RiskStoryService {
     private final ComplianceContextService complianceContextService;
     private final ApplicationManagementRepository applicationRepository;
     private final ProfileFieldRegistryService profileFieldRegistryService;
+    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
     public RiskStoryServiceImpl(RiskStoryRepository riskStoryRepository,
                                 RiskStoryEvidenceRepository riskStoryEvidenceRepository,
@@ -47,7 +54,8 @@ public class RiskStoryServiceImpl implements RiskStoryService {
                                 EvidenceService evidenceService,
                                 ComplianceContextService complianceContextService,
                                 ApplicationManagementRepository applicationRepository,
-                                ProfileFieldRegistryService profileFieldRegistryService) {
+                                ProfileFieldRegistryService profileFieldRegistryService,
+                                com.fasterxml.jackson.databind.ObjectMapper objectMapper) {
         this.riskStoryRepository = riskStoryRepository;
         this.riskStoryEvidenceRepository = riskStoryEvidenceRepository;
         this.trackService = trackService;
@@ -55,10 +63,13 @@ public class RiskStoryServiceImpl implements RiskStoryService {
         this.complianceContextService = complianceContextService;
         this.applicationRepository = applicationRepository;
         this.profileFieldRegistryService = profileFieldRegistryService;
+        this.objectMapper = objectMapper;
     }
 
     @Override
     @Transactional
+    @Audited(action = "CREATE_RISK_STORY", subjectType = "risk_story", subject = "#result.riskId",
+             context = {"appId=#appId", "fieldKey=#fieldKey", "creationType=#request.creationType", "assignedSme=#result.assignedSme"})
     public RiskStoryResponse createRiskStory(String appId, String fieldKey, CreateRiskStoryRequest request) {
         if (request.trackId() != null) {
             Track track = trackService.getTrackById(request.trackId())
@@ -134,6 +145,19 @@ public class RiskStoryServiceImpl implements RiskStoryService {
     }
     
     @Override
+    public PageResponse<RiskStoryResponse> getRisksByAppIdPaginated(String appId, int page, int pageSize) {
+        int safePage = Math.max(page, 1);
+        int safePageSize = Math.max(pageSize, 1);
+        int offset = (safePage - 1) * safePageSize;
+        
+        long total = riskStoryRepository.countByAppId(appId);
+        List<Map<String, Object>> risks = riskStoryRepository.findRisksByAppIdWithPagination(appId, safePageSize, offset);
+        List<RiskStoryResponse> riskResponses = risks.stream().map(this::mapToRiskStoryResponse).collect(Collectors.toList());
+        
+        return new PageResponse<>(safePage, safePageSize, total, riskResponses);
+    }
+    
+    @Override
     public RiskStoryResponse getRiskById(String riskId) {
         RiskStory risk = riskStoryRepository.findById(riskId)
                 .orElseThrow(() -> new NotFoundException("Risk story not found: " + riskId));
@@ -177,6 +201,39 @@ public class RiskStoryServiceImpl implements RiskStoryService {
         return results.stream()
                 .map(this::mapToRiskStoryResponse)
                 .collect(Collectors.toList());
+    }
+    
+    @Override
+    public PageResponse<RiskStoryResponse> searchRisksWithPagination(String appId, String assignedSme, String status, 
+                                                                   String domain, String derivedFrom, String fieldKey, 
+                                                                   String severity, String creationType, String triggeringEvidenceId,
+                                                                   String sortBy, String sortOrder, int page, int size) {
+        
+        int safePage = Math.max(page, 1);
+        int safeSize = Math.max(size, 1);
+        int offset = (safePage - 1) * safeSize;
+        
+        // Convert domain to derivedFrom if domain is provided but derivedFrom is not
+        String finalDerivedFrom = derivedFrom;
+        if (domain != null && derivedFrom == null) {
+            finalDerivedFrom = domain + "_rating";
+        }
+        
+        // Get total count for pagination
+        long total = riskStoryRepository.countSearchResults(
+            appId, assignedSme, status, finalDerivedFrom, fieldKey, 
+            severity, creationType, triggeringEvidenceId);
+        
+        // Get paginated results  
+        List<Map<String, Object>> results = riskStoryRepository.searchRisks(
+            appId, assignedSme, status, finalDerivedFrom, fieldKey, 
+            severity, creationType, triggeringEvidenceId, sortBy, sortOrder, safeSize, offset);
+        
+        List<RiskStoryResponse> riskResponses = results.stream()
+                .map(this::mapToRiskStoryResponse)
+                .collect(Collectors.toList());
+        
+        return new PageResponse<>(safePage, safeSize, total, riskResponses);
     }
     
     private RiskStoryResponse mapToRiskStoryResponse(Map<String, Object> row) {
@@ -252,9 +309,8 @@ public class RiskStoryServiceImpl implements RiskStoryService {
         risk.setReviewComment((String) row.get("review_comment"));
         
         // Handle JSONB fields - these come as PGobject or similar from PostgreSQL
-        // For now, we'll set them to empty maps if they're complex, or parse them if needed
-        risk.setAttributes(new java.util.HashMap<>());
-        risk.setPolicyRequirementSnapshot(new java.util.HashMap<>());
+        risk.setAttributes(parseJsonColumn(row.get("attributes")));
+        risk.setPolicyRequirementSnapshot(parseJsonColumn(row.get("policy_requirement_snapshot")));
         
         // Handle timestamps (they can come as various types from the database)
         risk.setOpenedAt(convertToOffsetDateTime(row.get("opened_at")));
@@ -291,6 +347,48 @@ public class RiskStoryServiceImpl implements RiskStoryService {
         // If we can't convert, log and return null
         System.err.println("Unable to convert timestamp type: " + timestamp.getClass().getName() + " value: " + timestamp);
         return null;
+    }
+    
+    /**
+     * Parse JSONB column from database result
+     */
+    private Map<String, Object> parseJsonColumn(Object jsonObj) {
+        if (jsonObj == null) {
+            return new java.util.HashMap<>();
+        }
+        
+        if (jsonObj instanceof String jsonString) {
+            try {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> parsed = objectMapper.readValue(jsonString, Map.class);
+                return parsed;
+            } catch (Exception e) {
+                log.warn("Failed to parse JSON column: {}", e.getMessage());
+                return new java.util.HashMap<>();
+            }
+        }
+        
+        if (jsonObj instanceof Map) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> map = (Map<String, Object>) jsonObj;
+            return new java.util.HashMap<>(map);
+        }
+        
+        // Handle PostgreSQL PGobject
+        if (jsonObj.getClass().getName().contains("PGobject")) {
+            try {
+                String jsonString = jsonObj.toString();
+                @SuppressWarnings("unchecked")
+                Map<String, Object> parsed = objectMapper.readValue(jsonString, Map.class);
+                return parsed;
+            } catch (Exception e) {
+                log.warn("Failed to parse PGobject JSON: {}", e.getMessage());
+                return new java.util.HashMap<>();
+            }
+        }
+        
+        log.warn("Unknown JSON column type: {}", jsonObj.getClass());
+        return new java.util.HashMap<>();
     }
     
     /**

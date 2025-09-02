@@ -8,7 +8,9 @@ public record FieldGraphPayload(
         String label,
         Object policyRequirement,
         List<EvidenceGraphPayload> evidence,
-        String assurance,
-        List<RiskGraphPayload> risks
+        String approvalStatus,    // missing, pending, approved, rejected
+        String freshnessStatus,   // current, expiring, expired, broken
+        List<RiskGraphPayload> risks,
+        List<AttestationGraphPayload> attestations  // Evidence awaiting PO review
 ) {
 }

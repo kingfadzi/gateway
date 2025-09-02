@@ -222,7 +222,7 @@ public class EvidenceReuseRepository {
     public Map<String, Object> readPolicyContext(String appId) {
         // The keys OPA needs; expand if your policy grows
         List<String> keys = List.of(
-                "app_criticality",
+                "app_criticality_assessment",
                 "security_rating",
                 "integrity_rating",
                 "availability_rating",

@@ -309,7 +309,7 @@ CREATE TABLE evidence_field_link (
     profile_field_id    TEXT NOT NULL,
     app_id             TEXT NOT NULL,
     -- Use TEXT instead of ENUM for better Hibernate compatibility
-    link_status        TEXT NOT NULL DEFAULT 'PENDING_REVIEW',
+    link_status        TEXT NOT NULL DEFAULT 'PENDING_SME_REVIEW',
     linked_by          TEXT NOT NULL,
     linked_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
     reviewed_by        TEXT,
@@ -322,7 +322,7 @@ CREATE TABLE evidence_field_link (
     CONSTRAINT fk_efl_profile_field FOREIGN KEY (profile_field_id) REFERENCES profile_field(id) ON DELETE CASCADE,
     CONSTRAINT fk_efl_app FOREIGN KEY (app_id) REFERENCES application(app_id) ON DELETE CASCADE,
     -- Constraint to ensure valid status values
-    CONSTRAINT chk_efl_status CHECK (link_status IN ('ATTACHED', 'PENDING_REVIEW', 'APPROVED', 'REJECTED'))
+    CONSTRAINT chk_efl_status CHECK (link_status IN ('ATTACHED', 'PENDING_PO_REVIEW', 'PENDING_SME_REVIEW', 'APPROVED', 'REJECTED'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_efl_evidence ON evidence_field_link(evidence_id);
@@ -419,6 +419,24 @@ CREATE TABLE risk_story_evidence (
 CREATE INDEX IF NOT EXISTS idx_rse_risk ON risk_story_evidence(risk_id);
 CREATE INDEX IF NOT EXISTS idx_rse_evidence ON risk_story_evidence(evidence_id);
 CREATE INDEX IF NOT EXISTS idx_rse_status ON risk_story_evidence(review_status);
+
+-- ===========================
+-- Updated Evidence Field Link Status
+-- ===========================
+-- Migrate existing PENDING_REVIEW data to PENDING_SME_REVIEW and update constraint
+
+-- Update existing data first
+UPDATE evidence_field_link 
+SET link_status = 'PENDING_SME_REVIEW' 
+WHERE link_status = 'PENDING_REVIEW';
+
+-- Drop old constraint
+ALTER TABLE evidence_field_link DROP CONSTRAINT IF EXISTS chk_efl_status;
+
+-- Add new constraint with updated status values  
+ALTER TABLE evidence_field_link 
+ADD CONSTRAINT chk_efl_status 
+CHECK (link_status IN ('ATTACHED', 'PENDING_PO_REVIEW', 'PENDING_SME_REVIEW', 'APPROVED', 'REJECTED'));
 
 -- =========================
 -- SME_QUEUE (Queue Management)

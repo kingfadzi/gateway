@@ -69,40 +69,23 @@ features:
 
 # Document URL validation configuration
 document-validation:
-  allowed-domains:
-    # Official GitLab domains
+  # Platform-specific allowed domains for strict validation
+  platform-domains:
     gitlab:
       - "gitlab.com"
       - "gitlab.io"
-    # Official Confluence/Atlassian domains  
+      - "eros.butterflycluster.com"  # Corporate GitLab instance
     confluence:
       - "atlassian.net"
       - "atlassian.com"
-    # Corporate self-hosted domains (configurable per environment)
-    corporate:
-      - "butterflycluster.com"
-      - "corp.company.org" 
-      - "internal.enterprise.net"
+      - "confluence.butterflycluster.com"  # Corporate Confluence (if exists)
+    # Future platforms can be added here
+    # sharepoint:
+    #   - "sharepoint.com"
+    #   - "office.com"
   
-  # Domains that are always rejected
-  blocked-domains:
-    - "example.com"
-    - "example.org" 
-    - "example.net"
-    - "test.com"
-    - "localhost"
-    - "127.0.0.1"
-    - "0.0.0.0"
-  
-  # Patterns that indicate fake/test domains
-  blocked-patterns:
-    - "example"
-    - "test" 
-    - "fake"
-    - "mock"
-    - "dummy"
-    - "placeholder"
-    - "demo"
+  # Strict mode: only allow configured platform domains
+  strict-mode: true
   
   # Response validation settings
   response-validation:

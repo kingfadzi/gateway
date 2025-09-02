@@ -28,7 +28,7 @@ public class EvidenceFieldLink {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "link_status", nullable = false, columnDefinition = "evidence_field_link_status")
-    private EvidenceFieldLinkStatus linkStatus = EvidenceFieldLinkStatus.PENDING_REVIEW;
+    private EvidenceFieldLinkStatus linkStatus = EvidenceFieldLinkStatus.PENDING_SME_REVIEW;
 
     @Column(name = "linked_by", nullable = false)
     private String linkedBy;

@@ -63,11 +63,8 @@ public class AutoProfileService {
 
         // 4) Build base context combining all signal sources for derivation input
         Map<String, Object> serviceNowContext = buildServiceNowAppRatingContext(appId, src);
-        Map<String, Object> artifactContext = buildArtifactContext(appId);
         
-        Map<String, Object> base = new LinkedHashMap<>();
-        base.putAll(serviceNowContext);
-        base.putAll(artifactContext);
+        Map<String, Object> base = new LinkedHashMap<>(serviceNowContext);
 
         // 5) Derive risk profile controls
         Map<String, Object> newlyDerived = derive(base);
@@ -166,16 +163,6 @@ public class AutoProfileService {
         return context;
     }
     
-    /** Build artifact signals for policy derivation */
-    private Map<String, Object> buildArtifactContext(String appId) {
-        Map<String, Object> context = new LinkedHashMap<>();
-        
-        // For now, all artifacts are required (static policy)
-        context.put("artifact", "required");
-        
-        if (log.isDebugEnabled()) log.debug("autoProfile: artifact context for {} -> {}", appId, context);
-        return context;
-    }
 
     private Map<String, Object> derive(Map<String, Object> base) {
         Map<String,Object> derived = registryDeriver.derive(base);

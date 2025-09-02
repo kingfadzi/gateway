@@ -10,34 +10,25 @@ import java.util.Map;
 @ConfigurationProperties(prefix = "document-validation")
 public class DocumentValidationProperties {
     
-    private Map<String, List<String>> allowedDomains;
-    private List<String> blockedDomains;
-    private List<String> blockedPatterns;
+    private Map<String, List<String>> platformDomains;
+    private boolean strictMode = true;
     private ResponseValidation responseValidation;
     
     // Getters and setters
-    public Map<String, List<String>> getAllowedDomains() {
-        return allowedDomains;
+    public Map<String, List<String>> getPlatformDomains() {
+        return platformDomains;
     }
     
-    public void setAllowedDomains(Map<String, List<String>> allowedDomains) {
-        this.allowedDomains = allowedDomains;
+    public void setPlatformDomains(Map<String, List<String>> platformDomains) {
+        this.platformDomains = platformDomains;
     }
     
-    public List<String> getBlockedDomains() {
-        return blockedDomains;
+    public boolean isStrictMode() {
+        return strictMode;
     }
     
-    public void setBlockedDomains(List<String> blockedDomains) {
-        this.blockedDomains = blockedDomains;
-    }
-    
-    public List<String> getBlockedPatterns() {
-        return blockedPatterns;
-    }
-    
-    public void setBlockedPatterns(List<String> blockedPatterns) {
-        this.blockedPatterns = blockedPatterns;
+    public void setStrictMode(boolean strictMode) {
+        this.strictMode = strictMode;
     }
     
     public ResponseValidation getResponseValidation() {
@@ -48,17 +39,41 @@ public class DocumentValidationProperties {
         this.responseValidation = responseValidation;
     }
     
-    // Helper methods
+    // Helper methods for platform-specific domain access
     public List<String> getGitlabDomains() {
-        return allowedDomains != null ? allowedDomains.getOrDefault("gitlab", List.of()) : List.of();
+        return platformDomains != null ? platformDomains.getOrDefault("gitlab", List.of()) : List.of();
     }
     
     public List<String> getConfluenceDomains() {
-        return allowedDomains != null ? allowedDomains.getOrDefault("confluence", List.of()) : List.of();
+        return platformDomains != null ? platformDomains.getOrDefault("confluence", List.of()) : List.of();
     }
     
-    public List<String> getCorporateDomains() {
-        return allowedDomains != null ? allowedDomains.getOrDefault("corporate", List.of()) : List.of();
+    public List<String> getSharepointDomains() {
+        return platformDomains != null ? platformDomains.getOrDefault("sharepoint", List.of()) : List.of();
+    }
+    
+    /**
+     * Find which platform a domain belongs to
+     * @param hostname The hostname to check
+     * @return The platform name (gitlab, confluence, etc.) or null if not found
+     */
+    public String findPlatformForHostname(String hostname) {
+        if (platformDomains == null || hostname == null) {
+            return null;
+        }
+        
+        for (Map.Entry<String, List<String>> entry : platformDomains.entrySet()) {
+            String platform = entry.getKey();
+            List<String> domains = entry.getValue();
+            
+            for (String domain : domains) {
+                if (hostname.equals(domain) || hostname.endsWith("." + domain)) {
+                    return platform;
+                }
+            }
+        }
+        
+        return null;
     }
     
     public static class ResponseValidation {

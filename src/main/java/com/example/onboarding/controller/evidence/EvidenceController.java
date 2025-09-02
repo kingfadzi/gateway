@@ -6,7 +6,6 @@ import com.example.onboarding.dto.evidence.CreateEvidenceRequest;
 import com.example.onboarding.dto.evidence.EnhancedAttachedDocumentsResponse;
 import com.example.onboarding.dto.evidence.CreateEvidenceWithDocumentRequest;
 import com.example.onboarding.dto.evidence.Evidence;
-import com.example.onboarding.dto.evidence.EvidenceSummary;
 import com.example.onboarding.dto.evidence.EvidenceWithDocumentResponse;
 import com.example.onboarding.dto.evidence.UpdateEvidenceRequest;
 import com.example.onboarding.dto.evidence.AttachEvidenceToFieldRequest;
@@ -14,7 +13,10 @@ import com.example.onboarding.dto.evidence.EvidenceFieldLinkResponse;
 import com.example.onboarding.dto.evidence.EvidenceUsageResponse;
 import com.example.onboarding.service.evidence.EvidenceService;
 import com.example.onboarding.service.document.DocumentService;
+import com.example.onboarding.service.evidence.EvidenceFieldLinkService;
 import com.example.onboarding.dto.document.DocumentResponse;
+import dev.controlplane.auditkit.annotations.Audited;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -28,10 +30,12 @@ public class EvidenceController {
     
     private final EvidenceService evidenceService;
     private final DocumentService documentService;
+    private final EvidenceFieldLinkService evidenceFieldLinkService;
     
-    public EvidenceController(EvidenceService evidenceService, DocumentService documentService) {
+    public EvidenceController(EvidenceService evidenceService, DocumentService documentService, EvidenceFieldLinkService evidenceFieldLinkService) {
         this.evidenceService = evidenceService;
         this.documentService = documentService;
+        this.evidenceFieldLinkService = evidenceFieldLinkService;
     }
     
     /**
@@ -93,13 +97,13 @@ public class EvidenceController {
      * GET /api/apps/{appId}/evidence?page=1&pageSize=10
      */
     @GetMapping("/apps/{appId}/evidence")
-    public ResponseEntity<PageResponse<EvidenceSummary>> getAppEvidence(
+    public ResponseEntity<PageResponse<com.example.onboarding.dto.evidence.EnhancedEvidenceSummary>> getAppEvidence(
             @PathVariable String appId,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int pageSize) {
         log.debug("Getting evidence for app {} (page={}, pageSize={})", appId, page, pageSize);
         try {
-            PageResponse<EvidenceSummary> evidence = evidenceService.getEvidenceByApp(appId, page, pageSize);
+            PageResponse<com.example.onboarding.dto.evidence.EnhancedEvidenceSummary> evidence = evidenceService.getEvidenceByApp(appId, page, pageSize);
             log.debug("Found {} evidence items for app {}", evidence.items().size(), appId);
             return ResponseEntity.ok(evidence);
         } catch (Exception e) {
@@ -109,21 +113,21 @@ public class EvidenceController {
     }
     
     /**
-     * List evidence for a profile field with pagination
+     * List evidence for a profile field with pagination (enhanced with EvidenceFieldLink metadata)
      * GET /api/profile-fields/{profileFieldId}/evidence?page=1&pageSize=10
      */
     @GetMapping("/profile-fields/{profileFieldId}/evidence")
-    public ResponseEntity<PageResponse<EvidenceSummary>> getProfileFieldEvidence(
+    public ResponseEntity<PageResponse<com.example.onboarding.dto.evidence.EnhancedEvidenceSummary>> getProfileFieldEvidence(
             @PathVariable String profileFieldId,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int pageSize) {
-        log.debug("Getting evidence for profile field {} (page={}, pageSize={})", profileFieldId, page, pageSize);
+        log.debug("Getting enhanced evidence for profile field {} (page={}, pageSize={})", profileFieldId, page, pageSize);
         try {
-            PageResponse<EvidenceSummary> evidence = evidenceService.getEvidenceByProfileField(profileFieldId, page, pageSize);
-            log.debug("Found {} evidence items for profile field {}", evidence.items().size(), profileFieldId);
+            PageResponse<com.example.onboarding.dto.evidence.EnhancedEvidenceSummary> evidence = evidenceService.getEvidenceByProfileField(profileFieldId, page, pageSize);
+            log.debug("Found {} enhanced evidence items for profile field {}", evidence.items().size(), profileFieldId);
             return ResponseEntity.ok(evidence);
         } catch (Exception e) {
-            log.error("Error getting evidence for profile field {}: {}", profileFieldId, e.getMessage(), e);
+            log.error("Error getting enhanced evidence for profile field {}: {}", profileFieldId, e.getMessage(), e);
             return ResponseEntity.internalServerError().build();
         }
     }
@@ -133,13 +137,13 @@ public class EvidenceController {
      * GET /api/claims/{claimId}/evidence?page=1&pageSize=10
      */
     @GetMapping("/claims/{claimId}/evidence")
-    public ResponseEntity<PageResponse<EvidenceSummary>> getClaimEvidence(
+    public ResponseEntity<PageResponse<com.example.onboarding.dto.evidence.EnhancedEvidenceSummary>> getClaimEvidence(
             @PathVariable String claimId,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int pageSize) {
         log.debug("Getting evidence for claim {} (page={}, pageSize={})", claimId, page, pageSize);
         try {
-            PageResponse<EvidenceSummary> evidence = evidenceService.getEvidenceByClaim(claimId, page, pageSize);
+            PageResponse<com.example.onboarding.dto.evidence.EnhancedEvidenceSummary> evidence = evidenceService.getEvidenceByClaim(claimId, page, pageSize);
             log.debug("Found {} evidence items for claim {}", evidence.items().size(), claimId);
             return ResponseEntity.ok(evidence);
         } catch (Exception e) {
@@ -153,13 +157,13 @@ public class EvidenceController {
      * GET /api/tracks/{trackId}/evidence?page=1&pageSize=10
      */
     @GetMapping("/tracks/{trackId}/evidence")
-    public ResponseEntity<PageResponse<EvidenceSummary>> getTrackEvidence(
+    public ResponseEntity<PageResponse<com.example.onboarding.dto.evidence.EnhancedEvidenceSummary>> getTrackEvidence(
             @PathVariable String trackId,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int pageSize) {
         log.debug("Getting evidence for track {} (page={}, pageSize={})", trackId, page, pageSize);
         try {
-            PageResponse<EvidenceSummary> evidence = evidenceService.getEvidenceByTrack(trackId, page, pageSize);
+            PageResponse<com.example.onboarding.dto.evidence.EnhancedEvidenceSummary> evidence = evidenceService.getEvidenceByTrack(trackId, page, pageSize);
             log.debug("Found {} evidence items for track {}", evidence.items().size(), trackId);
             return ResponseEntity.ok(evidence);
         } catch (Exception e) {
@@ -354,6 +358,131 @@ public class EvidenceController {
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             log.error("Error getting usage for evidence {}: {}", evidenceId, e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    /**
+     * Search evidence by review status and filters
+     * GET /api/evidence/search?linkStatus=PENDING_PO_REVIEW&appId=APM100001&fieldKey=backup_policy
+     */
+    @GetMapping("/evidence/search")
+    public ResponseEntity<List<com.example.onboarding.dto.evidence.EnhancedEvidenceSummary>> searchEvidence(
+            @RequestParam(required = false) String linkStatus,
+            @RequestParam(required = false) String appId,
+            @RequestParam(required = false) String fieldKey,
+            @RequestParam(required = false) String assignedPo,
+            @RequestParam(required = false) String assignedSme,
+            @RequestParam(required = false) String evidenceStatus,
+            @RequestParam(required = false) String documentSourceType,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size) {
+        
+        log.debug("Searching evidence with filters: linkStatus={}, appId={}, fieldKey={}, assignedPo={}", 
+                 linkStatus, appId, fieldKey, assignedPo);
+        try {
+            List<com.example.onboarding.dto.evidence.EnhancedEvidenceSummary> evidence = evidenceService.searchEvidence(
+                linkStatus, appId, fieldKey, assignedPo, assignedSme, evidenceStatus, documentSourceType, page, size);
+            log.debug("Found {} evidence items matching search criteria", evidence.size());
+            return ResponseEntity.ok(evidence);
+        } catch (Exception e) {
+            log.error("Error searching evidence: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    /**
+     * Get pending PO review evidence for a Product Owner
+     * GET /api/evidence/pending-po-review?assignedPo=po@company.com
+     */
+    @GetMapping("/evidence/pending-po-review")
+    public ResponseEntity<List<com.example.onboarding.dto.evidence.EnhancedEvidenceSummary>> getPendingPoReviewEvidence(
+            @RequestParam String assignedPo) {
+        log.debug("Getting pending PO review evidence for: {}", assignedPo);
+        try {
+            // Use the search method with linkStatus filter
+            List<com.example.onboarding.dto.evidence.EnhancedEvidenceSummary> evidence = evidenceService.searchEvidence(
+                "PENDING_PO_REVIEW", null, null, assignedPo, null, null, null, 0, 100);
+            log.debug("Found {} evidence items pending PO review", evidence.size());
+            return ResponseEntity.ok(evidence);
+        } catch (Exception e) {
+            log.error("Error getting pending PO review evidence: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    /**
+     * Get pending SME review evidence
+     * GET /api/evidence/pending-sme-review?assignedSme=sme@company.com
+     */
+    @GetMapping("/evidence/pending-sme-review")
+    public ResponseEntity<List<com.example.onboarding.dto.evidence.EnhancedEvidenceSummary>> getPendingSmeReviewEvidence(
+            @RequestParam String assignedSme) {
+        log.debug("Getting pending SME review evidence for: {}", assignedSme);
+        try {
+            // Use the search method with linkStatus filter
+            List<com.example.onboarding.dto.evidence.EnhancedEvidenceSummary> evidence = evidenceService.searchEvidence(
+                "PENDING_SME_REVIEW", null, null, null, assignedSme, null, null, 0, 100);
+            log.debug("Found {} evidence items pending SME review", evidence.size());
+            return ResponseEntity.ok(evidence);
+        } catch (Exception e) {
+            log.error("Error getting pending SME review evidence: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    /**
+     * Approve evidence as Product Owner (for low criticality fields)
+     * POST /api/evidence/{evidenceId}/po-approve
+     */
+    @PostMapping("/evidence/{evidenceId}/po-approve")
+    @Audited(action = "PO_APPROVE_EVIDENCE", subjectType = "profile_field", subject = "#profileFieldId",
+             context = {"evidenceId=#evidenceId", "reviewedBy=#reviewedBy", "attestationType=PO_APPROVAL"})
+    public ResponseEntity<EvidenceFieldLinkResponse> approveEvidenceAsPo(
+            @PathVariable String evidenceId,
+            @RequestParam String profileFieldId,
+            @RequestParam String reviewedBy,
+            @RequestParam(required = false) String reviewComment) {
+        log.debug("PO approving evidence {} for field {} by {}", evidenceId, profileFieldId, reviewedBy);
+        try {
+            EvidenceFieldLinkResponse response = evidenceFieldLinkService.reviewEvidenceFieldLink(
+                evidenceId, profileFieldId, reviewedBy, 
+                reviewComment != null ? reviewComment : "Approved by Product Owner", true);
+            log.info("Evidence {} approved by PO {} for field {}", evidenceId, reviewedBy, profileFieldId);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            log.warn("Evidence link not found: {} -> {}", evidenceId, profileFieldId);
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            log.error("Error approving evidence {} as PO: {}", evidenceId, e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    /**
+     * Reject evidence as Product Owner
+     * POST /api/evidence/{evidenceId}/po-reject
+     */
+    @PostMapping("/evidence/{evidenceId}/po-reject")
+    @Audited(action = "PO_REJECT_EVIDENCE", subjectType = "profile_field", subject = "#profileFieldId",
+             context = {"evidenceId=#evidenceId", "reviewedBy=#reviewedBy", "attestationType=PO_REJECTION"})
+    public ResponseEntity<EvidenceFieldLinkResponse> rejectEvidenceAsPo(
+            @PathVariable String evidenceId,
+            @RequestParam String profileFieldId, 
+            @RequestParam String reviewedBy,
+            @RequestParam(required = false) String reviewComment) {
+        log.debug("PO rejecting evidence {} for field {} by {}", evidenceId, profileFieldId, reviewedBy);
+        try {
+            EvidenceFieldLinkResponse response = evidenceFieldLinkService.reviewEvidenceFieldLink(
+                evidenceId, profileFieldId, reviewedBy,
+                reviewComment != null ? reviewComment : "Rejected by Product Owner", false);
+            log.info("Evidence {} rejected by PO {} for field {}", evidenceId, reviewedBy, profileFieldId);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            log.warn("Evidence link not found: {} -> {}", evidenceId, profileFieldId);
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            log.error("Error rejecting evidence {} as PO: {}", evidenceId, e.getMessage(), e);
             return ResponseEntity.internalServerError().build();
         }
     }

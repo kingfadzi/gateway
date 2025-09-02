@@ -146,7 +146,8 @@ public class RiskAutoCreationServiceImpl implements RiskAutoCreationService {
                 throw new IllegalArgumentException("Field " + fieldKey + " has no derived_from configuration");
             }
             
-            // 2. Query the application table for the rating column value
+            
+            // 3. Query the application table for the rating column value
             String rating = applicationRepository.getApplicationRatingByColumn(appId, derivedFrom);
             if (rating == null || rating.trim().isEmpty()) {
                 // Default rating if not set

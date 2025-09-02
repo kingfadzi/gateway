@@ -1,7 +1,6 @@
 package com.example.onboarding.repository.evidence;
 
 import com.example.onboarding.dto.evidence.Evidence;
-import com.example.onboarding.dto.evidence.EvidenceSummary;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -134,21 +133,27 @@ public class EvidenceRepository {
     }
     
     /**
-     * Find evidence by app with pagination
+     * Find enhanced evidence by app with EvidenceFieldLink metadata and document source info
      */
-    public List<EvidenceSummary> findEvidenceByApp(String appId, int limit, int offset) {
+    public List<com.example.onboarding.dto.evidence.EnhancedEvidenceSummary> findEvidenceByApp(String appId, int limit, int offset) {
         String sql = """
-            SELECT evidence_id, app_id, profile_field_id, claim_id, uri, type, status,
-                   submitted_by, valid_from, valid_until, track_id, document_id, 
-                   created_at, updated_at
-            FROM evidence
-            WHERE app_id = :appId
-            ORDER BY created_at DESC
+            SELECT e.evidence_id, e.app_id, e.profile_field_id, e.claim_id, e.uri, e.type, e.status,
+                   e.submitted_by, e.valid_from, e.valid_until, e.track_id, e.document_id, 
+                   e.created_at, e.updated_at,
+                   efl.link_status, efl.linked_by, efl.linked_at, 
+                   efl.reviewed_by, efl.reviewed_at, efl.review_comment,
+                   d.title as document_title, d.source_type as document_source_type, 
+                   d.owners as document_owners, d.link_health as document_link_health
+            FROM evidence e
+            JOIN evidence_field_link efl ON e.evidence_id = efl.evidence_id
+            LEFT JOIN document d ON e.document_id = d.document_id
+            WHERE e.app_id = :appId
+            ORDER BY e.created_at DESC
             LIMIT :limit OFFSET :offset
             """;
         
         return jdbc.query(sql, Map.of("appId", appId, "limit", limit, "offset", offset), 
-            this::mapEvidenceSummary);
+            this::mapEnhancedEvidenceSummary);
     }
     
     /**
@@ -161,57 +166,147 @@ public class EvidenceRepository {
     }
     
     /**
-     * Find evidence by profile field
+     * Find enhanced evidence by profile field with EvidenceFieldLink metadata and document source info
      */
-    public List<EvidenceSummary> findEvidenceByProfileField(String profileFieldId, int limit, int offset) {
+    public List<com.example.onboarding.dto.evidence.EnhancedEvidenceSummary> findEvidenceByProfileField(String profileFieldId, int limit, int offset) {
         String sql = """
-            SELECT evidence_id, app_id, profile_field_id, claim_id, uri, type, status,
-                   submitted_by, valid_from, valid_until, track_id, document_id, 
-                   created_at, updated_at
-            FROM evidence
-            WHERE profile_field_id = :profileFieldId
-            ORDER BY created_at DESC
+            SELECT e.evidence_id, e.app_id, e.profile_field_id, e.claim_id, e.uri, e.type, e.status,
+                   e.submitted_by, e.valid_from, e.valid_until, e.track_id, e.document_id, 
+                   e.created_at, e.updated_at,
+                   efl.link_status, efl.linked_by, efl.linked_at, 
+                   efl.reviewed_by, efl.reviewed_at, efl.review_comment,
+                   d.title as document_title, d.source_type as document_source_type, 
+                   d.owners as document_owners, d.link_health as document_link_health
+            FROM evidence e
+            JOIN evidence_field_link efl ON e.evidence_id = efl.evidence_id
+            LEFT JOIN document d ON e.document_id = d.document_id
+            WHERE e.profile_field_id = :profileFieldId
+            ORDER BY e.created_at DESC
             LIMIT :limit OFFSET :offset
             """;
         
         return jdbc.query(sql, Map.of("profileFieldId", profileFieldId, "limit", limit, "offset", offset),
-            this::mapEvidenceSummary);
+            this::mapEnhancedEvidenceSummary);
     }
     
+    
     /**
-     * Find evidence by claim
+     * Find enhanced evidence by claim with EvidenceFieldLink metadata and document source info
      */
-    public List<EvidenceSummary> findEvidenceByClaim(String claimId, int limit, int offset) {
+    public List<com.example.onboarding.dto.evidence.EnhancedEvidenceSummary> findEvidenceByClaim(String claimId, int limit, int offset) {
         String sql = """
-            SELECT evidence_id, app_id, profile_field_id, claim_id, uri, type, status,
-                   submitted_by, valid_from, valid_until, track_id, document_id, 
-                   created_at, updated_at
-            FROM evidence
-            WHERE claim_id = :claimId
-            ORDER BY created_at DESC
+            SELECT e.evidence_id, e.app_id, e.profile_field_id, e.claim_id, e.uri, e.type, e.status,
+                   e.submitted_by, e.valid_from, e.valid_until, e.track_id, e.document_id, 
+                   e.created_at, e.updated_at,
+                   efl.link_status, efl.linked_by, efl.linked_at, 
+                   efl.reviewed_by, efl.reviewed_at, efl.review_comment,
+                   d.title as document_title, d.source_type as document_source_type, 
+                   d.owners as document_owners, d.link_health as document_link_health
+            FROM evidence e
+            JOIN evidence_field_link efl ON e.evidence_id = efl.evidence_id
+            LEFT JOIN document d ON e.document_id = d.document_id
+            WHERE e.claim_id = :claimId
+            ORDER BY e.created_at DESC
             LIMIT :limit OFFSET :offset
             """;
         
         return jdbc.query(sql, Map.of("claimId", claimId, "limit", limit, "offset", offset),
-            this::mapEvidenceSummary);
+            this::mapEnhancedEvidenceSummary);
     }
     
     /**
-     * Find evidence by track
+     * Find enhanced evidence by track with EvidenceFieldLink metadata and document source info
      */
-    public List<EvidenceSummary> findEvidenceByTrack(String trackId, int limit, int offset) {
+    public List<com.example.onboarding.dto.evidence.EnhancedEvidenceSummary> findEvidenceByTrack(String trackId, int limit, int offset) {
         String sql = """
-            SELECT evidence_id, app_id, profile_field_id, claim_id, uri, type, status,
-                   submitted_by, valid_from, valid_until, track_id, document_id, 
-                   created_at, updated_at
-            FROM evidence
-            WHERE track_id = :trackId
-            ORDER BY created_at DESC
+            SELECT e.evidence_id, e.app_id, e.profile_field_id, e.claim_id, e.uri, e.type, e.status,
+                   e.submitted_by, e.valid_from, e.valid_until, e.track_id, e.document_id, 
+                   e.created_at, e.updated_at,
+                   efl.link_status, efl.linked_by, efl.linked_at, 
+                   efl.reviewed_by, efl.reviewed_at, efl.review_comment,
+                   d.title as document_title, d.source_type as document_source_type, 
+                   d.owners as document_owners, d.link_health as document_link_health
+            FROM evidence e
+            JOIN evidence_field_link efl ON e.evidence_id = efl.evidence_id
+            LEFT JOIN document d ON e.document_id = d.document_id
+            WHERE e.track_id = :trackId
+            ORDER BY e.created_at DESC
             LIMIT :limit OFFSET :offset
             """;
         
         return jdbc.query(sql, Map.of("trackId", trackId, "limit", limit, "offset", offset),
-            this::mapEvidenceSummary);
+            this::mapEnhancedEvidenceSummary);
+    }
+    
+    /**
+     * Search evidence with multiple filters
+     */
+    public List<com.example.onboarding.dto.evidence.EnhancedEvidenceSummary> searchEvidence(
+            String linkStatus, String appId, String fieldKey, String assignedPo, 
+            String assignedSme, String evidenceStatus, String documentSourceType, 
+            int limit, int offset) {
+        
+        StringBuilder sqlBuilder = new StringBuilder("""
+            SELECT e.evidence_id, e.app_id, e.profile_field_id, e.claim_id, e.uri, e.type, e.status,
+                   e.submitted_by, e.valid_from, e.valid_until, e.track_id, e.document_id, 
+                   e.created_at, e.updated_at,
+                   efl.link_status, efl.linked_by, efl.linked_at, 
+                   efl.reviewed_by, efl.reviewed_at, efl.review_comment,
+                   d.title as document_title, d.source_type as document_source_type, 
+                   d.owners as document_owners, d.link_health as document_link_health,
+                   pf.field_key, app.product_owner
+            FROM evidence e
+            JOIN evidence_field_link efl ON e.evidence_id = efl.evidence_id
+            LEFT JOIN document d ON e.document_id = d.document_id
+            LEFT JOIN profile_field pf ON e.profile_field_id = pf.id
+            LEFT JOIN application app ON e.app_id = app.app_id
+            WHERE 1=1
+            """);
+        
+        java.util.Map<String, Object> params = new java.util.HashMap<>();
+        
+        // Add dynamic filters
+        if (linkStatus != null && !linkStatus.trim().isEmpty()) {
+            sqlBuilder.append(" AND efl.link_status = :linkStatus");
+            params.put("linkStatus", linkStatus.trim());
+        }
+        
+        if (appId != null && !appId.trim().isEmpty()) {
+            sqlBuilder.append(" AND e.app_id = :appId");
+            params.put("appId", appId.trim());
+        }
+        
+        if (fieldKey != null && !fieldKey.trim().isEmpty()) {
+            sqlBuilder.append(" AND pf.field_key = :fieldKey");
+            params.put("fieldKey", fieldKey.trim());
+        }
+        
+        if (assignedPo != null && !assignedPo.trim().isEmpty()) {
+            sqlBuilder.append(" AND app.product_owner = :assignedPo");
+            params.put("assignedPo", assignedPo.trim());
+        }
+        
+        if (assignedSme != null && !assignedSme.trim().isEmpty()) {
+            // For SME assignment, we'd need to join with risk_story table
+            sqlBuilder.append(" AND EXISTS (SELECT 1 FROM risk_story rs WHERE rs.field_key = pf.field_key AND rs.app_id = e.app_id AND rs.assigned_sme = :assignedSme)");
+            params.put("assignedSme", assignedSme.trim());
+        }
+        
+        if (evidenceStatus != null && !evidenceStatus.trim().isEmpty()) {
+            sqlBuilder.append(" AND e.status = :evidenceStatus");
+            params.put("evidenceStatus", evidenceStatus.trim());
+        }
+        
+        if (documentSourceType != null && !documentSourceType.trim().isEmpty()) {
+            sqlBuilder.append(" AND d.source_type = :documentSourceType");
+            params.put("documentSourceType", documentSourceType.trim());
+        }
+        
+        sqlBuilder.append(" ORDER BY e.created_at DESC LIMIT :limit OFFSET :offset");
+        params.put("limit", limit);
+        params.put("offset", offset);
+        
+        return jdbc.query(sqlBuilder.toString(), params, this::mapEnhancedEvidenceSummary);
     }
     
     /**
@@ -267,11 +362,9 @@ public class EvidenceRepository {
         );
     }
     
-    /**
-     * Map result set to EvidenceSummary
-     */
-    private EvidenceSummary mapEvidenceSummary(ResultSet rs, int rowNum) throws SQLException {
-        return new EvidenceSummary(
+
+    private com.example.onboarding.dto.evidence.EnhancedEvidenceSummary mapEnhancedEvidenceSummary(ResultSet rs, int rowNum) throws SQLException {
+        return new com.example.onboarding.dto.evidence.EnhancedEvidenceSummary(
             rs.getString("evidence_id"),
             rs.getString("app_id"),
             rs.getString("profile_field_id"),
@@ -285,7 +378,19 @@ public class EvidenceRepository {
             rs.getString("track_id"),
             rs.getString("document_id"),
             rs.getObject("created_at", OffsetDateTime.class),
-            rs.getObject("updated_at", OffsetDateTime.class)
+            rs.getObject("updated_at", OffsetDateTime.class),
+            // EvidenceFieldLink metadata
+            com.example.onboarding.model.EvidenceFieldLinkStatus.valueOf(rs.getString("link_status")),
+            rs.getString("linked_by"),
+            rs.getObject("linked_at", OffsetDateTime.class),
+            rs.getString("reviewed_by"),
+            rs.getObject("reviewed_at", OffsetDateTime.class),
+            rs.getString("review_comment"),
+            // Document source information
+            rs.getString("document_title"),
+            rs.getString("document_source_type"),
+            rs.getString("document_owners"),
+            (Integer) rs.getObject("document_link_health")
         );
     }
 

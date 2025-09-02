@@ -38,7 +38,7 @@ public class ApplicationManagementRepository {
               :app_id, 'application',
               :parent_app_id, :parent_app_name,
               :name, :business_service_name,
-              :app_criticality, :security_rating, :confidentiality_rating, :integrity_rating, :availability_rating, :resilience_rating,
+              :app_criticality_assessment, :security_rating, :confidentiality_rating, :integrity_rating, :availability_rating, :resilience_rating,
               :business_application_sys_id, :architecture_hosting,
               :jira_backlog_id, :lean_control_service_id, :repo_id,
               :operational_status,
@@ -87,7 +87,7 @@ public class ApplicationManagementRepository {
             .addValue("parent_app_name",           nullIfBlank(src.applicationParent()))
             .addValue("name",                      nullIfBlank(src.applicationName())) // using application name as display
             .addValue("business_service_name",     nullIfBlank(src.businessServiceName()))
-            .addValue("app_criticality",           nullIfBlank(src.appCriticality()))
+            .addValue("app_criticality_assessment", nullIfBlank(src.appCriticality()))
             .addValue("security_rating",           nullIfBlank(src.securityRating()))
             .addValue("confidentiality_rating",    nullIfBlank(src.confidentialityRating()))
             .addValue("integrity_rating",          nullIfBlank(src.integrityRating()))

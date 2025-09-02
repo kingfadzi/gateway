@@ -159,7 +159,7 @@ public final class ProfileUtils {
                 rs.getString("application_parent_id"),
                 rs.getString("architecture_hosting"),
 
-                rs.getString("app_criticality"),
+                rs.getString("app_criticality_assessment"),
                 rs.getString("security_rating"),
                 rs.getString("confidentiality_rating"),
                 rs.getString("integrity_rating"),

@@ -87,4 +87,57 @@ public interface RiskStoryRepository extends JpaRepository<RiskStory, String> {
                                           @Param("sortOrder") String sortOrder,
                                           @Param("size") int size,
                                           @Param("offset") int offset);
+    
+    /**
+     * Find risks by app ID with pagination - returns raw result for flexible mapping
+     */
+    @Query(value = """
+        SELECT rs.risk_id, rs.app_id, rs.field_key, rs.triggering_evidence_id, rs.creation_type,
+               rs.assigned_sme, rs.title, rs.hypothesis, rs.condition, rs.consequence, 
+               rs.severity, rs.status, rs.raised_by, rs.opened_at, rs.assigned_at,
+               rs.policy_requirement_snapshot, rs.created_at, rs.updated_at,
+               app.name as app_name, app.app_criticality_assessment
+        FROM risk_story rs
+        JOIN application app ON rs.app_id = app.app_id
+        WHERE rs.app_id = :appId
+        ORDER BY rs.created_at DESC
+        LIMIT :limit OFFSET :offset
+        """, nativeQuery = true)
+    List<java.util.Map<String, Object>> findRisksByAppIdWithPagination(
+        @Param("appId") String appId, 
+        @Param("limit") int limit, 
+        @Param("offset") int offset);
+    
+    /**
+     * Count total risks for an application (for pagination)
+     */
+    @Query("SELECT COUNT(rs) FROM RiskStory rs WHERE rs.appId = :appId")
+    long countByAppId(@Param("appId") String appId);
+    
+    /**
+     * Count risks matching search criteria (for pagination total)
+     */
+    @Query(value = """
+        SELECT COUNT(*) 
+        FROM risk_story rs 
+        LEFT JOIN application app ON rs.app_id = app.app_id
+        LEFT JOIN profile_field pf ON rs.field_key = pf.field_key 
+                                   AND rs.profile_id = pf.profile_id
+        WHERE (:appId IS NULL OR rs.app_id = :appId)
+          AND (:assignedSme IS NULL OR rs.assigned_sme = :assignedSme)  
+          AND (:status IS NULL OR rs.status = :status)
+          AND (:derivedFrom IS NULL OR pf.derived_from = :derivedFrom)
+          AND (:fieldKey IS NULL OR rs.field_key = :fieldKey)
+          AND (:severity IS NULL OR rs.severity = :severity)
+          AND (:creationType IS NULL OR rs.creation_type = :creationType)
+          AND (:triggeringEvidenceId IS NULL OR rs.triggering_evidence_id = :triggeringEvidenceId)
+    """, nativeQuery = true)
+    long countSearchResults(@Param("appId") String appId,
+                           @Param("assignedSme") String assignedSme,
+                           @Param("status") String status,
+                           @Param("derivedFrom") String derivedFrom,
+                           @Param("fieldKey") String fieldKey,
+                           @Param("severity") String severity,
+                           @Param("creationType") String creationType,
+                           @Param("triggeringEvidenceId") String triggeringEvidenceId);
 }

@@ -15,56 +15,47 @@ public class KpiRepository {
         this.jdbc = jdbc;
     }
 
-    /** Compliant = applications that have at least one active evidence */
+    /** Compliant = count of profile fields that have approved evidence (portfolio-wide) */
     public int compliant() {
         final String sql = """
-            SELECT COUNT(DISTINCT a.app_id) AS compliant
-            FROM application a
-            WHERE EXISTS (
-                SELECT 1 FROM profile p 
-                JOIN profile_field pf ON p.profile_id = pf.profile_id
-                JOIN evidence e ON e.profile_field_id = pf.id 
-                WHERE p.app_id = a.app_id
-                AND e.status = 'active'
-            )
+            SELECT COUNT(DISTINCT pf.id) AS compliant
+            FROM profile p 
+            JOIN profile_field pf ON p.profile_id = pf.profile_id
+            JOIN evidence e ON e.profile_field_id = pf.id 
+            JOIN evidence_field_link efl ON efl.evidence_id = e.evidence_id
+            WHERE efl.link_status = 'APPROVED'
             """;
         return jdbc.queryForObject(sql, Map.of(), Integer.class);
     }
 
-    /** Pending Review = applications that have non-active evidence but no active evidence */
+    /** Pending Review = count of profile fields that have evidence awaiting review but no approved evidence (portfolio-wide) */
     public int pendingReview() {
         final String sql = """
-            SELECT COUNT(DISTINCT a.app_id) AS pendingReview
-            FROM application a
-            WHERE EXISTS (
-                SELECT 1 FROM profile p 
-                JOIN profile_field pf ON p.profile_id = pf.profile_id
-                JOIN evidence e ON e.profile_field_id = pf.id 
-                WHERE p.app_id = a.app_id
-                AND e.status IN ('superseded','revoked')
-            )
+            SELECT COUNT(DISTINCT pf.id) AS pendingReview
+            FROM profile p 
+            JOIN profile_field pf ON p.profile_id = pf.profile_id
+            JOIN evidence e ON e.profile_field_id = pf.id 
+            JOIN evidence_field_link efl ON efl.evidence_id = e.evidence_id
+            WHERE efl.link_status IN ('PENDING_PO_REVIEW', 'PENDING_SME_REVIEW')
             AND NOT EXISTS (
-                SELECT 1 FROM profile p 
-                JOIN profile_field pf ON p.profile_id = pf.profile_id
-                JOIN evidence e ON e.profile_field_id = pf.id 
-                WHERE p.app_id = a.app_id
-                AND e.status = 'active'
+                SELECT 1 FROM evidence e2 
+                JOIN evidence_field_link efl2 ON efl2.evidence_id = e2.evidence_id
+                WHERE e2.profile_field_id = pf.id 
+                AND efl2.link_status = 'APPROVED'
             )
             """;
         return jdbc.queryForObject(sql, Map.of(), Integer.class);
     }
 
-    /** Missing Evidence = applications that exist but have no active evidence */
+    /** Missing Evidence = count of profile fields that have no evidence at all (portfolio-wide) */
     public int missingEvidence() {
         final String sql = """
-            SELECT COUNT(*) AS missingEvidence
-            FROM application a
+            SELECT COUNT(pf.id) AS missingEvidence
+            FROM profile p 
+            JOIN profile_field pf ON p.profile_id = pf.profile_id
             WHERE NOT EXISTS (
-                SELECT 1 FROM profile p 
-                JOIN profile_field pf ON p.profile_id = pf.profile_id
-                JOIN evidence e ON e.profile_field_id = pf.id 
-                WHERE p.app_id = a.app_id
-                AND e.status = 'active'
+                SELECT 1 FROM evidence e 
+                WHERE e.profile_field_id = pf.id
             )
             """;
         return jdbc.queryForObject(sql, Map.of(), Integer.class);
@@ -72,11 +63,14 @@ public class KpiRepository {
 
     /** Risk Blocked = all open risks (portfolio-wide) */
     public int riskBlocked() {
-        // Risk story functionality removed - returning 0
-        return 0;
+        final String sql = """
+            SELECT COUNT(*) FROM risk_story 
+            WHERE status IN ('PENDING_SME_REVIEW', 'UNDER_REVIEW', 'OPEN')
+            """;
+        return jdbc.queryForObject(sql, Map.of(), Integer.class);
     }
 
-    /** App-specific: Compliant = count of profile fields that have at least one active evidence (latest version only) */
+    /** App-specific: Compliant = count of profile fields that have at least one approved evidence (latest version only) */
     public int compliantForApp(String appId) {
         final String sql = """
             SELECT COUNT(DISTINCT pf.id) AS compliant
@@ -89,8 +83,9 @@ public class KpiRepository {
             )
             AND EXISTS (
                 SELECT 1 FROM evidence e 
+                JOIN evidence_field_link efl ON efl.evidence_id = e.evidence_id
                 WHERE e.profile_field_id = pf.id 
-                AND e.status = 'active'
+                AND efl.link_status = 'APPROVED'
             )
             """;
         return jdbc.queryForObject(sql, Map.of("appId", appId), Integer.class);
@@ -115,7 +110,7 @@ public class KpiRepository {
         return jdbc.queryForObject(sql, Map.of("appId", appId), Integer.class);
     }
 
-    /** App-specific: Pending Review = count of profile fields that have non-active evidence but no active evidence (latest version only) */
+    /** App-specific: Pending Review = count of profile fields that have evidence awaiting review but no approved evidence (latest version only) */
     public int pendingReviewForApp(String appId) {
         final String sql = """
             SELECT COUNT(pf.id) AS pendingReview
@@ -128,13 +123,15 @@ public class KpiRepository {
             )
             AND EXISTS (
                 SELECT 1 FROM evidence e 
+                JOIN evidence_field_link efl ON efl.evidence_id = e.evidence_id
                 WHERE e.profile_field_id = pf.id 
-                AND e.status IN ('superseded','revoked')
+                AND efl.link_status IN ('PENDING_PO_REVIEW', 'PENDING_SME_REVIEW')
             )
             AND NOT EXISTS (
                 SELECT 1 FROM evidence e 
+                JOIN evidence_field_link efl ON efl.evidence_id = e.evidence_id
                 WHERE e.profile_field_id = pf.id 
-                AND e.status = 'active'
+                AND efl.link_status = 'APPROVED'
             )
             """;
         return jdbc.queryForObject(sql, Map.of("appId", appId), Integer.class);
@@ -142,7 +139,11 @@ public class KpiRepository {
 
     /** App-specific: Risk Blocked = count of open risks for this specific app */
     public int riskBlockedForApp(String appId) {
-        // Risk story functionality removed - returning 0
-        return 0;
+        final String sql = """
+            SELECT COUNT(*) FROM risk_story 
+            WHERE app_id = :appId
+            AND status IN ('PENDING_SME_REVIEW', 'UNDER_REVIEW', 'OPEN')
+            """;
+        return jdbc.queryForObject(sql, Map.of("appId", appId), Integer.class);
     }
 }

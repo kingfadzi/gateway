@@ -46,7 +46,7 @@ public class RequirementsService {
         // 1) Read normalized policy context
         Map<String, Object> ctx = profileReader.readPolicyContext(appId);
 
-        String criticality  = stringOrDefault(ctx.get("app_criticality"), "C");
+        String criticality  = stringOrDefault(ctx.get("app_criticality_assessment"), "C");
         String security     = stringOrDefault(ctx.get("security_rating"), "A2");
         String integrity    = stringOrDefault(ctx.get("integrity_rating"), "C");
         String availability = stringOrDefault(ctx.get("availability_rating"), "C");

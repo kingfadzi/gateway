@@ -260,6 +260,24 @@ public class ProfileRepository {
             ORDER BY e.created_at DESC
         """, new MapSqlParameterSource().addValue("fieldIds", fieldIds), ProfileUtils::mapEvidence);
     }
+    
+    /**
+     * Get a specific profile field by ID for TTL/status calculations
+     */
+    public Optional<ProfileField> getProfileFieldById(String profileFieldId) {
+        try {
+            ProfileField field = jdbc.queryForObject("""
+                SELECT id, field_key, value, source_system, source_ref,
+                       0 AS evidence_count, updated_at
+                FROM profile_field
+                WHERE id = :profileFieldId
+            """, new MapSqlParameterSource().addValue("profileFieldId", profileFieldId), 
+            ProfileUtils::mapProfileField);
+            return Optional.of(field);
+        } catch (EmptyResultDataAccessException e) {
+            return Optional.empty();
+        }
+    }
 
 
     public Map<String, Object> getApplication(String appId) {

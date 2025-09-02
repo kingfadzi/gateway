@@ -11,7 +11,6 @@ import com.example.onboarding.dto.evidence.CreateEvidenceRequest;
 import com.example.onboarding.dto.evidence.EnhancedAttachedDocumentsResponse;
 import com.example.onboarding.dto.evidence.CreateEvidenceWithDocumentRequest;
 import com.example.onboarding.dto.evidence.Evidence;
-import com.example.onboarding.dto.evidence.EvidenceSummary;
 import com.example.onboarding.dto.evidence.EvidenceWithDocumentResponse;
 import com.example.onboarding.dto.evidence.UpdateEvidenceRequest;
 import com.example.onboarding.dto.evidence.AttachEvidenceToFieldRequest;
@@ -135,47 +134,48 @@ public class EvidenceServiceImpl implements EvidenceService {
     }
     
     @Override
-    public PageResponse<EvidenceSummary> getEvidenceByApp(String appId, int page, int pageSize) {
+    public PageResponse<com.example.onboarding.dto.evidence.EnhancedEvidenceSummary> getEvidenceByApp(String appId, int page, int pageSize) {
         int safePage = Math.max(page, 1);
         int safePageSize = Math.max(pageSize, 1);
         int offset = (safePage - 1) * safePageSize;
         
         long total = evidenceRepository.countEvidenceByApp(appId);
-        List<EvidenceSummary> evidence = evidenceRepository.findEvidenceByApp(appId, safePageSize, offset);
+        List<com.example.onboarding.dto.evidence.EnhancedEvidenceSummary> evidence = evidenceRepository.findEvidenceByApp(appId, safePageSize, offset);
         
         return new PageResponse<>(safePage, safePageSize, total, evidence);
     }
     
     @Override
-    public PageResponse<EvidenceSummary> getEvidenceByProfileField(String profileFieldId, int page, int pageSize) {
+    public PageResponse<com.example.onboarding.dto.evidence.EnhancedEvidenceSummary> getEvidenceByProfileField(String profileFieldId, int page, int pageSize) {
         int safePage = Math.max(page, 1);
         int safePageSize = Math.max(pageSize, 1);
         int offset = (safePage - 1) * safePageSize;
         
         // Note: We don't have a count method for profile field, so we'll use the list size as approximation
-        List<EvidenceSummary> evidence = evidenceRepository.findEvidenceByProfileField(profileFieldId, safePageSize, offset);
+        List<com.example.onboarding.dto.evidence.EnhancedEvidenceSummary> evidence = evidenceRepository.findEvidenceByProfileField(profileFieldId, safePageSize, offset);
+        
+        return new PageResponse<>(safePage, safePageSize, evidence.size(), evidence);
+    }
+    
+    
+    @Override
+    public PageResponse<com.example.onboarding.dto.evidence.EnhancedEvidenceSummary> getEvidenceByClaim(String claimId, int page, int pageSize) {
+        int safePage = Math.max(page, 1);
+        int safePageSize = Math.max(pageSize, 1);
+        int offset = (safePage - 1) * safePageSize;
+        
+        List<com.example.onboarding.dto.evidence.EnhancedEvidenceSummary> evidence = evidenceRepository.findEvidenceByClaim(claimId, safePageSize, offset);
         
         return new PageResponse<>(safePage, safePageSize, evidence.size(), evidence);
     }
     
     @Override
-    public PageResponse<EvidenceSummary> getEvidenceByClaim(String claimId, int page, int pageSize) {
+    public PageResponse<com.example.onboarding.dto.evidence.EnhancedEvidenceSummary> getEvidenceByTrack(String trackId, int page, int pageSize) {
         int safePage = Math.max(page, 1);
         int safePageSize = Math.max(pageSize, 1);
         int offset = (safePage - 1) * safePageSize;
         
-        List<EvidenceSummary> evidence = evidenceRepository.findEvidenceByClaim(claimId, safePageSize, offset);
-        
-        return new PageResponse<>(safePage, safePageSize, evidence.size(), evidence);
-    }
-    
-    @Override
-    public PageResponse<EvidenceSummary> getEvidenceByTrack(String trackId, int page, int pageSize) {
-        int safePage = Math.max(page, 1);
-        int safePageSize = Math.max(pageSize, 1);
-        int offset = (safePage - 1) * safePageSize;
-        
-        List<EvidenceSummary> evidence = evidenceRepository.findEvidenceByTrack(trackId, safePageSize, offset);
+        List<com.example.onboarding.dto.evidence.EnhancedEvidenceSummary> evidence = evidenceRepository.findEvidenceByTrack(trackId, safePageSize, offset);
         
         return new PageResponse<>(safePage, safePageSize, evidence.size(), evidence);
     }
@@ -462,7 +462,7 @@ public class EvidenceServiceImpl implements EvidenceService {
         }
         
         // Find and store evidence information before deletion
-        List<EvidenceSummary> existingEvidence = evidenceRepository.findEvidenceByProfileField(profileFieldId, 100, 0)
+        List<com.example.onboarding.dto.evidence.EnhancedEvidenceSummary> existingEvidence = evidenceRepository.findEvidenceByProfileField(profileFieldId, 100, 0)
             .stream()
             .filter(e -> document.documentId().equals(e.documentId()))
             .toList();
@@ -473,7 +473,7 @@ public class EvidenceServiceImpl implements EvidenceService {
         }
         
         // Use the first evidence record for response (there should typically be only one)
-        EvidenceSummary evidenceToDelete = existingEvidence.get(0);
+        com.example.onboarding.dto.evidence.EnhancedEvidenceSummary evidenceToDelete = existingEvidence.get(0);
         
         // Delete evidence records that link this document to this profile field
         int deletedCount = evidenceRepository.deleteByAppIdProfileFieldIdAndDocumentId(appId, profileFieldId, document.documentId());
@@ -679,5 +679,20 @@ public class EvidenceServiceImpl implements EvidenceService {
         }
         log.warn("Unexpected timestamp type: {}", timestampObj.getClass());
         return null;
+    }
+    
+    @Override
+    public List<com.example.onboarding.dto.evidence.EnhancedEvidenceSummary> searchEvidence(
+            String linkStatus, String appId, String fieldKey, String assignedPo, 
+            String assignedSme, String evidenceStatus, String documentSourceType, 
+            int page, int size) {
+        
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.max(size, 1);
+        int offset = safePage * safeSize;
+        
+        return evidenceRepository.searchEvidence(linkStatus, appId, fieldKey, assignedPo, 
+                                                assignedSme, evidenceStatus, documentSourceType, 
+                                                safeSize, offset);
     }
 }

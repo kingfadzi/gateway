@@ -6,13 +6,13 @@ import com.example.onboarding.dto.evidence.CreateEvidenceRequest;
 import com.example.onboarding.dto.evidence.EnhancedAttachedDocumentsResponse;
 import com.example.onboarding.dto.evidence.CreateEvidenceWithDocumentRequest;
 import com.example.onboarding.dto.evidence.Evidence;
-import com.example.onboarding.dto.evidence.EvidenceSummary;
 import com.example.onboarding.dto.evidence.EvidenceWithDocumentResponse;
 import com.example.onboarding.dto.evidence.UpdateEvidenceRequest;
 import com.example.onboarding.dto.evidence.AttachEvidenceToFieldRequest;
 import com.example.onboarding.dto.evidence.EvidenceFieldLinkResponse;
 import com.example.onboarding.dto.evidence.EvidenceUsageResponse;
 import com.example.onboarding.dto.document.DocumentResponse;
+import java.util.List;
 
 import java.util.Optional;
 
@@ -36,22 +36,23 @@ public interface EvidenceService {
     /**
      * List evidence for an application with pagination
      */
-    PageResponse<EvidenceSummary> getEvidenceByApp(String appId, int page, int pageSize);
+    PageResponse<com.example.onboarding.dto.evidence.EnhancedEvidenceSummary> getEvidenceByApp(String appId, int page, int pageSize);
     
     /**
      * List evidence for a profile field with pagination
      */
-    PageResponse<EvidenceSummary> getEvidenceByProfileField(String profileFieldId, int page, int pageSize);
+    PageResponse<com.example.onboarding.dto.evidence.EnhancedEvidenceSummary> getEvidenceByProfileField(String profileFieldId, int page, int pageSize);
+    
     
     /**
      * List evidence for a claim with pagination
      */
-    PageResponse<EvidenceSummary> getEvidenceByClaim(String claimId, int page, int pageSize);
+    PageResponse<com.example.onboarding.dto.evidence.EnhancedEvidenceSummary> getEvidenceByClaim(String claimId, int page, int pageSize);
     
     /**
      * List evidence for a track with pagination
      */
-    PageResponse<EvidenceSummary> getEvidenceByTrack(String trackId, int page, int pageSize);
+    PageResponse<com.example.onboarding.dto.evidence.EnhancedEvidenceSummary> getEvidenceByTrack(String trackId, int page, int pageSize);
     
     /**
      * Revoke evidence
@@ -104,4 +105,12 @@ public interface EvidenceService {
      */
     EvidenceFieldLinkResponse reviewEvidenceFieldLink(String evidenceId, String profileFieldId, 
                                                      String reviewedBy, String comment, boolean approved);
+    
+    /**
+     * Search evidence with multiple filters
+     */
+    List<com.example.onboarding.dto.evidence.EnhancedEvidenceSummary> searchEvidence(
+        String linkStatus, String appId, String fieldKey, String assignedPo, 
+        String assignedSme, String evidenceStatus, String documentSourceType, 
+        int page, int size);
 }

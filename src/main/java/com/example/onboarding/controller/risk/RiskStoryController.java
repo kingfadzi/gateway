@@ -1,5 +1,6 @@
 package com.example.onboarding.controller.risk;
 
+import com.example.onboarding.dto.PageResponse;
 import com.example.onboarding.dto.risk.AttachEvidenceRequest;
 import com.example.onboarding.dto.risk.CreateRiskStoryRequest;
 import com.example.onboarding.dto.risk.RiskStoryResponse;
@@ -45,8 +46,11 @@ public class RiskStoryController {
     }
 
     @GetMapping("/apps/{appId}/risks")
-    public ResponseEntity<java.util.List<RiskStoryResponse>> getAppRisks(@PathVariable String appId) {
-        java.util.List<RiskStoryResponse> risks = riskStoryService.getRisksByAppId(appId);
+    public ResponseEntity<PageResponse<RiskStoryResponse>> getAppRisks(
+            @PathVariable String appId,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int pageSize) {
+        PageResponse<RiskStoryResponse> risks = riskStoryService.getRisksByAppIdPaginated(appId, page, pageSize);
         return ResponseEntity.ok(risks);
     }
     
@@ -71,7 +75,7 @@ public class RiskStoryController {
     }
     
     @GetMapping("/risks/search")
-    public ResponseEntity<java.util.List<RiskStoryResponse>> searchRisks(
+    public ResponseEntity<PageResponse<RiskStoryResponse>> searchRisks(
             @RequestParam(required = false) String appId,
             @RequestParam(required = false) String assignedSme,
             @RequestParam(required = false) String status,
@@ -83,10 +87,10 @@ public class RiskStoryController {
             @RequestParam(required = false) String triggeringEvidenceId,
             @RequestParam(defaultValue = "assignedAt") String sortBy,
             @RequestParam(defaultValue = "desc") String sortOrder,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "50") int size) {
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size) {
         
-        java.util.List<RiskStoryResponse> risks = riskStoryService.searchRisks(
+        PageResponse<RiskStoryResponse> risks = riskStoryService.searchRisksWithPagination(
             appId, assignedSme, status, domain, derivedFrom, fieldKey, 
             severity, creationType, triggeringEvidenceId, sortBy, sortOrder, page, size);
         return ResponseEntity.ok(risks);

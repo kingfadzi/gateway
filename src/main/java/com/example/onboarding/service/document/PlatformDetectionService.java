@@ -1,12 +1,12 @@
 package com.example.onboarding.service.document;
 
+import com.example.onboarding.config.DocumentValidationProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -15,17 +15,24 @@ public class PlatformDetectionService {
     
     private static final Logger log = LoggerFactory.getLogger(PlatformDetectionService.class);
     
-    // GitLab URL patterns
+    // URL parsing patterns for extracting project information
     private static final Pattern GITLAB_BLOB_PATTERN = Pattern.compile(
             "https?://([^/]+)/([^/]+/[^/]+)/-/blob/([^/]+)/(.+)");
+    private static final Pattern GITLAB_RAW_PATTERN = Pattern.compile(
+            "https?://([^/]+)/([^/]+/[^/]+)/-/raw/([^/]+)/(.+)");
     private static final Pattern GITLAB_PROJECT_PATTERN = Pattern.compile(
             "https?://([^/]+)/([^/]+/[^/]+)/?$");
     
-    // Confluence URL patterns
     private static final Pattern CONFLUENCE_PAGES_PATTERN = Pattern.compile(
             "https?://([^/]+)/.*?pages/([0-9]+)");
     private static final Pattern CONFLUENCE_DISPLAY_PATTERN = Pattern.compile(
             "https?://([^/]+)/.*?display/([^/]+)/(.+)");
+    
+    private final DocumentValidationProperties validationProperties;
+    
+    public PlatformDetectionService(DocumentValidationProperties validationProperties) {
+        this.validationProperties = validationProperties;
+    }
     
     public PlatformInfo detectPlatform(String url) {
         if (url == null || url.trim().isEmpty()) {
@@ -34,21 +41,29 @@ public class PlatformDetectionService {
         
         try {
             URL parsedUrl = new URL(url);
-            String host = parsedUrl.getHost();
+            String hostname = parsedUrl.getHost();
             
-            // Try GitLab detection first
-            Optional<PlatformInfo> gitlabInfo = detectGitLab(url, host);
-            if (gitlabInfo.isPresent()) {
-                return gitlabInfo.get();
+            if (hostname == null) {
+                return new PlatformInfo("unknown", false, "Invalid URL - no hostname");
             }
             
-            // Try Confluence detection
-            Optional<PlatformInfo> confluenceInfo = detectConfluence(url, host);
-            if (confluenceInfo.isPresent()) {
-                return confluenceInfo.get();
+            // Find platform based on domain configuration
+            String platform = validationProperties.findPlatformForHostname(hostname);
+            
+            if (platform != null) {
+                log.debug("Detected platform '{}' for hostname '{}'", platform, hostname);
+                return createPlatformInfo(platform, url, hostname);
             }
             
-            // Generic URL
+            // In strict mode, reject unknown domains
+            if (validationProperties.isStrictMode()) {
+                log.warn("Domain '{}' not in allowed platform domains (strict mode enabled)", hostname);
+                return new PlatformInfo("unknown", false, 
+                    "Domain '" + hostname + "' is not in the list of allowed platform domains");
+            }
+            
+            // Fallback to generic (if strict mode disabled)
+            log.debug("Unknown domain '{}' - allowing as generic (strict mode disabled)", hostname);
             return new PlatformInfo("generic", true, null);
             
         } catch (MalformedURLException e) {
@@ -57,8 +72,22 @@ public class PlatformDetectionService {
         }
     }
     
-    private Optional<PlatformInfo> detectGitLab(String url, String host) {
-        // Check for GitLab blob URLs
+    private PlatformInfo createPlatformInfo(String platform, String url, String hostname) {
+        switch (platform.toLowerCase()) {
+            case "gitlab":
+                return createGitlabPlatformInfo(url, hostname);
+            case "confluence":
+                return createConfluencePlatformInfo(url, hostname);
+            default:
+                // Future platforms (sharepoint, etc.) can be added here
+                return new PlatformInfo(platform, true, null);
+        }
+    }
+    
+    private PlatformInfo createGitlabPlatformInfo(String url, String hostname) {
+        // Parse GitLab URL to extract project information
+        
+        // Check for GitLab blob URLs (/-/blob/)
         Matcher blobMatcher = GITLAB_BLOB_PATTERN.matcher(url);
         if (blobMatcher.matches()) {
             String gitlabHost = blobMatcher.group(1);
@@ -67,7 +96,19 @@ public class PlatformDetectionService {
             String filePath = blobMatcher.group(4);
             
             GitLabUrlInfo gitlabInfo = new GitLabUrlInfo(gitlabHost, projectPath, commitSha, filePath, true);
-            return Optional.of(new PlatformInfo("gitlab", true, null, gitlabInfo));
+            return new PlatformInfo("gitlab", true, null, gitlabInfo);
+        }
+        
+        // Check for GitLab raw URLs (/-/raw/)
+        Matcher rawMatcher = GITLAB_RAW_PATTERN.matcher(url);
+        if (rawMatcher.matches()) {
+            String gitlabHost = rawMatcher.group(1);
+            String projectPath = rawMatcher.group(2);
+            String commitSha = rawMatcher.group(3);
+            String filePath = rawMatcher.group(4);
+            
+            GitLabUrlInfo gitlabInfo = new GitLabUrlInfo(gitlabHost, projectPath, commitSha, filePath, false);
+            return new PlatformInfo("gitlab", true, null, gitlabInfo);
         }
         
         // Check for GitLab project URLs
@@ -77,29 +118,29 @@ public class PlatformDetectionService {
             String projectPath = projectMatcher.group(2);
             
             GitLabUrlInfo gitlabInfo = new GitLabUrlInfo(gitlabHost, projectPath, null, null, false);
-            return Optional.of(new PlatformInfo("gitlab", true, null, gitlabInfo));
+            return new PlatformInfo("gitlab", true, null, gitlabInfo);
         }
         
-        // Check for common GitLab hostnames
-        if (host != null && (host.contains("gitlab") || host.equals("gitlab.com"))) {
-            return Optional.of(new PlatformInfo("gitlab", true, null));
-        }
-        
-        return Optional.empty();
+        // Fallback: domain is GitLab but URL structure not recognized
+        log.warn("GitLab domain detected but URL structure not recognized: {}", url);
+        GitLabUrlInfo gitlabInfo = new GitLabUrlInfo(hostname, null, null, null, false);
+        return new PlatformInfo("gitlab", true, "URL structure not recognized, metadata extraction may fail", gitlabInfo);
     }
     
-    private Optional<PlatformInfo> detectConfluence(String url, String host) {
-        // Check for Confluence pages with ID
+    private PlatformInfo createConfluencePlatformInfo(String url, String hostname) {
+        // Parse Confluence URL to extract page information
+        
+        // Check for Confluence pages with ID (pages/123456)
         Matcher pagesMatcher = CONFLUENCE_PAGES_PATTERN.matcher(url);
         if (pagesMatcher.matches()) {
             String confluenceHost = pagesMatcher.group(1);
             String pageId = pagesMatcher.group(2);
             
             ConfluenceUrlInfo confluenceInfo = new ConfluenceUrlInfo(confluenceHost, null, pageId, null);
-            return Optional.of(new PlatformInfo("confluence", true, null, confluenceInfo));
+            return new PlatformInfo("confluence", true, null, confluenceInfo);
         }
         
-        // Check for Confluence display URLs
+        // Check for Confluence display URLs (display/SPACE/Page+Title)
         Matcher displayMatcher = CONFLUENCE_DISPLAY_PATTERN.matcher(url);
         if (displayMatcher.matches()) {
             String confluenceHost = displayMatcher.group(1);
@@ -107,15 +148,13 @@ public class PlatformDetectionService {
             String pageTitle = displayMatcher.group(3);
             
             ConfluenceUrlInfo confluenceInfo = new ConfluenceUrlInfo(confluenceHost, spaceKey, null, pageTitle);
-            return Optional.of(new PlatformInfo("confluence", true, null, confluenceInfo));
+            return new PlatformInfo("confluence", true, null, confluenceInfo);
         }
         
-        // Check for common Confluence hostnames or path patterns
-        if (host != null && (host.contains("confluence") || url.contains("/wiki/") || url.contains("/display/"))) {
-            return Optional.of(new PlatformInfo("confluence", true, null));
-        }
-        
-        return Optional.empty();
+        // Fallback: domain is Confluence but URL structure not recognized
+        log.warn("Confluence domain detected but URL structure not recognized: {}", url);
+        ConfluenceUrlInfo confluenceInfo = new ConfluenceUrlInfo(hostname, null, null, null);
+        return new PlatformInfo("confluence", true, "URL structure not recognized, metadata extraction may fail", confluenceInfo);
     }
     
     public static class PlatformInfo {
@@ -149,8 +188,8 @@ public class PlatformDetectionService {
         public String getPlatformType() { return platformType; }
         public boolean isValid() { return isValid; }
         public String getErrorMessage() { return errorMessage; }
-        public Optional<GitLabUrlInfo> getGitlabInfo() { return Optional.ofNullable(gitlabInfo); }
-        public Optional<ConfluenceUrlInfo> getConfluenceInfo() { return Optional.ofNullable(confluenceInfo); }
+        public java.util.Optional<GitLabUrlInfo> getGitlabInfo() { return java.util.Optional.ofNullable(gitlabInfo); }
+        public java.util.Optional<ConfluenceUrlInfo> getConfluenceInfo() { return java.util.Optional.ofNullable(confluenceInfo); }
         
         public boolean isGitLab() { return "gitlab".equals(platformType); }
         public boolean isConfluence() { return "confluence".equals(platformType); }
@@ -184,8 +223,7 @@ public class PlatformDetectionService {
         }
         
         public String getProjectApiUrl() {
-            // Don't manually encode - let RestTemplate handle URL encoding
-            return String.format("%s/projects/%s", getApiBaseUrl(), projectPath);
+            return String.format("%s/projects/%s", getApiBaseUrl(), projectPath != null ? projectPath : "");
         }
     }
     

@@ -1,5 +1,6 @@
 package com.example.onboarding.service.risk;
 
+import com.example.onboarding.dto.PageResponse;
 import com.example.onboarding.dto.risk.AttachEvidenceRequest;
 import com.example.onboarding.dto.risk.CreateRiskStoryRequest;
 import com.example.onboarding.dto.risk.RiskStoryResponse;
@@ -17,6 +18,8 @@ public interface RiskStoryService {
 
     List<RiskStoryResponse> getRisksByAppId(String appId);
     
+    PageResponse<RiskStoryResponse> getRisksByAppIdPaginated(String appId, int page, int pageSize);
+    
     RiskStoryResponse getRiskById(String riskId);
     
     List<RiskStoryResponse> getRisksByAppIdAndFieldKey(String appId, String fieldKey);
@@ -27,4 +30,9 @@ public interface RiskStoryService {
                                        String domain, String derivedFrom, String fieldKey, 
                                        String severity, String creationType, String triggeringEvidenceId,
                                        String sortBy, String sortOrder, int page, int size);
+    
+    PageResponse<RiskStoryResponse> searchRisksWithPagination(String appId, String assignedSme, String status, 
+                                                            String domain, String derivedFrom, String fieldKey, 
+                                                            String severity, String creationType, String triggeringEvidenceId,
+                                                            String sortBy, String sortOrder, int page, int size);
 }

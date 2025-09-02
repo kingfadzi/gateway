@@ -54,7 +54,7 @@ public final class RatingsNormalizer {
     /** Validate and normalize ratings from ServiceNow (source of truth) */
     public static Map<String,Object> normalizeCtx(String appId, String appCriticality, String sec, String conf, String integ, String avail, String resil) {
         return Map.of(
-                "app_criticality",  validateStandardRating(appCriticality, "App criticality", appId),
+                "app_criticality_assessment",  validateStandardRating(appCriticality, "App criticality", appId),
                 "security_rating",  validateSecurityRating(sec, appId),
                 "confidentiality_rating", validateStandardRating(conf, "Confidentiality", appId),
                 "integrity_rating", validateStandardRating(integ, "Integrity", appId),
