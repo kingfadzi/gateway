@@ -12,6 +12,7 @@ public class AuditProperties {
     private String apiKey;
     private boolean includeArgsDefault = true;
     private boolean includeResultDefault = false;
+    private boolean logOnFailure = true;
     private int maxJsonBytes = 4096;
     private List<String> redactKeys = List.of("password", "token", "secret", "attachment", "content", "data");
 
@@ -38,6 +39,9 @@ public class AuditProperties {
 
     public List<String> getRedactKeys() { return redactKeys; }
     public void setRedactKeys(List<String> redactKeys) { this.redactKeys = redactKeys; }
+
+    public boolean isLogOnFailure() { return logOnFailure; }
+    public void setLogOnFailure(boolean logOnFailure) { this.logOnFailure = logOnFailure; }
 
     public static class Sink {
         private String url;

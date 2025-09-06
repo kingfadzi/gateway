@@ -1,9 +1,12 @@
 package com.example.onboarding.service.application;
 
 import com.example.onboarding.dto.application.PortfolioKpis;
+import com.example.onboarding.dto.application.KpiSummary;
+import com.example.onboarding.model.Application;
 import com.example.onboarding.repository.application.KpiRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.List;
 
 @Service
 @Transactional(readOnly = true)
@@ -29,5 +32,25 @@ public class KpiService {
         final int pendingReview   = repo.pendingReviewForApp(appId);
         final int riskBlocked     = repo.riskBlockedForApp(appId);
         return new PortfolioKpis(compliant, missingEvidence, pendingReview, riskBlocked);
+    }
+    
+    public KpiSummary calculateKpisFromApplications(List<Application> applications) {
+        if (applications.isEmpty()) {
+            return new KpiSummary(0, 0, 0, 0);
+        }
+        
+        int compliant = 0;
+        int missingEvidence = 0;
+        int pendingReview = 0;
+        int riskBlocked = 0;
+        
+        for (Application app : applications) {
+            compliant += repo.compliantForApp(app.getAppId());
+            missingEvidence += repo.missingEvidenceForApp(app.getAppId());
+            pendingReview += repo.pendingReviewForApp(app.getAppId());
+            riskBlocked += repo.riskBlockedForApp(app.getAppId());
+        }
+        
+        return new KpiSummary(compliant, missingEvidence, pendingReview, riskBlocked);
     }
 }

@@ -24,4 +24,7 @@ public interface EvidenceFieldLinkRepository extends JpaRepository<EvidenceField
     
     @Query("SELECT efl FROM EvidenceFieldLink efl WHERE efl.evidenceId = :evidenceId AND efl.linkStatus = :status")
     List<EvidenceFieldLink> findByEvidenceIdAndStatus(@Param("evidenceId") String evidenceId, @Param("status") EvidenceFieldLinkStatus status);
+    
+    @Query("SELECT efl FROM EvidenceFieldLink efl WHERE efl.profileFieldId = :profileFieldId AND efl.linkStatus = :status")
+    List<EvidenceFieldLink> findByProfileFieldIdAndStatus(@Param("profileFieldId") String profileFieldId, @Param("status") EvidenceFieldLinkStatus status);
 }

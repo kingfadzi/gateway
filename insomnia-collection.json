@@ -29,7 +29,7 @@
     {
       "_id": "wrk_main",
       "_type": "workspace",
-      "name": "Delivery Unit Backend API",
+      "name": "Gateway API",
       "description": "API endpoints for the delivery unit backend application",
       "scope": null
     },
@@ -49,22 +49,43 @@
       "_type": "request",
       "url": "{{ _.base_url }}/api/apps",
       "name": "Search Applications",
-      "description": "Search for applications with optional query parameters",
+      "description": "Search for applications with optional query parameters. Returns apps array, KPIs, totalCount, and filteredCount.",
       "method": "GET",
       "body": {},
       "parameters": [
         {
-          "id": "param_search_name",
-          "name": "name",
+          "id": "param_search",
+          "name": "search",
           "value": "",
-          "description": "Filter by application name",
+          "description": "Filter by app name/ID (partial match)",
           "disabled": true
         },
         {
-          "id": "param_search_owner",
-          "name": "owner",
+          "id": "param_criticality",
+          "name": "criticality",
           "value": "",
-          "description": "Filter by owner",
+          "description": "Filter by criticality (A|B|C|D)",
+          "disabled": true
+        },
+        {
+          "id": "param_application_type",
+          "name": "applicationType",
+          "value": "",
+          "description": "Filter by application type (exact match)",
+          "disabled": true
+        },
+        {
+          "id": "param_architecture_type",
+          "name": "architectureType",
+          "value": "",
+          "description": "Filter by architecture type (exact match)",
+          "disabled": true
+        },
+        {
+          "id": "param_install_type",
+          "name": "installType",
+          "value": "",
+          "description": "Filter by install type (exact match)",
           "disabled": true
         }
       ],
@@ -76,6 +97,53 @@
       ],
       "authentication": {},
       "metaSortKey": -1693167600000,
+      "isPrivate": false
+    },
+    {
+      "_id": "req_app_search_filtered",
+      "parentId": "fld_applications",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/apps?search=payment&criticality=A",
+      "name": "Search Applications - Filtered Example",
+      "description": "Example search with filters: search for 'payment' with criticality 'A'",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693167599500,
+      "isPrivate": false
+    },
+    {
+      "_id": "req_bulk_attestation",
+      "parentId": "fld_applications",
+      "_type": "request",
+      "url": "{{ _.base_url }}/api/apps/{{ _.sample_app_id }}/attestations/bulk",
+      "name": "Bulk Attestation",
+      "description": "Process bulk attestations for multiple fields",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"fields\": [\n    {\n      \"profileFieldId\": \"pf_1fb7289f29892c53b0be97bbb0e88db3\",\n      \"fieldKey\": \"backup_policy\"\n    },\n    {\n      \"profileFieldId\": \"pf_05d0df4f63476bb20927a3a7bb4ec17e\",\n      \"fieldKey\": \"encryption_at_rest\"\n    }\n  ],\n  \"attestedBy\": \"po_user_001\",\n  \"attestationComments\": \"Bulk attestation for compliance review\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1693167599250,
       "isPrivate": false
     },
     {

@@ -47,7 +47,8 @@ public class RegistryRiskConfigService {
         }
         
         boolean shouldCreate = rule.requiresReview();
-        log.info("Risk evaluation: field={}, criticality={}, requiresReview={}", fieldKey, appCriticality, shouldCreate);
+        log.info("Risk evaluation: field={}, criticality={}, requiresReview={}, ruleValue={}", 
+            fieldKey, appCriticality, shouldCreate, rule.value());
         
         return shouldCreate 
             ? RegistryRuleEvaluation.riskRequired(fieldKey, appId, appCriticality, rule)

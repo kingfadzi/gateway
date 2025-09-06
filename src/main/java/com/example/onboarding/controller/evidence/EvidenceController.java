@@ -436,18 +436,16 @@ public class EvidenceController {
      * POST /api/evidence/{evidenceId}/po-approve
      */
     @PostMapping("/evidence/{evidenceId}/po-approve")
-    @Audited(action = "PO_APPROVE_EVIDENCE", subjectType = "profile_field", subject = "#profileFieldId",
-             context = {"evidenceId=#evidenceId", "reviewedBy=#reviewedBy", "attestationType=PO_APPROVAL"})
     public ResponseEntity<EvidenceFieldLinkResponse> approveEvidenceAsPo(
             @PathVariable String evidenceId,
             @RequestParam String profileFieldId,
             @RequestParam String reviewedBy,
             @RequestParam(required = false) String reviewComment) {
-        log.debug("PO approving evidence {} for field {} by {}", evidenceId, profileFieldId, reviewedBy);
+        log.debug("PO attesting evidence {} for field {} by {}", evidenceId, profileFieldId, reviewedBy);
         try {
-            EvidenceFieldLinkResponse response = evidenceFieldLinkService.reviewEvidenceFieldLink(
+            EvidenceFieldLinkResponse response = evidenceFieldLinkService.userAttestEvidenceFieldLink(
                 evidenceId, profileFieldId, reviewedBy, 
-                reviewComment != null ? reviewComment : "Approved by Product Owner", true);
+                reviewComment != null ? reviewComment : "Attested by Product Owner");
             log.info("Evidence {} approved by PO {} for field {}", evidenceId, reviewedBy, profileFieldId);
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {

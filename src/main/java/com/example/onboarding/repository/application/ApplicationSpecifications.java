@@ -13,10 +13,29 @@ public class ApplicationSpecifications {
             List<Predicate> predicates = new ArrayList<>();
             params.forEach((key, value) -> {
                 if (value != null && !value.toString().isEmpty()) {
-                    predicates.add(cb.equal(root.get(key), value));
+                    if ("search".equals(key)) {
+                        // Search parameter: partial match on appId or name
+                        String searchValue = "%" + value.toString().toLowerCase() + "%";
+                        Predicate appIdMatch = cb.like(cb.lower(root.get("appId")), searchValue);
+                        Predicate nameMatch = cb.like(cb.lower(root.get("name")), searchValue);
+                        predicates.add(cb.or(appIdMatch, nameMatch));
+                    } else {
+                        // All other parameters: exact match
+                        predicates.add(cb.equal(root.get(mapParamToField(key)), value));
+                    }
                 }
             });
             return cb.and(predicates.toArray(new Predicate[0]));
+        };
+    }
+    
+    private static String mapParamToField(String param) {
+        return switch (param) {
+            case "criticality" -> "appCriticalityAssessment";
+            case "applicationType" -> "applicationType";
+            case "architectureType" -> "architectureType";
+            case "installType" -> "installType";
+            default -> param;
         };
     }
 }

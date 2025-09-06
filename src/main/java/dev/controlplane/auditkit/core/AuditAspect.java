@@ -32,7 +32,11 @@ public class AuditAspect {
 
     @Around("@annotation(dev.controlplane.auditkit.annotations.Audited)")
     public Object around(ProceedingJoinPoint pjp) throws Throwable {
-        if (!props.isEnabled()) return pjp.proceed();
+        System.out.println("AUDIT ASPECT: Method intercepted - " + pjp.getSignature());
+        if (!props.isEnabled()) {
+            System.out.println("AUDIT ASPECT: Audit disabled, proceeding without audit");
+            return pjp.proceed();
+        }
 
         Method method = ((MethodSignature) pjp.getSignature()).getMethod();
         Audited ann = method.getAnnotation(Audited.class);

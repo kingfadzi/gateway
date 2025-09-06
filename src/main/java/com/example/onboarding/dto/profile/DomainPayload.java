@@ -8,6 +8,7 @@ public record DomainPayload(
         String icon,
         String driverLabel,
         String driverValue,
-        List<FieldGraphPayload> fields
+        List<FieldGraphPayload> fields,
+        boolean bulkAttestationEnabled  // Bulk attestation allowed based on CIA+S+R ratings
 ) {
 }

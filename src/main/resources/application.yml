@@ -25,8 +25,8 @@ logging:
     root: INFO
     org.springframework.web: DEBUG
     com.example.onboarding: DEBUG
-    org.springframework.jdbc.core: DEBUG
-    org.springframework.jdbc.datasource: DEBUG
+    org.springframework.jdbc.core: WARN
+    org.springframework.jdbc.datasource: WARN
 
 cps:
   jira:
@@ -104,4 +104,6 @@ audit:
   sink:
     url: http://localhost:8081/audit/events
   api-key: dev-key
+  # For local development - log audit events when sink is unavailable
+  log-on-failure: true
 

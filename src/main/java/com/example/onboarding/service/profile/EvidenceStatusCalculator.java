@@ -35,21 +35,28 @@ public class EvidenceStatusCalculator {
         }
         
         boolean hasApproved = false;
+        boolean hasUserAttested = false;
         boolean hasRejected = false;
         boolean hasPending = false;
         
         for (EnhancedEvidenceSummary ev : evidence) {
             switch (ev.linkStatus()) {
                 case APPROVED -> hasApproved = true;
+                case USER_ATTESTED -> hasUserAttested = true;
                 case REJECTED -> hasRejected = true;
                 case PENDING_REVIEW, PENDING_PO_REVIEW, PENDING_SME_REVIEW, ATTACHED -> hasPending = true;
             }
         }
         
-        // Apply approval status logic
-        if (hasApproved && !hasRejected && !hasPending) {
-            return "approved";  // ALL evidence is approved
-        } else if (hasRejected && !hasApproved && !hasPending) {
+        // Apply approval status logic - distinguish between approved and user_attested
+        if ((hasApproved || hasUserAttested) && !hasRejected && !hasPending) {
+            // If we have both types, prioritize showing the formal approval
+            if (hasApproved) {
+                return "approved";      // Formally approved by reviewer
+            } else {
+                return "user_attested"; // Self-attested by user
+            }
+        } else if (hasRejected && !hasApproved && !hasUserAttested && !hasPending) {
             return "rejected";  // ALL evidence is rejected
         } else {
             return "pending";   // ANY OTHER COMBINATION
@@ -79,8 +86,9 @@ public class EvidenceStatusCalculator {
         boolean hasBrokenEvidence = false;
         
         for (EnhancedEvidenceSummary ev : evidence) {
-            // Only consider approved and active evidence for freshness
-            if (ev.linkStatus() != com.example.onboarding.model.EvidenceFieldLinkStatus.APPROVED || 
+            // Only consider approved/attested and active evidence for freshness
+            if ((ev.linkStatus() != com.example.onboarding.model.EvidenceFieldLinkStatus.APPROVED && 
+                 ev.linkStatus() != com.example.onboarding.model.EvidenceFieldLinkStatus.USER_ATTESTED) || 
                 !"active".equals(ev.status())) {
                 continue;
             }

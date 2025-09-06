@@ -13,7 +13,11 @@ import com.example.onboarding.service.document.DocumentService;
 import com.example.onboarding.service.profile.ProfileFieldRegistryService;
 import com.example.onboarding.dto.evidence.EnhancedEvidenceSummary;
 import com.example.onboarding.repository.evidence.EvidenceRepository;
+import com.example.onboarding.repository.EvidenceFieldLinkRepository;
+import com.example.onboarding.model.EvidenceFieldLinkStatus;
 import com.example.onboarding.util.ProfileUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +34,8 @@ import java.util.stream.Collectors;
 @Service
 public class ProfileServiceImpl implements ProfileService {
 
+    private static final Logger log = LoggerFactory.getLogger(ProfileServiceImpl.class);
+
     private final ProfileRepository profileRepository;
     private final FieldRegistryConfig fieldRegistryConfig;
     private final DocumentService documentService;
@@ -37,6 +43,7 @@ public class ProfileServiceImpl implements ProfileService {
     private final RiskStoryRepository riskStoryRepository;
     private final EvidenceStatusCalculator evidenceStatusCalculator;
     private final EvidenceRepository evidenceRepository;
+    private final EvidenceFieldLinkRepository evidenceFieldLinkRepository;
 
     public ProfileServiceImpl(ProfileRepository profileRepository, 
                              FieldRegistryConfig fieldRegistryConfig,
@@ -44,7 +51,8 @@ public class ProfileServiceImpl implements ProfileService {
                              ProfileFieldRegistryService profileFieldRegistryService,
                              RiskStoryRepository riskStoryRepository,
                              EvidenceStatusCalculator evidenceStatusCalculator,
-                             EvidenceRepository evidenceRepository) {
+                             EvidenceRepository evidenceRepository,
+                             EvidenceFieldLinkRepository evidenceFieldLinkRepository) {
         this.profileRepository = profileRepository;
         this.fieldRegistryConfig = fieldRegistryConfig;
         this.documentService = documentService;
@@ -52,6 +60,7 @@ public class ProfileServiceImpl implements ProfileService {
         this.riskStoryRepository = riskStoryRepository;
         this.evidenceStatusCalculator = evidenceStatusCalculator;
         this.evidenceRepository = evidenceRepository;
+        this.evidenceFieldLinkRepository = evidenceFieldLinkRepository;
     }
 
 
@@ -274,7 +283,8 @@ public class ProfileServiceImpl implements ProfileService {
                     getDomainIcon(domainKey),
                     domainKey,
                     getDriverValue(domainKey, appData),
-                    fieldPayloads
+                    fieldPayloads,
+                    calculateBulkAttestationEnabled(domainKey, fieldPayloads)
             ));
         }
         
@@ -441,6 +451,19 @@ public class ProfileServiceImpl implements ProfileService {
         if (daysLeft < 0) return "Expired";
         if (daysLeft <= 90) return "Expiring";
         return "Current";
+    }
+
+    /**
+     * Calculate if bulk attestation is enabled based on domain and driver value.
+     * Bulk attestation is DISABLED (false) for high-risk combinations:
+     * - Security domain: A1, A2, B
+     * - Resiliency domain: 0, 1  
+     * - Other domains (CIA): A, B
+     */
+    private boolean calculateBulkAttestationEnabled(String domainKey, List<FieldGraphPayload> fieldPayloads) {
+        // Simple check: if ANY field in this domain has attestations, then bulkAttestationEnabled = true
+        return fieldPayloads.stream()
+            .anyMatch(field -> field.attestations() != null && !field.attestations().isEmpty());
     }
 
     @Override

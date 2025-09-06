@@ -24,7 +24,7 @@ public record EnhancedEvidenceSummary(
         OffsetDateTime updatedAt,
         
         // EvidenceFieldLink metadata
-        EvidenceFieldLinkStatus linkStatus,    // ATTACHED/PENDING_PO_REVIEW/PENDING_SME_REVIEW/APPROVED/REJECTED
+        EvidenceFieldLinkStatus linkStatus,    // ATTACHED/PENDING_PO_REVIEW/PENDING_SME_REVIEW/APPROVED/USER_ATTESTED/REJECTED
         String linkedBy,
         OffsetDateTime linkedAt,
         String reviewedBy,

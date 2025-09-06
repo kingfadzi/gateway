@@ -1,5 +1,6 @@
 package com.example.onboarding.service.application;
 
+import com.example.onboarding.dto.application.AppSummaryResponse;
 import com.example.onboarding.model.Application;
 import com.example.onboarding.repository.application.ApplicationRepository;
 import com.example.onboarding.repository.application.ApplicationSpecifications;
@@ -28,5 +29,23 @@ public class ApplicationQueryService {
 
     public Application getById(String appId) {
         return repository.findById(appId).orElse(null);
+    }
+    
+    public List<AppSummaryResponse> convertToSummaryResponse(List<Application> applications) {
+        return applications.stream()
+                .map(this::toAppSummaryResponse)
+                .collect(Collectors.toList());
+    }
+    
+    private AppSummaryResponse toAppSummaryResponse(Application app) {
+        return new AppSummaryResponse(
+            app.getAppId(),
+            app.getName(),
+            app.getAppCriticalityAssessment(),
+            app.getBusinessServiceName(),
+            app.getApplicationType(),
+            app.getInstallType(),
+            app.getArchitectureType()
+        );
     }
 }

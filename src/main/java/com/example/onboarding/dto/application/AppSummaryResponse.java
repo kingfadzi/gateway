@@ -6,6 +6,7 @@ public record AppSummaryResponse(
     String name,
     String appCriticalityAssessment,
     String businessServiceName,
+    String applicationType,
     String install_type,
     String architecture_type
 ) {}

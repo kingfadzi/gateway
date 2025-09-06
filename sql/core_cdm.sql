@@ -322,7 +322,7 @@ CREATE TABLE evidence_field_link (
     CONSTRAINT fk_efl_profile_field FOREIGN KEY (profile_field_id) REFERENCES profile_field(id) ON DELETE CASCADE,
     CONSTRAINT fk_efl_app FOREIGN KEY (app_id) REFERENCES application(app_id) ON DELETE CASCADE,
     -- Constraint to ensure valid status values
-    CONSTRAINT chk_efl_status CHECK (link_status IN ('ATTACHED', 'PENDING_PO_REVIEW', 'PENDING_SME_REVIEW', 'APPROVED', 'REJECTED'))
+    CONSTRAINT chk_efl_status CHECK (link_status IN ('ATTACHED', 'PENDING_PO_REVIEW', 'PENDING_SME_REVIEW', 'APPROVED', 'USER_ATTESTED', 'REJECTED'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_efl_evidence ON evidence_field_link(evidence_id);
@@ -433,10 +433,10 @@ WHERE link_status = 'PENDING_REVIEW';
 -- Drop old constraint
 ALTER TABLE evidence_field_link DROP CONSTRAINT IF EXISTS chk_efl_status;
 
--- Add new constraint with updated status values  
+-- Add new constraint with updated status values including USER_ATTESTED
 ALTER TABLE evidence_field_link 
 ADD CONSTRAINT chk_efl_status 
-CHECK (link_status IN ('ATTACHED', 'PENDING_PO_REVIEW', 'PENDING_SME_REVIEW', 'APPROVED', 'REJECTED'));
+CHECK (link_status IN ('ATTACHED', 'PENDING_PO_REVIEW', 'PENDING_SME_REVIEW', 'APPROVED', 'USER_ATTESTED', 'REJECTED'));
 
 -- =========================
 -- SME_QUEUE (Queue Management)

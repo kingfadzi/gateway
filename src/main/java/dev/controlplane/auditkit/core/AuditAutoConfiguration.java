@@ -19,6 +19,8 @@ public class AuditAutoConfiguration {
     @Bean
     @ConditionalOnProperty(prefix = "audit", name = "enabled", havingValue = "true", matchIfMissing = true)
     public AuditAspect auditAspect(AuditProperties props, AuditSinkClient client) {
-        return new AuditAspect(props, client);
+        AuditAspect aspect = new AuditAspect(props, client);
+        System.out.println("AUDIT CONFIG: AuditAspect bean created successfully - enabled=" + props.isEnabled());
+        return aspect;
     }
 }
