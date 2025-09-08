@@ -66,7 +66,7 @@ public class EvidenceReuseRepository {
             WHERE app_id=:app
           )
           AND pf.field_key = ANY(:keys)
-          AND e.status <> 'revoked'
+          -- Removed status check - field deprecated
           AND (e.valid_from  IS NULL OR e.valid_from  <= :asOf::timestamptz)
           AND (e.valid_until IS NULL OR e.valid_until >= :asOf::timestamptz)
           AND (:minFrom::timestamptz IS NULL OR e.valid_from IS NULL OR e.valid_from >= :minFrom::timestamptz)

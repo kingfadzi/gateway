@@ -444,10 +444,10 @@ public class ProfileServiceImpl implements ProfileService {
 
     private String deriveAssurance(List<Evidence> evidence) {
         if (evidence == null || evidence.isEmpty()) return "Missing";
-        Evidence active = evidence.stream().filter(e -> "active".equals(e.status())).findFirst().orElse(null);
-        if (active == null) return "Expired";
-        if (active.validUntil() == null) return "Current";
-        long daysLeft = Duration.between(Instant.now(), active.validUntil().toInstant()).toDays();
+        // Status field deprecated - use first available evidence and check validUntil
+        Evidence firstEvidence = evidence.get(0);
+        if (firstEvidence.validUntil() == null) return "Current";
+        long daysLeft = Duration.between(Instant.now(), firstEvidence.validUntil().toInstant()).toDays();
         if (daysLeft < 0) return "Expired";
         if (daysLeft <= 90) return "Expiring";
         return "Current";

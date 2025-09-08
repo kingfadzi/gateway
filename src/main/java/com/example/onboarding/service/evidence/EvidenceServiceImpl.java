@@ -17,6 +17,8 @@ import com.example.onboarding.dto.evidence.AttachEvidenceToFieldRequest;
 import com.example.onboarding.dto.evidence.EvidenceFieldLinkResponse;
 import com.example.onboarding.dto.evidence.EvidenceUsageResponse;
 import com.example.onboarding.repository.evidence.EvidenceRepository;
+import com.example.onboarding.repository.profile.ProfileRepository;
+import com.example.onboarding.dto.profile.ProfileField;
 import com.example.onboarding.service.document.DocumentService;
 import dev.controlplane.auditkit.annotations.Audited;
 import org.slf4j.Logger;
@@ -36,15 +38,18 @@ public class EvidenceServiceImpl implements EvidenceService {
     private final EvidenceRepository evidenceRepository;
     private final DocumentService documentService;
     private final EvidenceFieldLinkService evidenceFieldLinkService;
+    private final ProfileRepository profileRepository;
+    private final UnifiedFreshnessCalculator unifiedFreshnessCalculator;
     
-    // Valid enum values for validation
-    private static final Set<String> VALID_STATUSES = Set.of("active", "superseded", "revoked");
     
     public EvidenceServiceImpl(EvidenceRepository evidenceRepository, DocumentService documentService,
-                               EvidenceFieldLinkService evidenceFieldLinkService) {
+                               EvidenceFieldLinkService evidenceFieldLinkService, ProfileRepository profileRepository,
+                               UnifiedFreshnessCalculator unifiedFreshnessCalculator) {
         this.evidenceRepository = evidenceRepository;
         this.documentService = documentService;
         this.evidenceFieldLinkService = evidenceFieldLinkService;
+        this.profileRepository = profileRepository;
+        this.unifiedFreshnessCalculator = unifiedFreshnessCalculator;
     }
     
     @Override
@@ -57,6 +62,34 @@ public class EvidenceServiceImpl implements EvidenceService {
         
         // Set defaults
         OffsetDateTime validFrom = request.validFrom() != null ? request.validFrom() : OffsetDateTime.now();
+        OffsetDateTime createdAt = OffsetDateTime.now();
+        
+        // IGNORE manual validUntil from request - compute from source date + TTL
+        OffsetDateTime computedValidUntil = null;
+        if (request.validUntil() != null) {
+            log.warn("validUntil provided in request but will be computed from source date + TTL");
+        }
+        
+        // Compute validUntil from source date + profile field TTL
+        if (request.profileFieldId() != null) {
+            try {
+                ProfileField profileField = profileRepository.getProfileFieldById(request.profileFieldId())
+                    .orElseThrow(() -> new RuntimeException("Profile field not found: " + request.profileFieldId()));
+                
+                computedValidUntil = unifiedFreshnessCalculator.calculateValidUntil(
+                    request.docVersionId(),    // for document source date lookup
+                    validFrom,                 // fallback #1
+                    createdAt,                // fallback #2
+                    profileField
+                );
+                
+                log.debug("Computed validUntil: {} for evidence with docVersionId: {}", 
+                         computedValidUntil, request.docVersionId());
+                         
+            } catch (Exception e) {
+                log.warn("Failed to compute validUntil for evidence, will use null: {}", e.getMessage());
+            }
+        }
         
         try {
             String evidenceId = evidenceRepository.createEvidence(
@@ -67,7 +100,7 @@ public class EvidenceServiceImpl implements EvidenceService {
                 request.sourceSystem(),
                 request.submittedBy(),
                 validFrom,
-                request.validUntil(),
+                computedValidUntil, // ✅ Use computed value instead of request.validUntil()
                 request.relatedEvidenceFields(),
                 request.trackId(),
                 request.documentId(),
@@ -95,7 +128,44 @@ public class EvidenceServiceImpl implements EvidenceService {
             .orElseThrow(() -> new IllegalArgumentException("Evidence not found: " + evidenceId));
         
         // Validate update request
-        validateUpdateRequest(request);
+        // Status validation removed - field deprecated
+        
+        // IGNORE manual fields that are now computed
+        if (request.validUntil() != null) {
+            log.warn("validUntil provided in update request but will be computed from source date + TTL");
+        }
+        if (request.status() != null) {
+            log.warn("status provided in update request but status field is deprecated");
+        }
+        if (request.reviewedBy() != null) {
+            log.warn("reviewedBy provided in update request but field is deprecated");
+        }
+        
+        // Recompute validUntil if profile field or document changed
+        OffsetDateTime computedValidUntil = existing.validUntil(); // Keep existing by default
+        
+        String profileFieldId = existing.profileFieldId();
+        String docVersionId = request.docVersionId() != null ? request.docVersionId() : existing.docVersionId();
+        OffsetDateTime validFrom = request.validFrom() != null ? request.validFrom() : existing.validFrom();
+        
+        if (profileFieldId != null && (request.docVersionId() != null || request.validFrom() != null)) {
+            try {
+                ProfileField profileField = profileRepository.getProfileFieldById(profileFieldId)
+                    .orElseThrow(() -> new RuntimeException("Profile field not found: " + profileFieldId));
+                
+                computedValidUntil = unifiedFreshnessCalculator.calculateValidUntil(
+                    docVersionId,
+                    validFrom,
+                    existing.createdAt(),
+                    profileField
+                );
+                
+                log.debug("Recomputed validUntil: {} for evidence update", computedValidUntil);
+                
+            } catch (Exception e) {
+                log.warn("Failed to recompute validUntil for evidence update: {}", e.getMessage());
+            }
+        }
         
         try {
             boolean updated = evidenceRepository.updateEvidence(
@@ -105,9 +175,9 @@ public class EvidenceServiceImpl implements EvidenceService {
                 request.sourceSystem(),
                 request.submittedBy(),
                 request.validFrom(),
-                request.validUntil(),
-                request.status(),
-                request.reviewedBy(),
+                computedValidUntil, // ✅ Use computed value
+                null, // ✅ Ignore status field
+                null, // ✅ Ignore reviewedBy field  
                 request.relatedEvidenceFields(),
                 request.documentId(),
                 request.docVersionId()
@@ -348,11 +418,6 @@ public class EvidenceServiceImpl implements EvidenceService {
         }
     }
     
-    private void validateUpdateRequest(UpdateEvidenceRequest request) {
-        if (request.status() != null && !VALID_STATUSES.contains(request.status())) {
-            throw new IllegalArgumentException("Invalid status. Valid values: " + VALID_STATUSES);
-        }
-    }
 
     @Override
     public AttachedDocumentsResponse getAttachedDocuments(String appId, String profileFieldId) {

@@ -463,4 +463,24 @@ public class DocumentRepository {
         String sql = "SELECT COUNT(*) FROM document WHERE app_id = :appId";
         return jdbc.queryForObject(sql, new MapSqlParameterSource("appId", appId), Integer.class);
     }
+
+    /**
+     * Get source date from document version for evidence freshness calculation
+     */
+    public OffsetDateTime getSourceDateByVersionId(String docVersionId) {
+        String sql = """
+            SELECT source_date 
+            FROM document_version 
+            WHERE doc_version_id = :docVersionId
+            """;
+        
+        try {
+            return jdbc.queryForObject(sql, 
+                new MapSqlParameterSource("docVersionId", docVersionId), 
+                OffsetDateTime.class);
+        } catch (Exception e) {
+            log.warn("Failed to get source date for document version {}: {}", docVersionId, e.getMessage());
+            return null;
+        }
+    }
 }

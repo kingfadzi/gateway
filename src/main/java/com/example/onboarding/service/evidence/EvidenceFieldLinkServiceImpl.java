@@ -44,6 +44,7 @@ public class EvidenceFieldLinkServiceImpl implements EvidenceFieldLinkService {
     private final FieldRegistryConfig fieldRegistryConfig;
     private final NamedParameterJdbcTemplate namedJdbc;
     private final FieldAttestationService fieldAttestationService;
+    private final EvidenceAttestationService evidenceAttestationService;
     public EvidenceFieldLinkServiceImpl(EvidenceFieldLinkRepository evidenceFieldLinkRepository,
                                        RiskAutoCreationService riskAutoCreationService,
                                        EvidenceRepository evidenceRepository,
@@ -51,7 +52,8 @@ public class EvidenceFieldLinkServiceImpl implements EvidenceFieldLinkService {
                                        ApplicationManagementRepository applicationRepository,
                                        FieldRegistryConfig fieldRegistryConfig,
                                        NamedParameterJdbcTemplate namedJdbc,
-                                       FieldAttestationService fieldAttestationService) {
+                                       FieldAttestationService fieldAttestationService,
+                                       EvidenceAttestationService evidenceAttestationService) {
         this.evidenceFieldLinkRepository = evidenceFieldLinkRepository;
         this.riskAutoCreationService = riskAutoCreationService;
         this.evidenceRepository = evidenceRepository;
@@ -60,6 +62,7 @@ public class EvidenceFieldLinkServiceImpl implements EvidenceFieldLinkService {
         this.fieldRegistryConfig = fieldRegistryConfig;
         this.namedJdbc = namedJdbc;
         this.fieldAttestationService = fieldAttestationService;
+        this.evidenceAttestationService = evidenceAttestationService;
     }
 
     @Override
@@ -152,8 +155,6 @@ public class EvidenceFieldLinkServiceImpl implements EvidenceFieldLinkService {
 
     @Override
     @Transactional
-    @Audited(action = "USER_ATTEST_EVIDENCE_FIELD", subjectType = "profile_field", subject = "#profileFieldId",
-             context = {"evidenceId=#evidenceId", "attestedBy=#attestedBy", "comment=#comment"})
     public EvidenceFieldLinkResponse userAttestEvidenceFieldLink(String evidenceId, String profileFieldId,
                                                                String attestedBy, String comment) {
         log.debug("AUDIT DEBUG: userAttestEvidenceFieldLink called with evidenceId={}, profileFieldId={}, attestedBy={}", 
@@ -320,8 +321,8 @@ public class EvidenceFieldLinkServiceImpl implements EvidenceFieldLinkService {
 
     @Override
     @Transactional
-    @Audited(action = "INDIVIDUAL_ATTEST_FIELD", subjectType = "profile_field", subject = "#request.profileFieldId",
-             context = {"appId=#appId", "evidenceId=#request.evidenceId", "attestationType=#request.attestationType", "attestedBy=#request.attestedBy"})
+    @Audited(action = "USER_ATTEST_EVIDENCE_FIELD", subjectType = "profile_field", subject = "#request.profileFieldId()",
+             context = {"appId=#appId", "attestedBy=#request.attestedBy()", "attestationType=#request.attestationType()"})
     public IndividualAttestationResponse processIndividualAttestation(String appId, IndividualAttestationRequest request) {
         log.debug("Processing individual attestation for app {} field {} by {} (type: {})", 
                  appId, request.profileFieldId(), request.attestedBy(), request.attestationType());
@@ -360,12 +361,12 @@ public class EvidenceFieldLinkServiceImpl implements EvidenceFieldLinkService {
                     "Evidence not found with ID: " + evidenceId);
             }
 
-            // 4. Process the attestation
+            // 4. Process the attestation using external auditable service
             String commentsToUse = request.attestationComments() != null ? 
                 request.attestationComments() : "Individual attestation - " + request.attestationType();
 
-            EvidenceFieldLinkResponse linkResponse = userAttestEvidenceFieldLink(
-                evidenceId, request.profileFieldId(), request.attestedBy(), commentsToUse
+            EvidenceFieldLinkResponse linkResponse = evidenceAttestationService.attestEvidenceFieldLink(
+                evidenceId, request.profileFieldId(), request.attestedBy(), commentsToUse, "individual"
             );
 
             // 5. Generate attestation ID

@@ -20,6 +20,7 @@ public record EnhancedEvidenceSummary(
         OffsetDateTime validUntil,
         String trackId,
         String documentId,
+        String docVersionId,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt,
         

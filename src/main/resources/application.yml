@@ -25,6 +25,7 @@ logging:
     root: INFO
     org.springframework.web: DEBUG
     com.example.onboarding: DEBUG
+    dev.controlplane.auditkit: DEBUG
     org.springframework.jdbc.core: WARN
     org.springframework.jdbc.datasource: WARN
 

@@ -14,6 +14,7 @@ import com.example.onboarding.dto.evidence.EvidenceUsageResponse;
 import com.example.onboarding.service.evidence.EvidenceService;
 import com.example.onboarding.service.document.DocumentService;
 import com.example.onboarding.service.evidence.EvidenceFieldLinkService;
+import com.example.onboarding.service.evidence.EvidenceAttestationService;
 import com.example.onboarding.dto.document.DocumentResponse;
 import dev.controlplane.auditkit.annotations.Audited;
 import java.util.List;
@@ -31,11 +32,14 @@ public class EvidenceController {
     private final EvidenceService evidenceService;
     private final DocumentService documentService;
     private final EvidenceFieldLinkService evidenceFieldLinkService;
+    private final EvidenceAttestationService evidenceAttestationService;
     
-    public EvidenceController(EvidenceService evidenceService, DocumentService documentService, EvidenceFieldLinkService evidenceFieldLinkService) {
+    public EvidenceController(EvidenceService evidenceService, DocumentService documentService, 
+                             EvidenceFieldLinkService evidenceFieldLinkService, EvidenceAttestationService evidenceAttestationService) {
         this.evidenceService = evidenceService;
         this.documentService = documentService;
         this.evidenceFieldLinkService = evidenceFieldLinkService;
+        this.evidenceAttestationService = evidenceAttestationService;
     }
     
     /**
@@ -443,9 +447,9 @@ public class EvidenceController {
             @RequestParam(required = false) String reviewComment) {
         log.debug("PO attesting evidence {} for field {} by {}", evidenceId, profileFieldId, reviewedBy);
         try {
-            EvidenceFieldLinkResponse response = evidenceFieldLinkService.userAttestEvidenceFieldLink(
+            EvidenceFieldLinkResponse response = evidenceAttestationService.attestEvidenceFieldLink(
                 evidenceId, profileFieldId, reviewedBy, 
-                reviewComment != null ? reviewComment : "Attested by Product Owner");
+                reviewComment != null ? reviewComment : "Attested by Product Owner", "po-approval");
             log.info("Evidence {} approved by PO {} for field {}", evidenceId, reviewedBy, profileFieldId);
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {

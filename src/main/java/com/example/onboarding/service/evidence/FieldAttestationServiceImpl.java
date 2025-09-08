@@ -28,10 +28,13 @@ public class FieldAttestationServiceImpl implements FieldAttestationService {
     
     @Autowired
     private ProfileFieldRegistryService profileFieldRegistryService;
+    
+    @Autowired
+    private EvidenceAttestationService evidenceAttestationService;
 
     @Override
-    @Audited(action = "PROCESS_FIELD_ATTESTATION", subjectType = "profile_field", subject = "#fieldRequest.profileFieldId",
-             context = {"appId=#appId", "fieldKey=#fieldRequest.fieldKey", "attestedBy=#attestedBy"})
+    @Audited(action = "USER_ATTEST_EVIDENCE_FIELD", subjectType = "profile_field", subject = "#fieldRequest.profileFieldId()",
+             context = {"appId=#appId", "fieldKey=#fieldRequest.fieldKey()", "attestedBy=#attestedBy"})
     public void processFieldAttestation(String appId,
                                       BulkAttestationRequest.FieldAttestationRequest fieldRequest,
                                       String attestedBy, 
@@ -70,8 +73,8 @@ public class FieldAttestationServiceImpl implements FieldAttestationService {
                 return;
             }
             
-            // 4. Process the attestation
-            String attestationId = attestProfileField(profileFieldId, attestedBy, comments);
+            // 4. Process the attestation using external auditable service
+            String attestationId = processAttestationForProfileField(profileFieldId, attestedBy, comments);
             
             successful.add(new BulkAttestationResponse.AttestationSuccess(
                 profileFieldId, fieldKey, attestationId
@@ -109,7 +112,7 @@ public class FieldAttestationServiceImpl implements FieldAttestationService {
     }
     
     @Transactional
-    private String attestProfileField(String profileFieldId, String attestedBy, String comments) {
+    private String processAttestationForProfileField(String profileFieldId, String attestedBy, String comments) {
         List<EvidenceFieldLink> links = evidenceFieldLinkRepository.findByProfileFieldId(profileFieldId);
         
         if (links.isEmpty()) {
@@ -119,13 +122,11 @@ public class FieldAttestationServiceImpl implements FieldAttestationService {
         // Generate attestation ID
         String attestationId = "att_" + UUID.randomUUID().toString().replace("-", "").substring(0, 16);
         
-        // Update all links for this profile field
+        // Process attestation for each evidence link using external auditable service
         for (EvidenceFieldLink link : links) {
-            link.setLinkStatus(EvidenceFieldLinkStatus.USER_ATTESTED);
-            link.setReviewedBy(attestedBy);
-            link.setReviewedAt(OffsetDateTime.now());
-            link.setReviewComment(comments);
-            evidenceFieldLinkRepository.save(link);
+            evidenceAttestationService.attestEvidenceFieldLink(
+                link.getEvidenceId(), profileFieldId, attestedBy, comments, "bulk"
+            );
         }
         
         return attestationId;

@@ -138,7 +138,7 @@ public class EvidenceRepository {
     public List<com.example.onboarding.dto.evidence.EnhancedEvidenceSummary> findEvidenceByApp(String appId, int limit, int offset) {
         String sql = """
             SELECT e.evidence_id, e.app_id, e.profile_field_id, e.claim_id, e.uri, e.type, e.status,
-                   e.submitted_by, e.valid_from, e.valid_until, e.track_id, e.document_id, 
+                   e.submitted_by, e.valid_from, e.valid_until, e.track_id, e.document_id, e.doc_version_id,
                    e.created_at, e.updated_at,
                    efl.link_status, efl.linked_by, efl.linked_at, 
                    efl.reviewed_by, efl.reviewed_at, efl.review_comment,
@@ -171,7 +171,7 @@ public class EvidenceRepository {
     public List<com.example.onboarding.dto.evidence.EnhancedEvidenceSummary> findEvidenceByProfileField(String profileFieldId, int limit, int offset) {
         String sql = """
             SELECT e.evidence_id, e.app_id, e.profile_field_id, e.claim_id, e.uri, e.type, e.status,
-                   e.submitted_by, e.valid_from, e.valid_until, e.track_id, e.document_id, 
+                   e.submitted_by, e.valid_from, e.valid_until, e.track_id, e.document_id, e.doc_version_id,
                    e.created_at, e.updated_at,
                    efl.link_status, efl.linked_by, efl.linked_at, 
                    efl.reviewed_by, efl.reviewed_at, efl.review_comment,
@@ -196,7 +196,7 @@ public class EvidenceRepository {
     public List<com.example.onboarding.dto.evidence.EnhancedEvidenceSummary> findEvidenceByClaim(String claimId, int limit, int offset) {
         String sql = """
             SELECT e.evidence_id, e.app_id, e.profile_field_id, e.claim_id, e.uri, e.type, e.status,
-                   e.submitted_by, e.valid_from, e.valid_until, e.track_id, e.document_id, 
+                   e.submitted_by, e.valid_from, e.valid_until, e.track_id, e.document_id, e.doc_version_id,
                    e.created_at, e.updated_at,
                    efl.link_status, efl.linked_by, efl.linked_at, 
                    efl.reviewed_by, efl.reviewed_at, efl.review_comment,
@@ -220,7 +220,7 @@ public class EvidenceRepository {
     public List<com.example.onboarding.dto.evidence.EnhancedEvidenceSummary> findEvidenceByTrack(String trackId, int limit, int offset) {
         String sql = """
             SELECT e.evidence_id, e.app_id, e.profile_field_id, e.claim_id, e.uri, e.type, e.status,
-                   e.submitted_by, e.valid_from, e.valid_until, e.track_id, e.document_id, 
+                   e.submitted_by, e.valid_from, e.valid_until, e.track_id, e.document_id, e.doc_version_id,
                    e.created_at, e.updated_at,
                    efl.link_status, efl.linked_by, efl.linked_at, 
                    efl.reviewed_by, efl.reviewed_at, efl.review_comment,
@@ -248,7 +248,7 @@ public class EvidenceRepository {
         
         StringBuilder sqlBuilder = new StringBuilder("""
             SELECT e.evidence_id, e.app_id, e.profile_field_id, e.claim_id, e.uri, e.type, e.status,
-                   e.submitted_by, e.valid_from, e.valid_until, e.track_id, e.document_id, 
+                   e.submitted_by, e.valid_from, e.valid_until, e.track_id, e.document_id, e.doc_version_id,
                    e.created_at, e.updated_at,
                    efl.link_status, efl.linked_by, efl.linked_at, 
                    efl.reviewed_by, efl.reviewed_at, efl.review_comment,
@@ -292,9 +292,9 @@ public class EvidenceRepository {
             params.put("assignedSme", assignedSme.trim());
         }
         
+        // Evidence status filter removed - field deprecated
         if (evidenceStatus != null && !evidenceStatus.trim().isEmpty()) {
-            sqlBuilder.append(" AND e.status = :evidenceStatus");
-            params.put("evidenceStatus", evidenceStatus.trim());
+            log.warn("Evidence status filter '{}' ignored - status field deprecated", evidenceStatus.trim());
         }
         
         if (documentSourceType != null && !documentSourceType.trim().isEmpty()) {
@@ -377,6 +377,7 @@ public class EvidenceRepository {
             rs.getObject("valid_until", OffsetDateTime.class),
             rs.getString("track_id"),
             rs.getString("document_id"),
+            rs.getString("doc_version_id"),
             rs.getObject("created_at", OffsetDateTime.class),
             rs.getObject("updated_at", OffsetDateTime.class),
             // EvidenceFieldLink metadata
