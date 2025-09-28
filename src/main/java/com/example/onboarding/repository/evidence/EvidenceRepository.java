@@ -1,6 +1,7 @@
 package com.example.onboarding.repository.evidence;
 
 import com.example.onboarding.dto.evidence.Evidence;
+import com.example.onboarding.dto.evidence.EvidenceSearchRequest;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -134,25 +135,29 @@ public class EvidenceRepository {
     
     /**
      * Find enhanced evidence by app with EvidenceFieldLink metadata and document source info
+     * Uses KPI-style profile version filtering
      */
     public List<com.example.onboarding.dto.evidence.EnhancedEvidenceSummary> findEvidenceByApp(String appId, int limit, int offset) {
         String sql = """
             SELECT e.evidence_id, e.app_id, e.profile_field_id, e.claim_id, e.uri, e.type, e.status,
                    e.submitted_by, e.valid_from, e.valid_until, e.track_id, e.document_id, e.doc_version_id,
                    e.created_at, e.updated_at,
-                   efl.link_status, efl.linked_by, efl.linked_at, 
+                   efl.link_status, efl.linked_by, efl.linked_at,
                    efl.reviewed_by, efl.reviewed_at, efl.review_comment,
-                   d.title as document_title, d.source_type as document_source_type, 
+                   d.title as document_title, d.source_type as document_source_type,
                    d.owners as document_owners, d.link_health as document_link_health
             FROM evidence e
             JOIN evidence_field_link efl ON e.evidence_id = efl.evidence_id
+            JOIN profile_field pf ON e.profile_field_id = pf.id
+            JOIN profile p ON pf.profile_id = p.profile_id
             LEFT JOIN document d ON e.document_id = d.document_id
-            WHERE e.app_id = :appId
+            WHERE p.app_id = :appId
+            AND p.version = (SELECT MAX(version) FROM profile WHERE app_id = :appId)
             ORDER BY e.created_at DESC
             LIMIT :limit OFFSET :offset
             """;
-        
-        return jdbc.query(sql, Map.of("appId", appId, "limit", limit, "offset", offset), 
+
+        return jdbc.query(sql, Map.of("appId", appId, "limit", limit, "offset", offset),
             this::mapEnhancedEvidenceSummary);
     }
     
@@ -167,24 +172,28 @@ public class EvidenceRepository {
     
     /**
      * Find enhanced evidence by profile field with EvidenceFieldLink metadata and document source info
+     * Uses KPI-style profile version filtering
      */
     public List<com.example.onboarding.dto.evidence.EnhancedEvidenceSummary> findEvidenceByProfileField(String profileFieldId, int limit, int offset) {
         String sql = """
             SELECT e.evidence_id, e.app_id, e.profile_field_id, e.claim_id, e.uri, e.type, e.status,
                    e.submitted_by, e.valid_from, e.valid_until, e.track_id, e.document_id, e.doc_version_id,
                    e.created_at, e.updated_at,
-                   efl.link_status, efl.linked_by, efl.linked_at, 
+                   efl.link_status, efl.linked_by, efl.linked_at,
                    efl.reviewed_by, efl.reviewed_at, efl.review_comment,
-                   d.title as document_title, d.source_type as document_source_type, 
+                   d.title as document_title, d.source_type as document_source_type,
                    d.owners as document_owners, d.link_health as document_link_health
             FROM evidence e
             JOIN evidence_field_link efl ON e.evidence_id = efl.evidence_id
+            JOIN profile_field pf ON e.profile_field_id = pf.id
+            JOIN profile p ON pf.profile_id = p.profile_id
             LEFT JOIN document d ON e.document_id = d.document_id
             WHERE e.profile_field_id = :profileFieldId
+            AND p.version = (SELECT MAX(version) FROM profile p2 WHERE p2.app_id = p.app_id)
             ORDER BY e.created_at DESC
             LIMIT :limit OFFSET :offset
             """;
-        
+
         return jdbc.query(sql, Map.of("profileFieldId", profileFieldId, "limit", limit, "offset", offset),
             this::mapEnhancedEvidenceSummary);
     }
@@ -192,88 +201,102 @@ public class EvidenceRepository {
     
     /**
      * Find enhanced evidence by claim with EvidenceFieldLink metadata and document source info
+     * Uses KPI-style profile version filtering
      */
     public List<com.example.onboarding.dto.evidence.EnhancedEvidenceSummary> findEvidenceByClaim(String claimId, int limit, int offset) {
         String sql = """
             SELECT e.evidence_id, e.app_id, e.profile_field_id, e.claim_id, e.uri, e.type, e.status,
                    e.submitted_by, e.valid_from, e.valid_until, e.track_id, e.document_id, e.doc_version_id,
                    e.created_at, e.updated_at,
-                   efl.link_status, efl.linked_by, efl.linked_at, 
+                   efl.link_status, efl.linked_by, efl.linked_at,
                    efl.reviewed_by, efl.reviewed_at, efl.review_comment,
-                   d.title as document_title, d.source_type as document_source_type, 
+                   d.title as document_title, d.source_type as document_source_type,
                    d.owners as document_owners, d.link_health as document_link_health
             FROM evidence e
             JOIN evidence_field_link efl ON e.evidence_id = efl.evidence_id
+            JOIN profile_field pf ON e.profile_field_id = pf.id
+            JOIN profile p ON pf.profile_id = p.profile_id
             LEFT JOIN document d ON e.document_id = d.document_id
             WHERE e.claim_id = :claimId
+            AND p.version = (SELECT MAX(version) FROM profile p2 WHERE p2.app_id = p.app_id)
             ORDER BY e.created_at DESC
             LIMIT :limit OFFSET :offset
             """;
-        
+
         return jdbc.query(sql, Map.of("claimId", claimId, "limit", limit, "offset", offset),
             this::mapEnhancedEvidenceSummary);
     }
     
     /**
      * Find enhanced evidence by track with EvidenceFieldLink metadata and document source info
+     * Uses KPI-style profile version filtering
      */
     public List<com.example.onboarding.dto.evidence.EnhancedEvidenceSummary> findEvidenceByTrack(String trackId, int limit, int offset) {
         String sql = """
             SELECT e.evidence_id, e.app_id, e.profile_field_id, e.claim_id, e.uri, e.type, e.status,
                    e.submitted_by, e.valid_from, e.valid_until, e.track_id, e.document_id, e.doc_version_id,
                    e.created_at, e.updated_at,
-                   efl.link_status, efl.linked_by, efl.linked_at, 
+                   efl.link_status, efl.linked_by, efl.linked_at,
                    efl.reviewed_by, efl.reviewed_at, efl.review_comment,
-                   d.title as document_title, d.source_type as document_source_type, 
+                   d.title as document_title, d.source_type as document_source_type,
                    d.owners as document_owners, d.link_health as document_link_health
             FROM evidence e
             JOIN evidence_field_link efl ON e.evidence_id = efl.evidence_id
+            JOIN profile_field pf ON e.profile_field_id = pf.id
+            JOIN profile p ON pf.profile_id = p.profile_id
             LEFT JOIN document d ON e.document_id = d.document_id
             WHERE e.track_id = :trackId
+            AND p.version = (SELECT MAX(version) FROM profile p2 WHERE p2.app_id = p.app_id)
             ORDER BY e.created_at DESC
             LIMIT :limit OFFSET :offset
             """;
-        
+
         return jdbc.query(sql, Map.of("trackId", trackId, "limit", limit, "offset", offset),
             this::mapEnhancedEvidenceSummary);
     }
     
     /**
-     * Search evidence with multiple filters
+     * Search evidence with multiple filters using KPI-style query logic with profile version filtering
      */
     public List<com.example.onboarding.dto.evidence.EnhancedEvidenceSummary> searchEvidence(
-            String linkStatus, String appId, String fieldKey, String assignedPo, 
-            String assignedSme, String evidenceStatus, String documentSourceType, 
+            String linkStatus, String appId, String fieldKey, String assignedPo,
+            String assignedSme, String evidenceStatus, String documentSourceType,
             int limit, int offset) {
-        
+
         StringBuilder sqlBuilder = new StringBuilder("""
             SELECT e.evidence_id, e.app_id, e.profile_field_id, e.claim_id, e.uri, e.type, e.status,
                    e.submitted_by, e.valid_from, e.valid_until, e.track_id, e.document_id, e.doc_version_id,
                    e.created_at, e.updated_at,
-                   efl.link_status, efl.linked_by, efl.linked_at, 
+                   efl.link_status, efl.linked_by, efl.linked_at,
                    efl.reviewed_by, efl.reviewed_at, efl.review_comment,
-                   d.title as document_title, d.source_type as document_source_type, 
+                   d.title as document_title, d.source_type as document_source_type,
                    d.owners as document_owners, d.link_health as document_link_health,
                    pf.field_key, app.product_owner
             FROM evidence e
             JOIN evidence_field_link efl ON e.evidence_id = efl.evidence_id
+            JOIN profile_field pf ON e.profile_field_id = pf.id
+            JOIN profile p ON pf.profile_id = p.profile_id
             LEFT JOIN document d ON e.document_id = d.document_id
-            LEFT JOIN profile_field pf ON e.profile_field_id = pf.id
             LEFT JOIN application app ON e.app_id = app.app_id
             WHERE 1=1
             """);
-        
+
         java.util.Map<String, Object> params = new java.util.HashMap<>();
-        
+
+        // Add profile version filtering (KPI-style logic)
+        if (appId != null && !appId.trim().isEmpty()) {
+            sqlBuilder.append(" AND p.app_id = :appId");
+            sqlBuilder.append(" AND p.version = (SELECT MAX(version) FROM profile WHERE app_id = :appId)");
+            params.put("appId", appId.trim());
+        } else {
+            // For portfolio-wide searches, ensure we only get latest versions for each app
+            sqlBuilder.append(" AND p.version = (SELECT MAX(version) FROM profile p2 WHERE p2.app_id = p.app_id)");
+        }
+
         // Add dynamic filters
         if (linkStatus != null && !linkStatus.trim().isEmpty()) {
             sqlBuilder.append(" AND efl.link_status = :linkStatus");
             params.put("linkStatus", linkStatus.trim());
-        }
-        
-        if (appId != null && !appId.trim().isEmpty()) {
-            sqlBuilder.append(" AND e.app_id = :appId");
-            params.put("appId", appId.trim());
         }
         
         if (fieldKey != null && !fieldKey.trim().isEmpty()) {
@@ -287,8 +310,8 @@ public class EvidenceRepository {
         }
         
         if (assignedSme != null && !assignedSme.trim().isEmpty()) {
-            // For SME assignment, we'd need to join with risk_story table
-            sqlBuilder.append(" AND EXISTS (SELECT 1 FROM risk_story rs WHERE rs.field_key = pf.field_key AND rs.app_id = e.app_id AND rs.assigned_sme = :assignedSme)");
+            // For SME assignment, join with risk_story table using proper profile version filtering
+            sqlBuilder.append(" AND EXISTS (SELECT 1 FROM risk_story rs WHERE rs.field_key = pf.field_key AND rs.app_id = p.app_id AND rs.assigned_sme = :assignedSme)");
             params.put("assignedSme", assignedSme.trim());
         }
         
@@ -308,7 +331,275 @@ public class EvidenceRepository {
         
         return jdbc.query(sqlBuilder.toString(), params, this::mapEnhancedEvidenceSummary);
     }
-    
+
+    public List<Map<String, Object>> searchWorkbenchEvidence(EvidenceSearchRequest request) {
+        StringBuilder sqlBuilder = new StringBuilder("""
+            SELECT
+                e.evidence_id,
+                e.doc_version_id,
+                e.valid_from,
+                e.created_at,
+                app.app_id,
+                app.name AS app_name,
+                app.app_criticality_assessment AS app_criticality,
+                app.application_type,
+                app.architecture_type,
+                app.install_type,
+                app.application_tier,
+                pf.id as profile_field_id,
+                pf.field_key,
+                pf.field_key AS field_label, -- Corrected column
+                pf.value, -- Assuming TTL info is in the 'value' jsonb for a field
+                efl.link_status AS approval_status,
+                efl.reviewed_by AS assigned_reviewer,
+                e.created_at AS submitted_date,
+                e.submitted_by,
+                e.valid_until,
+                e.uri,
+                (SELECT COUNT(*) FROM risk_story rs WHERE rs.triggering_evidence_id = e.evidence_id) AS risk_count
+            FROM
+                evidence e
+                JOIN evidence_field_link efl ON e.evidence_id = efl.evidence_id
+                JOIN profile_field pf ON efl.profile_field_id = pf.id
+                JOIN profile p ON pf.profile_id = p.profile_id
+                LEFT JOIN application app ON e.app_id = app.app_id
+                LEFT JOIN document d ON e.document_id = d.document_id
+            WHERE 1=1
+            """);
+
+        MapSqlParameterSource params = new MapSqlParameterSource();
+
+        // Add profile version filtering (KPI-style logic)
+        if (request.getAppId() != null) {
+            sqlBuilder.append(" AND p.app_id = :appId");
+            sqlBuilder.append(" AND p.version = (SELECT MAX(version) FROM profile WHERE app_id = :appId)");
+            params.addValue("appId", request.getAppId());
+        } else {
+            // For portfolio-wide searches, ensure we only get latest versions for each app
+            sqlBuilder.append(" AND p.version = (SELECT MAX(version) FROM profile p2 WHERE p2.app_id = p.app_id)");
+        }
+
+        // Add dynamic filters
+        if (request.getStatus() != null) {
+            sqlBuilder.append(" AND e.status = :status");
+            params.addValue("status", request.getStatus());
+        }
+        if (request.getApprovalStatus() != null) {
+            sqlBuilder.append(" AND efl.link_status = :approvalStatus");
+            params.addValue("approvalStatus", request.getApprovalStatus());
+        }
+        if (request.getCriticality() != null) {
+            sqlBuilder.append(" AND app.app_criticality_assessment = :criticality");
+            params.addValue("criticality", request.getCriticality());
+        }
+        if (request.getApplicationType() != null) {
+            sqlBuilder.append(" AND app.application_type = :applicationType");
+            params.addValue("applicationType", request.getApplicationType());
+        }
+        if (request.getArchitectureType() != null) {
+            sqlBuilder.append(" AND app.architecture_type = :architectureType");
+            params.addValue("architectureType", request.getArchitectureType());
+        }
+        if (request.getInstallType() != null) {
+            sqlBuilder.append(" AND app.install_type = :installType");
+            params.addValue("installType", request.getInstallType());
+        }
+        if (request.getFieldKey() != null) {
+            sqlBuilder.append(" AND pf.field_key = :fieldKey");
+            params.addValue("fieldKey", request.getFieldKey());
+        }
+        if (request.getAssignedReviewer() != null) {
+            sqlBuilder.append(" AND efl.reviewed_by = :assignedReviewer");
+            params.addValue("assignedReviewer", request.getAssignedReviewer());
+        }
+        if (request.getSubmittedBy() != null) {
+            sqlBuilder.append(" AND e.submitted_by = :submittedBy");
+            params.addValue("submittedBy", request.getSubmittedBy());
+        }
+        if (request.getDomain() != null) {
+            sqlBuilder.append(" AND pf.derived_from LIKE :domain || '_rating'");
+            params.addValue("domain", request.getDomain());
+        }
+        if (request.getSearch() != null && !request.getSearch().isBlank()) {
+            sqlBuilder.append("""
+                 AND (
+                    app.name ILIKE '%' || :search || '%'
+                    OR pf.field_key ILIKE '%' || :search || '%'
+                    OR app.app_id ILIKE '%' || :search || '%'
+                )
+                """);
+            params.addValue("search", request.getSearch());
+        }
+
+        sqlBuilder.append(" ORDER BY e.created_at DESC");
+        sqlBuilder.append(" LIMIT :limit OFFSET :offset");
+        params.addValue("limit", request.getLimit());
+        params.addValue("offset", request.getOffset());
+
+        return jdbc.queryForList(sqlBuilder.toString(), params);
+    }
+
+    /**
+     * Find evidence by KPI state: COMPLIANT
+     * Returns evidence that has approved or user attested link status
+     */
+    public List<com.example.onboarding.dto.evidence.KpiEvidenceSummary> findCompliantEvidence(String appId, int limit, int offset) {
+        StringBuilder sqlBuilder = new StringBuilder("""
+            SELECT DISTINCT e.evidence_id, e.app_id, e.profile_field_id, e.claim_id, e.uri, e.type, e.status,
+                   e.submitted_by, e.valid_from, e.valid_until, e.track_id, e.document_id, e.doc_version_id,
+                   e.created_at, e.updated_at,
+                   efl.link_status, efl.linked_by, efl.linked_at,
+                   efl.reviewed_by, efl.reviewed_at, efl.review_comment,
+                   d.title as document_title, d.source_type as document_source_type,
+                   d.owners as document_owners, d.link_health as document_link_health,
+                   pf.field_key, pf.derived_from,
+                   app.name as app_name, app.product_owner, app.application_tier,
+                   app.architecture_type, app.install_type, app.app_criticality_assessment
+            FROM evidence e
+            JOIN evidence_field_link efl ON e.evidence_id = efl.evidence_id
+            JOIN profile_field pf ON e.profile_field_id = pf.id
+            JOIN profile p ON pf.profile_id = p.profile_id
+            LEFT JOIN document d ON e.document_id = d.document_id
+            LEFT JOIN application app ON e.app_id = app.app_id
+            WHERE efl.link_status IN ('APPROVED', 'USER_ATTESTED')
+            """);
+
+        java.util.Map<String, Object> params = new java.util.HashMap<>();
+
+        // Add profile version filtering (KPI-style logic)
+        if (appId != null && !appId.trim().isEmpty()) {
+            sqlBuilder.append(" AND p.app_id = :appId");
+            sqlBuilder.append(" AND p.version = (SELECT MAX(version) FROM profile WHERE app_id = :appId)");
+            params.put("appId", appId.trim());
+        } else {
+            // For portfolio-wide searches, ensure we only get latest versions for each app
+            sqlBuilder.append(" AND p.version = (SELECT MAX(version) FROM profile p2 WHERE p2.app_id = p.app_id)");
+        }
+
+        sqlBuilder.append(" ORDER BY e.created_at DESC LIMIT :limit OFFSET :offset");
+        params.put("limit", limit);
+        params.put("offset", offset);
+
+        return jdbc.query(sqlBuilder.toString(), params, this::mapKpiEvidenceSummary);
+    }
+
+    /**
+     * Find evidence by KPI state: PENDING REVIEW
+     * Returns evidence that has pending review status but no approved/attested evidence for the same field
+     */
+    public List<com.example.onboarding.dto.evidence.KpiEvidenceSummary> findPendingReviewEvidence(String appId, int limit, int offset) {
+        StringBuilder sqlBuilder = new StringBuilder("""
+            SELECT DISTINCT e.evidence_id, e.app_id, e.profile_field_id, e.claim_id, e.uri, e.type, e.status,
+                   e.submitted_by, e.valid_from, e.valid_until, e.track_id, e.document_id, e.doc_version_id,
+                   e.created_at, e.updated_at,
+                   efl.link_status, efl.linked_by, efl.linked_at,
+                   efl.reviewed_by, efl.reviewed_at, efl.review_comment,
+                   d.title as document_title, d.source_type as document_source_type,
+                   d.owners as document_owners, d.link_health as document_link_health,
+                   pf.field_key, pf.derived_from,
+                   app.name as app_name, app.product_owner, app.application_tier,
+                   app.architecture_type, app.install_type, app.app_criticality_assessment
+            FROM evidence e
+            JOIN evidence_field_link efl ON e.evidence_id = efl.evidence_id
+            JOIN profile_field pf ON e.profile_field_id = pf.id
+            JOIN profile p ON pf.profile_id = p.profile_id
+            LEFT JOIN document d ON e.document_id = d.document_id
+            LEFT JOIN application app ON e.app_id = app.app_id
+            WHERE efl.link_status IN ('PENDING_PO_REVIEW', 'PENDING_SME_REVIEW')
+            AND NOT EXISTS (
+                SELECT 1 FROM evidence e2
+                JOIN evidence_field_link efl2 ON efl2.evidence_id = e2.evidence_id
+                WHERE e2.profile_field_id = pf.id
+                AND efl2.link_status IN ('APPROVED', 'USER_ATTESTED')
+            )
+            """);
+
+        java.util.Map<String, Object> params = new java.util.HashMap<>();
+
+        // Add profile version filtering (KPI-style logic)
+        if (appId != null && !appId.trim().isEmpty()) {
+            sqlBuilder.append(" AND p.app_id = :appId");
+            sqlBuilder.append(" AND p.version = (SELECT MAX(version) FROM profile WHERE app_id = :appId)");
+            params.put("appId", appId.trim());
+        } else {
+            // For portfolio-wide searches, ensure we only get latest versions for each app
+            sqlBuilder.append(" AND p.version = (SELECT MAX(version) FROM profile p2 WHERE p2.app_id = p.app_id)");
+        }
+
+        sqlBuilder.append(" ORDER BY e.created_at DESC LIMIT :limit OFFSET :offset");
+        params.put("limit", limit);
+        params.put("offset", offset);
+
+        return jdbc.query(sqlBuilder.toString(), params, this::mapKpiEvidenceSummary);
+    }
+
+    /**
+     * Find profile fields by KPI state: MISSING EVIDENCE
+     * Returns profile fields that have no evidence at all
+     * Note: This returns profile field info since there's no evidence to return
+     */
+    public List<Map<String, Object>> findMissingEvidenceFields(String appId, int limit, int offset) {
+        StringBuilder sqlBuilder = new StringBuilder("""
+            SELECT pf.id as profile_field_id, pf.field_key, p.app_id,
+                   app.name as app_name, app.product_owner,
+                   p.profile_id, p.version
+            FROM profile p
+            JOIN profile_field pf ON p.profile_id = pf.profile_id
+            LEFT JOIN application app ON p.app_id = app.app_id
+            WHERE NOT EXISTS (
+                SELECT 1 FROM evidence e
+                WHERE e.profile_field_id = pf.id
+            )
+            """);
+
+        java.util.Map<String, Object> params = new java.util.HashMap<>();
+
+        // Add profile version filtering (KPI-style logic)
+        if (appId != null && !appId.trim().isEmpty()) {
+            sqlBuilder.append(" AND p.app_id = :appId");
+            sqlBuilder.append(" AND p.version = (SELECT MAX(version) FROM profile WHERE app_id = :appId)");
+            params.put("appId", appId.trim());
+        } else {
+            // For portfolio-wide searches, ensure we only get latest versions for each app
+            sqlBuilder.append(" AND p.version = (SELECT MAX(version) FROM profile p2 WHERE p2.app_id = p.app_id)");
+        }
+
+        sqlBuilder.append(" ORDER BY pf.field_key LIMIT :limit OFFSET :offset");
+        params.put("limit", limit);
+        params.put("offset", offset);
+
+        return jdbc.queryForList(sqlBuilder.toString(), params);
+    }
+
+    /**
+     * Find risks by KPI state: RISK BLOCKED
+     * Returns risks that are in open states (PENDING_SME_REVIEW, UNDER_REVIEW, OPEN)
+     */
+    public List<Map<String, Object>> findRiskBlockedItems(String appId, int limit, int offset) {
+        StringBuilder sqlBuilder = new StringBuilder("""
+            SELECT rs.risk_id, rs.app_id, rs.field_key, rs.status as risk_status,
+                   rs.assigned_sme, rs.created_at, rs.updated_at,
+                   rs.triggering_evidence_id, rs.title, rs.hypothesis,
+                   app.name as app_name, app.product_owner
+            FROM risk_story rs
+            LEFT JOIN application app ON rs.app_id = app.app_id
+            WHERE rs.status IN ('PENDING_SME_REVIEW', 'UNDER_REVIEW', 'OPEN')
+            """);
+
+        java.util.Map<String, Object> params = new java.util.HashMap<>();
+
+        if (appId != null && !appId.trim().isEmpty()) {
+            sqlBuilder.append(" AND rs.app_id = :appId");
+            params.put("appId", appId.trim());
+        }
+
+        sqlBuilder.append(" ORDER BY rs.created_at DESC LIMIT :limit OFFSET :offset");
+        params.put("limit", limit);
+        params.put("offset", offset);
+
+        return jdbc.queryForList(sqlBuilder.toString(), params);
+    }
+
     /**
      * Revoke evidence
      */
@@ -392,6 +683,51 @@ public class EvidenceRepository {
             rs.getString("document_source_type"),
             rs.getString("document_owners"),
             (Integer) rs.getObject("document_link_health")
+        );
+    }
+
+    /**
+     * Map result set to KpiEvidenceSummary with full application context
+     */
+    private com.example.onboarding.dto.evidence.KpiEvidenceSummary mapKpiEvidenceSummary(ResultSet rs, int rowNum) throws SQLException {
+        return new com.example.onboarding.dto.evidence.KpiEvidenceSummary(
+            rs.getString("evidence_id"),
+            rs.getString("app_id"),
+            rs.getString("profile_field_id"),
+            rs.getString("claim_id"),
+            rs.getString("uri"),
+            rs.getString("type"),
+            rs.getString("status"),
+            rs.getString("submitted_by"),
+            rs.getObject("valid_from", OffsetDateTime.class),
+            rs.getObject("valid_until", OffsetDateTime.class),
+            rs.getString("track_id"),
+            rs.getString("document_id"),
+            rs.getString("doc_version_id"),
+            rs.getObject("created_at", OffsetDateTime.class),
+            rs.getObject("updated_at", OffsetDateTime.class),
+            // EvidenceFieldLink metadata
+            com.example.onboarding.model.EvidenceFieldLinkStatus.valueOf(rs.getString("link_status")),
+            rs.getString("linked_by"),
+            rs.getObject("linked_at", OffsetDateTime.class),
+            rs.getString("reviewed_by"),
+            rs.getObject("reviewed_at", OffsetDateTime.class),
+            rs.getString("review_comment"),
+            // Document source information
+            rs.getString("document_title"),
+            rs.getString("document_source_type"),
+            rs.getString("document_owners"),
+            (Integer) rs.getObject("document_link_health"),
+            // Profile field context
+            rs.getString("field_key"),
+            rs.getString("derived_from"),
+            // Application context
+            rs.getString("app_name"),
+            rs.getString("product_owner"),
+            rs.getString("application_tier"),
+            rs.getString("architecture_type"),
+            rs.getString("install_type"),
+            rs.getString("app_criticality_assessment")
         );
     }
 

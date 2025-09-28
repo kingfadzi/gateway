@@ -1,21 +1,12 @@
 package com.example.onboarding.service.evidence;
 
+import com.example.onboarding.config.FieldRegistryConfig;
 import com.example.onboarding.dto.PageResponse;
 import com.example.onboarding.dto.document.CreateDocumentRequest;
 import com.example.onboarding.dto.document.DocumentResponse;
 import com.example.onboarding.dto.document.DocumentVersionInfo;
 import com.example.onboarding.dto.document.EnhancedDocumentResponse;
-import com.example.onboarding.dto.evidence.AttachedDocumentInfo;
-import com.example.onboarding.dto.evidence.AttachedDocumentsResponse;
-import com.example.onboarding.dto.evidence.CreateEvidenceRequest;
-import com.example.onboarding.dto.evidence.EnhancedAttachedDocumentsResponse;
-import com.example.onboarding.dto.evidence.CreateEvidenceWithDocumentRequest;
-import com.example.onboarding.dto.evidence.Evidence;
-import com.example.onboarding.dto.evidence.EvidenceWithDocumentResponse;
-import com.example.onboarding.dto.evidence.UpdateEvidenceRequest;
-import com.example.onboarding.dto.evidence.AttachEvidenceToFieldRequest;
-import com.example.onboarding.dto.evidence.EvidenceFieldLinkResponse;
-import com.example.onboarding.dto.evidence.EvidenceUsageResponse;
+import com.example.onboarding.dto.evidence.*;
 import com.example.onboarding.repository.evidence.EvidenceRepository;
 import com.example.onboarding.repository.profile.ProfileRepository;
 import com.example.onboarding.dto.profile.ProfileField;
@@ -27,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -40,16 +32,18 @@ public class EvidenceServiceImpl implements EvidenceService {
     private final EvidenceFieldLinkService evidenceFieldLinkService;
     private final ProfileRepository profileRepository;
     private final UnifiedFreshnessCalculator unifiedFreshnessCalculator;
+    private final FieldRegistryConfig fieldRegistryConfig;
     
     
     public EvidenceServiceImpl(EvidenceRepository evidenceRepository, DocumentService documentService,
                                EvidenceFieldLinkService evidenceFieldLinkService, ProfileRepository profileRepository,
-                               UnifiedFreshnessCalculator unifiedFreshnessCalculator) {
+                               UnifiedFreshnessCalculator unifiedFreshnessCalculator, FieldRegistryConfig fieldRegistryConfig) {
         this.evidenceRepository = evidenceRepository;
         this.documentService = documentService;
         this.evidenceFieldLinkService = evidenceFieldLinkService;
         this.profileRepository = profileRepository;
         this.unifiedFreshnessCalculator = unifiedFreshnessCalculator;
+        this.fieldRegistryConfig = fieldRegistryConfig;
     }
     
     @Override
@@ -759,5 +753,120 @@ public class EvidenceServiceImpl implements EvidenceService {
         return evidenceRepository.searchEvidence(linkStatus, appId, fieldKey, assignedPo, 
                                                 assignedSme, evidenceStatus, documentSourceType, 
                                                 safeSize, offset);
+    }
+
+    @Override
+    public List<WorkbenchEvidenceItem> searchWorkbenchEvidence(EvidenceSearchRequest request) {
+        List<Map<String, Object>> results = evidenceRepository.searchWorkbenchEvidence(request);
+        List<WorkbenchEvidenceItem> items = new ArrayList<>();
+
+        for (Map<String, Object> row : results) {
+            WorkbenchEvidenceItem item = new WorkbenchEvidenceItem();
+            item.setEvidenceId((String) row.get("evidence_id"));
+            item.setAppId((String) row.get("app_id"));
+            item.setAppName((String) row.get("app_name"));
+            item.setAppCriticality((String) row.get("app_criticality"));
+            item.setApplicationType((String) row.get("application_type"));
+            item.setArchitectureType((String) row.get("architecture_type"));
+            item.setInstallType((String) row.get("install_type"));
+            item.setApplicationTier((String) row.get("application_tier"));
+            item.setFieldKey((String) row.get("field_key"));
+            item.setFieldLabel((String) row.get("field_label"));
+            item.setApprovalStatus((String) row.get("approval_status"));
+            item.setAssignedReviewer((String) row.get("assigned_reviewer"));
+            item.setSubmittedDate(convertToOffsetDateTime(row.get("submitted_date")));
+            item.setSubmittedBy((String) row.get("submitted_by"));
+            item.setUri((String) row.get("uri"));
+            item.setRiskCount(((Number) row.get("risk_count")).intValue());
+
+            // Domain Title Enrichment
+            String derivedFrom = fieldRegistryConfig.getDerivedFromByFieldKey(item.getFieldKey());
+            if (derivedFrom != null && !derivedFrom.equals("unknown")) {
+                String domainTitle = derivedFrom.replace("_rating", "");
+                item.setDomainTitle(domainTitle.substring(0, 1).toUpperCase() + domainTitle.substring(1));
+            } else {
+                item.setDomainTitle("Unknown");
+            }
+
+            // Freshness Calculation (Optimized)
+            try {
+                // Reconstruct lightweight objects for the calculator from the query results
+                Evidence evidenceForFreshness = new Evidence(
+                        item.getEvidenceId(), null, (String) row.get("profile_field_id"), null, null, null, null, null, null,
+                        convertToOffsetDateTime(row.get("valid_from")),
+                        convertToOffsetDateTime(row.get("valid_until")),
+                        null, null, null, null, null, null, null,
+                        (String) row.get("doc_version_id"),
+                        null,
+                        convertToOffsetDateTime(row.get("created_at")),
+                        null
+                );
+
+                ProfileField profileFieldForFreshness = new ProfileField(
+                        (String) row.get("profile_field_id"),
+                        item.getFieldKey(),
+                        null, // value
+                        null, // sourceSystem
+                        null, // sourceRef
+                        0,    // evidenceCount
+                        null  // updatedAt
+                );
+
+                // The 'rule' is not part of the ProfileField record, so we pass the reconstructed object
+                item.setFreshnessStatus(unifiedFreshnessCalculator.calculateFreshness(evidenceForFreshness, profileFieldForFreshness));
+
+            } catch (Exception e) {
+                log.warn("Error calculating freshness for evidence {}: {}", item.getEvidenceId(), e.getMessage());
+                item.setFreshnessStatus("broken");
+            }
+
+
+            // Days Overdue Calculation
+            OffsetDateTime dueDate = item.getDueDate(); // Assuming dueDate is set from the query
+            if (dueDate != null && dueDate.isBefore(OffsetDateTime.now())) {
+                item.setDaysOverdue(ChronoUnit.DAYS.between(dueDate, OffsetDateTime.now()));
+            } else {
+                item.setDaysOverdue(0);
+            }
+
+            items.add(item);
+        }
+        return items;
+    }
+
+    @Override
+    public List<com.example.onboarding.dto.evidence.KpiEvidenceSummary> getCompliantEvidence(String appId, int page, int size) {
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.max(size, 1);
+        int offset = safePage * safeSize;
+
+        return evidenceRepository.findCompliantEvidence(appId, safeSize, offset);
+    }
+
+    @Override
+    public List<com.example.onboarding.dto.evidence.KpiEvidenceSummary> getPendingReviewEvidence(String appId, int page, int size) {
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.max(size, 1);
+        int offset = safePage * safeSize;
+
+        return evidenceRepository.findPendingReviewEvidence(appId, safeSize, offset);
+    }
+
+    @Override
+    public List<Map<String, Object>> getMissingEvidenceFields(String appId, int page, int size) {
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.max(size, 1);
+        int offset = safePage * safeSize;
+
+        return evidenceRepository.findMissingEvidenceFields(appId, safeSize, offset);
+    }
+
+    @Override
+    public List<Map<String, Object>> getRiskBlockedItems(String appId, int page, int size) {
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.max(size, 1);
+        int offset = safePage * safeSize;
+
+        return evidenceRepository.findRiskBlockedItems(appId, safeSize, offset);
     }
 }

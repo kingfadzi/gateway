@@ -16,8 +16,12 @@ import com.example.onboarding.service.document.DocumentService;
 import com.example.onboarding.service.evidence.EvidenceFieldLinkService;
 import com.example.onboarding.service.evidence.EvidenceAttestationService;
 import com.example.onboarding.dto.document.DocumentResponse;
+import com.example.onboarding.dto.evidence.EvidenceSearchRequest;
+import com.example.onboarding.dto.evidence.WorkbenchEvidenceItem;
 import dev.controlplane.auditkit.annotations.Audited;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -367,11 +371,11 @@ public class EvidenceController {
     }
 
     /**
-     * Search evidence by review status and filters
-     * GET /api/evidence/search?linkStatus=PENDING_PO_REVIEW&appId=APM100001&fieldKey=backup_policy
+     * Search evidence with enhanced filtering and optional workbench enrichment
+     * GET /api/evidence/search?linkStatus=PENDING_PO_REVIEW&appId=APM100001&fieldKey=backup_policy&enhanced=true
      */
     @GetMapping("/evidence/search")
-    public ResponseEntity<List<com.example.onboarding.dto.evidence.EnhancedEvidenceSummary>> searchEvidence(
+    public ResponseEntity<?> searchEvidence(
             @RequestParam(required = false) String linkStatus,
             @RequestParam(required = false) String appId,
             @RequestParam(required = false) String fieldKey,
@@ -379,16 +383,47 @@ public class EvidenceController {
             @RequestParam(required = false) String assignedSme,
             @RequestParam(required = false) String evidenceStatus,
             @RequestParam(required = false) String documentSourceType,
+            @RequestParam(required = false) String criticality,
+            @RequestParam(required = false) String applicationType,
+            @RequestParam(required = false) String architectureType,
+            @RequestParam(required = false) String installType,
+            @RequestParam(required = false) String assignedReviewer,
+            @RequestParam(required = false) String submittedBy,
+            @RequestParam(required = false) String domain,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "false") boolean enhanced,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
-        
-        log.debug("Searching evidence with filters: linkStatus={}, appId={}, fieldKey={}, assignedPo={}", 
-                 linkStatus, appId, fieldKey, assignedPo);
+
+        log.debug("Searching evidence with filters: linkStatus={}, appId={}, fieldKey={}, enhanced={}",
+                 linkStatus, appId, fieldKey, enhanced);
         try {
-            List<com.example.onboarding.dto.evidence.EnhancedEvidenceSummary> evidence = evidenceService.searchEvidence(
-                linkStatus, appId, fieldKey, assignedPo, assignedSme, evidenceStatus, documentSourceType, page, size);
-            log.debug("Found {} evidence items matching search criteria", evidence.size());
-            return ResponseEntity.ok(evidence);
+            if (enhanced) {
+                // Create request object for workbench-style search
+                EvidenceSearchRequest request = new EvidenceSearchRequest();
+                request.setApprovalStatus(linkStatus);
+                request.setAppId(appId);
+                request.setFieldKey(fieldKey);
+                request.setAssignedReviewer(assignedReviewer != null ? assignedReviewer : assignedPo);
+                request.setSubmittedBy(submittedBy);
+                request.setCriticality(criticality);
+                request.setApplicationType(applicationType);
+                request.setArchitectureType(architectureType);
+                request.setInstallType(installType);
+                request.setDomain(domain);
+                request.setSearch(search);
+                request.setLimit(size);
+                request.setOffset(page * size);
+
+                List<WorkbenchEvidenceItem> evidence = evidenceService.searchWorkbenchEvidence(request);
+                log.debug("Found {} enhanced evidence items matching search criteria", evidence.size());
+                return ResponseEntity.ok(evidence);
+            } else {
+                List<com.example.onboarding.dto.evidence.EnhancedEvidenceSummary> evidence = evidenceService.searchEvidence(
+                    linkStatus, appId, fieldKey, assignedPo, assignedSme, evidenceStatus, documentSourceType, page, size);
+                log.debug("Found {} evidence items matching search criteria", evidence.size());
+                return ResponseEntity.ok(evidence);
+            }
         } catch (Exception e) {
             log.error("Error searching evidence: {}", e.getMessage(), e);
             return ResponseEntity.internalServerError().build();
@@ -512,6 +547,134 @@ public class EvidenceController {
             return ResponseEntity.badRequest().build();
         } catch (Exception e) {
             log.error("Unexpected error reviewing evidence field link {} -> {}: {}", evidenceId, profileFieldId, e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    /**
+     * Get evidence by KPI state: COMPLIANT
+     * GET /api/evidence/by-state/compliant?appId=APM100001&page=0&size=10
+     */
+    @GetMapping("/evidence/by-state/compliant")
+    public ResponseEntity<List<com.example.onboarding.dto.evidence.KpiEvidenceSummary>> getCompliantEvidence(
+            @RequestParam(required = false) String appId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        log.debug("Getting compliant evidence for appId: {}, page: {}, size: {}", appId, page, size);
+        try {
+            List<com.example.onboarding.dto.evidence.KpiEvidenceSummary> evidence = evidenceService.getCompliantEvidence(appId, page, size);
+            log.debug("Found {} compliant evidence items", evidence.size());
+            return ResponseEntity.ok(evidence);
+        } catch (Exception e) {
+            log.error("Error getting compliant evidence: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    /**
+     * Get evidence by KPI state: PENDING REVIEW
+     * GET /api/evidence/by-state/pending-review?appId=APM100001&page=0&size=10
+     */
+    @GetMapping("/evidence/by-state/pending-review")
+    public ResponseEntity<List<com.example.onboarding.dto.evidence.KpiEvidenceSummary>> getPendingReviewEvidence(
+            @RequestParam(required = false) String appId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        log.debug("Getting pending review evidence for appId: {}, page: {}, size: {}", appId, page, size);
+        try {
+            List<com.example.onboarding.dto.evidence.KpiEvidenceSummary> evidence = evidenceService.getPendingReviewEvidence(appId, page, size);
+            log.debug("Found {} pending review evidence items", evidence.size());
+            return ResponseEntity.ok(evidence);
+        } catch (Exception e) {
+            log.error("Error getting pending review evidence: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    /**
+     * Get profile fields by KPI state: MISSING EVIDENCE
+     * GET /api/evidence/by-state/missing-evidence?appId=APM100001&page=0&size=10
+     */
+    @GetMapping("/evidence/by-state/missing-evidence")
+    public ResponseEntity<List<Map<String, Object>>> getMissingEvidenceFields(
+            @RequestParam(required = false) String appId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        log.debug("Getting missing evidence fields for appId: {}, page: {}, size: {}", appId, page, size);
+        try {
+            List<Map<String, Object>> fields = evidenceService.getMissingEvidenceFields(appId, page, size);
+            log.debug("Found {} profile fields missing evidence", fields.size());
+            return ResponseEntity.ok(fields);
+        } catch (Exception e) {
+            log.error("Error getting missing evidence fields: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    /**
+     * Get risks by KPI state: RISK BLOCKED
+     * GET /api/evidence/by-state/risk-blocked?appId=APM100001&page=0&size=10
+     */
+    @GetMapping("/evidence/by-state/risk-blocked")
+    public ResponseEntity<List<Map<String, Object>>> getRiskBlockedItems(
+            @RequestParam(required = false) String appId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        log.debug("Getting risk blocked items for appId: {}, page: {}, size: {}", appId, page, size);
+        try {
+            List<Map<String, Object>> risks = evidenceService.getRiskBlockedItems(appId, page, size);
+            log.debug("Found {} risk blocked items", risks.size());
+            return ResponseEntity.ok(risks);
+        } catch (Exception e) {
+            log.error("Error getting risk blocked items: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    /**
+     * Get evidence by multiple KPI states in a single call
+     * GET /api/evidence/by-state?states=compliant,pending-review&appId=APM100001&page=0&size=10
+     */
+    @GetMapping("/evidence/by-state")
+    public ResponseEntity<Map<String, Object>> getEvidenceByStates(
+            @RequestParam(required = false) String appId,
+            @RequestParam(defaultValue = "compliant,pending-review,missing-evidence,risk-blocked") String states,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        log.debug("Getting evidence by states: {} for appId: {}, page: {}, size: {}", states, appId, page, size);
+        try {
+            Map<String, Object> result = new HashMap<>();
+            String[] stateArray = states.split(",");
+
+            for (String state : stateArray) {
+                state = state.trim();
+                switch (state) {
+                    case "compliant":
+                        result.put("compliant", evidenceService.getCompliantEvidence(appId, page, size));
+                        break;
+                    case "pending-review":
+                        result.put("pendingReview", evidenceService.getPendingReviewEvidence(appId, page, size));
+                        break;
+                    case "missing-evidence":
+                        result.put("missingEvidence", evidenceService.getMissingEvidenceFields(appId, page, size));
+                        break;
+                    case "risk-blocked":
+                        result.put("riskBlocked", evidenceService.getRiskBlockedItems(appId, page, size));
+                        break;
+                    default:
+                        log.warn("Unknown state requested: {}", state);
+                }
+            }
+
+            log.debug("Retrieved evidence for {} states", result.size());
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            log.error("Error getting evidence by states: {}", e.getMessage(), e);
             return ResponseEntity.internalServerError().build();
         }
     }

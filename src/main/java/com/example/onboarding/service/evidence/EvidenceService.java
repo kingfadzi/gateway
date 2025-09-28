@@ -12,7 +12,10 @@ import com.example.onboarding.dto.evidence.AttachEvidenceToFieldRequest;
 import com.example.onboarding.dto.evidence.EvidenceFieldLinkResponse;
 import com.example.onboarding.dto.evidence.EvidenceUsageResponse;
 import com.example.onboarding.dto.document.DocumentResponse;
+import com.example.onboarding.dto.evidence.EvidenceSearchRequest;
+import com.example.onboarding.dto.evidence.WorkbenchEvidenceItem;
 import java.util.List;
+import java.util.Map;
 
 import java.util.Optional;
 
@@ -113,4 +116,29 @@ public interface EvidenceService {
         String linkStatus, String appId, String fieldKey, String assignedPo, 
         String assignedSme, String evidenceStatus, String documentSourceType, 
         int page, int size);
+
+    /**
+     * Search evidence for the compliance workbench
+     */
+    List<WorkbenchEvidenceItem> searchWorkbenchEvidence(EvidenceSearchRequest request);
+
+    /**
+     * Get evidence by KPI state: COMPLIANT
+     */
+    List<com.example.onboarding.dto.evidence.KpiEvidenceSummary> getCompliantEvidence(String appId, int page, int size);
+
+    /**
+     * Get evidence by KPI state: PENDING REVIEW
+     */
+    List<com.example.onboarding.dto.evidence.KpiEvidenceSummary> getPendingReviewEvidence(String appId, int page, int size);
+
+    /**
+     * Get profile fields by KPI state: MISSING EVIDENCE
+     */
+    List<Map<String, Object>> getMissingEvidenceFields(String appId, int page, int size);
+
+    /**
+     * Get risks by KPI state: RISK BLOCKED
+     */
+    List<Map<String, Object>> getRiskBlockedItems(String appId, int page, int size);
 }

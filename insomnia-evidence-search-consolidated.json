@@ -1,0 +1,480 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2025-09-27T21:30:00.000Z",
+  "__export_source": "claude-code",
+  "resources": [
+    {
+      "_id": "wrk_1",
+      "parentId": null,
+      "modified": 1727486400000,
+      "created": 1727486400000,
+      "name": "Evidence Search - Consolidated",
+      "description": "Testing the consolidated evidence search endpoint with both basic and enhanced modes",
+      "scope": "collection",
+      "_type": "workspace"
+    },
+    {
+      "_id": "fld_basic",
+      "parentId": "wrk_1",
+      "modified": 1727486400000,
+      "created": 1727486400000,
+      "name": "Basic Search (enhanced=false)",
+      "description": "Returns EnhancedEvidenceSummary - lightweight responses",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1000000000,
+      "_type": "request_group"
+    },
+    {
+      "_id": "fld_enhanced",
+      "parentId": "wrk_1",
+      "modified": 1727486400000,
+      "created": 1727486400000,
+      "name": "Enhanced Search (enhanced=true)",
+      "description": "Returns WorkbenchEvidenceItem - full enrichment with freshness, domain, risk counts",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -900000000,
+      "_type": "request_group"
+    },
+    {
+      "_id": "req_basic_1",
+      "parentId": "fld_basic",
+      "modified": 1727486400000,
+      "created": 1727486400000,
+      "url": "{{ _.baseUrl }}/api/evidence/search",
+      "name": "Basic - All Evidence",
+      "description": "Get all evidence with basic EnhancedEvidenceSummary response",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        {
+          "id": "pair_1",
+          "name": "enhanced",
+          "value": "false",
+          "description": "Return basic response type"
+        },
+        {
+          "id": "pair_2",
+          "name": "page",
+          "value": "0",
+          "description": "Page number"
+        },
+        {
+          "id": "pair_3",
+          "name": "size",
+          "value": "10",
+          "description": "Page size"
+        }
+      ],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -1000000000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_basic_2",
+      "parentId": "fld_basic",
+      "modified": 1727486400000,
+      "created": 1727486400000,
+      "url": "{{ _.baseUrl }}/api/evidence/search",
+      "name": "Basic - Filter by App ID",
+      "description": "Filter evidence by specific application",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        {
+          "id": "pair_1",
+          "name": "enhanced",
+          "value": "false",
+          "description": "Return basic response type"
+        },
+        {
+          "id": "pair_2",
+          "name": "appId",
+          "value": "CORR-12356",
+          "description": "Filter by app ID"
+        }
+      ],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -999000000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_basic_3",
+      "parentId": "fld_basic",
+      "modified": 1727486400000,
+      "created": 1727486400000,
+      "url": "{{ _.baseUrl }}/api/evidence/search",
+      "name": "Basic - Filter by Link Status",
+      "description": "Filter by evidence field link status",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        {
+          "id": "pair_1",
+          "name": "enhanced",
+          "value": "false",
+          "description": "Return basic response type"
+        },
+        {
+          "id": "pair_2",
+          "name": "linkStatus",
+          "value": "PENDING_PO_REVIEW",
+          "description": "Filter by link status"
+        }
+      ],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -998000000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_basic_4",
+      "parentId": "fld_basic",
+      "modified": 1727486400000,
+      "created": 1727486400000,
+      "url": "{{ _.baseUrl }}/api/evidence/search",
+      "name": "Basic - Filter by Field Key",
+      "description": "Filter by specific profile field key",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        {
+          "id": "pair_1",
+          "name": "enhanced",
+          "value": "false",
+          "description": "Return basic response type"
+        },
+        {
+          "id": "pair_2",
+          "name": "fieldKey",
+          "value": "backup_policy",
+          "description": "Filter by field key"
+        }
+      ],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -997000000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_basic_5",
+      "parentId": "fld_basic",
+      "modified": 1727486400000,
+      "created": 1727486400000,
+      "url": "{{ _.baseUrl }}/api/evidence/search",
+      "name": "Basic - Filter by Assigned PO",
+      "description": "Filter by assigned Product Owner",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        {
+          "id": "pair_1",
+          "name": "enhanced",
+          "value": "false",
+          "description": "Return basic response type"
+        },
+        {
+          "id": "pair_2",
+          "name": "assignedPo",
+          "value": "po@company.com",
+          "description": "Filter by assigned PO"
+        }
+      ],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -996000000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_enhanced_1",
+      "parentId": "fld_enhanced",
+      "modified": 1727486400000,
+      "created": 1727486400000,
+      "url": "{{ _.baseUrl }}/api/evidence/search",
+      "name": "Enhanced - All Evidence (Workbench)",
+      "description": "Get all evidence with full WorkbenchEvidenceItem enrichment",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        {
+          "id": "pair_1",
+          "name": "enhanced",
+          "value": "true",
+          "description": "Return enhanced workbench response type"
+        },
+        {
+          "id": "pair_2",
+          "name": "page",
+          "value": "0",
+          "description": "Page number"
+        },
+        {
+          "id": "pair_3",
+          "name": "size",
+          "value": "10",
+          "description": "Page size"
+        }
+      ],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -900000000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_enhanced_2",
+      "parentId": "fld_enhanced",
+      "modified": 1727486400000,
+      "created": 1727486400000,
+      "url": "{{ _.baseUrl }}/api/evidence/search",
+      "name": "Enhanced - Filter by App ID",
+      "description": "Filter evidence by app with enhanced workbench data",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        {
+          "id": "pair_1",
+          "name": "enhanced",
+          "value": "true",
+          "description": "Return enhanced workbench response type"
+        },
+        {
+          "id": "pair_2",
+          "name": "appId",
+          "value": "CORR-12356",
+          "description": "Filter by app ID"
+        }
+      ],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -899000000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_enhanced_3",
+      "parentId": "fld_enhanced",
+      "modified": 1727486400000,
+      "created": 1727486400000,
+      "url": "{{ _.baseUrl }}/api/evidence/search",
+      "name": "Enhanced - Text Search",
+      "description": "Search across app name, field key, and app ID",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        {
+          "id": "pair_1",
+          "name": "enhanced",
+          "value": "true",
+          "description": "Return enhanced workbench response type"
+        },
+        {
+          "id": "pair_2",
+          "name": "search",
+          "value": "Core Banking",
+          "description": "Text search term"
+        }
+      ],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -898000000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_enhanced_4",
+      "parentId": "fld_enhanced",
+      "modified": 1727486400000,
+      "created": 1727486400000,
+      "url": "{{ _.baseUrl }}/api/evidence/search",
+      "name": "Enhanced - Filter by Criticality",
+      "description": "Filter by application criticality assessment",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        {
+          "id": "pair_1",
+          "name": "enhanced",
+          "value": "true",
+          "description": "Return enhanced workbench response type"
+        },
+        {
+          "id": "pair_2",
+          "name": "criticality",
+          "value": "A",
+          "description": "Filter by app criticality"
+        }
+      ],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -897000000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_enhanced_5",
+      "parentId": "fld_enhanced",
+      "modified": 1727486400000,
+      "created": 1727486400000,
+      "url": "{{ _.baseUrl }}/api/evidence/search",
+      "name": "Enhanced - Filter by Domain and Approval Status",
+      "description": "Combine domain filter with approval status",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        {
+          "id": "pair_1",
+          "name": "enhanced",
+          "value": "true",
+          "description": "Return enhanced workbench response type"
+        },
+        {
+          "id": "pair_2",
+          "name": "domain",
+          "value": "security",
+          "description": "Filter by security domain"
+        },
+        {
+          "id": "pair_3",
+          "name": "linkStatus",
+          "value": "PENDING_SME_REVIEW",
+          "description": "Filter by approval status"
+        }
+      ],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -896000000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_enhanced_6",
+      "parentId": "fld_enhanced",
+      "modified": 1727486400000,
+      "created": 1727486400000,
+      "url": "{{ _.baseUrl }}/api/evidence/search",
+      "name": "Enhanced - Filter by Application Type",
+      "description": "Filter by application type and architecture",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        {
+          "id": "pair_1",
+          "name": "enhanced",
+          "value": "true",
+          "description": "Return enhanced workbench response type"
+        },
+        {
+          "id": "pair_2",
+          "name": "applicationType",
+          "value": "Web Application",
+          "description": "Filter by application type"
+        },
+        {
+          "id": "pair_3",
+          "name": "architectureType",
+          "value": "Microservices",
+          "description": "Filter by architecture type"
+        }
+      ],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -895000000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_enhanced_7",
+      "parentId": "fld_enhanced",
+      "modified": 1727486400000,
+      "created": 1727486400000,
+      "url": "{{ _.baseUrl }}/api/evidence/search",
+      "name": "Enhanced - Multiple Filters",
+      "description": "Demonstrate multiple filters combined",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        {
+          "id": "pair_1",
+          "name": "enhanced",
+          "value": "true",
+          "description": "Return enhanced workbench response type"
+        },
+        {
+          "id": "pair_2",
+          "name": "criticality",
+          "value": "A",
+          "description": "High criticality apps only"
+        },
+        {
+          "id": "pair_3",
+          "name": "fieldKey",
+          "value": "backup_policy",
+          "description": "Backup policy field only"
+        },
+        {
+          "id": "pair_4",
+          "name": "linkStatus",
+          "value": "PENDING_PO_REVIEW",
+          "description": "Pending PO review status"
+        }
+      ],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -894000000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_comparison",
+      "parentId": "wrk_1",
+      "modified": 1727486400000,
+      "created": 1727486400000,
+      "url": "{{ _.baseUrl }}/api/evidence/search",
+      "name": "Response Comparison",
+      "description": "Same query with enhanced=false vs enhanced=true to compare response structures",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        {
+          "id": "pair_1",
+          "name": "enhanced",
+          "value": "false",
+          "description": "Change to 'true' to compare responses"
+        },
+        {
+          "id": "pair_2",
+          "name": "appId",
+          "value": "CORR-12356",
+          "description": "Same filter for comparison"
+        },
+        {
+          "id": "pair_3",
+          "name": "size",
+          "value": "5",
+          "description": "Small result set for easy comparison"
+        }
+      ],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -800000000,
+      "_type": "request"
+    },
+    {
+      "_id": "env_1",
+      "parentId": "wrk_1",
+      "modified": 1727486400000,
+      "created": 1727486400000,
+      "name": "Local Development",
+      "data": {
+        "baseUrl": "http://localhost:8080"
+      },
+      "dataPropertyOrder": {
+        "&": [
+          "baseUrl"
+        ]
+      },
+      "color": null,
+      "isPrivate": false,
+      "metaSortKey": 1727486400000,
+      "_type": "environment"
+    }
+  ]
+}

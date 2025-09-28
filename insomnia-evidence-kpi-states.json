@@ -1,0 +1,463 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2025-09-27T21:40:00.000Z",
+  "__export_source": "claude-code",
+  "resources": [
+    {
+      "_id": "wrk_kpi_states",
+      "parentId": null,
+      "modified": 1727487600000,
+      "created": 1727487600000,
+      "name": "Evidence by KPI States",
+      "description": "Testing evidence listing endpoints by KPI states: compliant, pending review, missing evidence, risk blocked",
+      "scope": "collection",
+      "_type": "workspace"
+    },
+    {
+      "_id": "fld_individual",
+      "parentId": "wrk_kpi_states",
+      "modified": 1727487600000,
+      "created": 1727487600000,
+      "name": "Individual KPI States",
+      "description": "Test each KPI state endpoint individually",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1000000000,
+      "_type": "request_group"
+    },
+    {
+      "_id": "fld_combined",
+      "parentId": "wrk_kpi_states",
+      "modified": 1727487600000,
+      "created": 1727487600000,
+      "name": "Combined KPI States",
+      "description": "Test multiple KPI states in single call",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -900000000,
+      "_type": "request_group"
+    },
+    {
+      "_id": "req_compliant_all",
+      "parentId": "fld_individual",
+      "modified": 1727487600000,
+      "created": 1727487600000,
+      "url": "{{ _.baseUrl }}/api/evidence/by-state/compliant",
+      "name": "Compliant Evidence - Portfolio Wide",
+      "description": "Get all compliant evidence across the portfolio (approved or user attested)",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        {
+          "id": "pair_1",
+          "name": "page",
+          "value": "0",
+          "description": "Page number"
+        },
+        {
+          "id": "pair_2",
+          "name": "size",
+          "value": "20",
+          "description": "Page size"
+        }
+      ],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -1000000000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_compliant_app",
+      "parentId": "fld_individual",
+      "modified": 1727487600000,
+      "created": 1727487600000,
+      "url": "{{ _.baseUrl }}/api/evidence/by-state/compliant",
+      "name": "Compliant Evidence - Specific App",
+      "description": "Get compliant evidence for a specific application",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        {
+          "id": "pair_1",
+          "name": "appId",
+          "value": "CORR-12356",
+          "description": "Filter by specific app"
+        },
+        {
+          "id": "pair_2",
+          "name": "page",
+          "value": "0",
+          "description": "Page number"
+        },
+        {
+          "id": "pair_3",
+          "name": "size",
+          "value": "10",
+          "description": "Page size"
+        }
+      ],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -999000000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_pending_all",
+      "parentId": "fld_individual",
+      "modified": 1727487600000,
+      "created": 1727487600000,
+      "url": "{{ _.baseUrl }}/api/evidence/by-state/pending-review",
+      "name": "Pending Review Evidence - Portfolio Wide",
+      "description": "Get all evidence pending review (no approved evidence exists for same field)",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        {
+          "id": "pair_1",
+          "name": "page",
+          "value": "0",
+          "description": "Page number"
+        },
+        {
+          "id": "pair_2",
+          "name": "size",
+          "value": "20",
+          "description": "Page size"
+        }
+      ],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -998000000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_pending_app",
+      "parentId": "fld_individual",
+      "modified": 1727487600000,
+      "created": 1727487600000,
+      "url": "{{ _.baseUrl }}/api/evidence/by-state/pending-review",
+      "name": "Pending Review Evidence - Specific App",
+      "description": "Get pending review evidence for a specific application",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        {
+          "id": "pair_1",
+          "name": "appId",
+          "value": "CORR-12356",
+          "description": "Filter by specific app"
+        },
+        {
+          "id": "pair_2",
+          "name": "page",
+          "value": "0",
+          "description": "Page number"
+        },
+        {
+          "id": "pair_3",
+          "name": "size",
+          "value": "10",
+          "description": "Page size"
+        }
+      ],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -997000000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_missing_all",
+      "parentId": "fld_individual",
+      "modified": 1727487600000,
+      "created": 1727487600000,
+      "url": "{{ _.baseUrl }}/api/evidence/by-state/missing-evidence",
+      "name": "Missing Evidence Fields - Portfolio Wide",
+      "description": "Get all profile fields that have no evidence at all",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        {
+          "id": "pair_1",
+          "name": "page",
+          "value": "0",
+          "description": "Page number"
+        },
+        {
+          "id": "pair_2",
+          "name": "size",
+          "value": "20",
+          "description": "Page size"
+        }
+      ],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -996000000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_missing_app",
+      "parentId": "fld_individual",
+      "modified": 1727487600000,
+      "created": 1727487600000,
+      "url": "{{ _.baseUrl }}/api/evidence/by-state/missing-evidence",
+      "name": "Missing Evidence Fields - Specific App",
+      "description": "Get profile fields missing evidence for a specific application",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        {
+          "id": "pair_1",
+          "name": "appId",
+          "value": "CORR-12356",
+          "description": "Filter by specific app"
+        },
+        {
+          "id": "pair_2",
+          "name": "page",
+          "value": "0",
+          "description": "Page number"
+        },
+        {
+          "id": "pair_3",
+          "name": "size",
+          "value": "10",
+          "description": "Page size"
+        }
+      ],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -995000000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_risk_all",
+      "parentId": "fld_individual",
+      "modified": 1727487600000,
+      "created": 1727487600000,
+      "url": "{{ _.baseUrl }}/api/evidence/by-state/risk-blocked",
+      "name": "Risk Blocked Items - Portfolio Wide",
+      "description": "Get all open risks (PENDING_SME_REVIEW, UNDER_REVIEW, OPEN) - returns risk_id, app_id, field_key, etc.",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        {
+          "id": "pair_1",
+          "name": "page",
+          "value": "0",
+          "description": "Page number"
+        },
+        {
+          "id": "pair_2",
+          "name": "size",
+          "value": "20",
+          "description": "Page size"
+        }
+      ],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -994000000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_risk_app",
+      "parentId": "fld_individual",
+      "modified": 1727487600000,
+      "created": 1727487600000,
+      "url": "{{ _.baseUrl }}/api/evidence/by-state/risk-blocked",
+      "name": "Risk Blocked Items - Specific App",
+      "description": "Get open risks for a specific application",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        {
+          "id": "pair_1",
+          "name": "appId",
+          "value": "CORR-12356",
+          "description": "Filter by specific app"
+        },
+        {
+          "id": "pair_2",
+          "name": "page",
+          "value": "0",
+          "description": "Page number"
+        },
+        {
+          "id": "pair_3",
+          "name": "size",
+          "value": "10",
+          "description": "Page size"
+        }
+      ],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -993000000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_combined_all",
+      "parentId": "fld_combined",
+      "modified": 1727487600000,
+      "created": 1727487600000,
+      "url": "{{ _.baseUrl }}/api/evidence/by-state",
+      "name": "All KPI States - Portfolio Wide",
+      "description": "Get all 4 KPI states in a single call (portfolio-wide)",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        {
+          "id": "pair_1",
+          "name": "states",
+          "value": "compliant,pending-review,missing-evidence,risk-blocked",
+          "description": "All KPI states"
+        },
+        {
+          "id": "pair_2",
+          "name": "page",
+          "value": "0",
+          "description": "Page number"
+        },
+        {
+          "id": "pair_3",
+          "name": "size",
+          "value": "10",
+          "description": "Page size (per state)"
+        }
+      ],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -900000000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_combined_app",
+      "parentId": "fld_combined",
+      "modified": 1727487600000,
+      "created": 1727487600000,
+      "url": "{{ _.baseUrl }}/api/evidence/by-state",
+      "name": "All KPI States - Specific App",
+      "description": "Get all 4 KPI states for a specific application",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        {
+          "id": "pair_1",
+          "name": "appId",
+          "value": "CORR-12356",
+          "description": "Filter by specific app"
+        },
+        {
+          "id": "pair_2",
+          "name": "states",
+          "value": "compliant,pending-review,missing-evidence,risk-blocked",
+          "description": "All KPI states"
+        },
+        {
+          "id": "pair_3",
+          "name": "page",
+          "value": "0",
+          "description": "Page number"
+        },
+        {
+          "id": "pair_4",
+          "name": "size",
+          "value": "5",
+          "description": "Page size (per state)"
+        }
+      ],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -899000000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_combined_partial",
+      "parentId": "fld_combined",
+      "modified": 1727487600000,
+      "created": 1727487600000,
+      "url": "{{ _.baseUrl }}/api/evidence/by-state",
+      "name": "Partial KPI States - Custom Selection",
+      "description": "Get only specific KPI states (e.g., just compliant and pending)",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        {
+          "id": "pair_1",
+          "name": "states",
+          "value": "compliant,pending-review",
+          "description": "Only compliant and pending review"
+        },
+        {
+          "id": "pair_2",
+          "name": "page",
+          "value": "0",
+          "description": "Page number"
+        },
+        {
+          "id": "pair_3",
+          "name": "size",
+          "value": "15",
+          "description": "Page size (per state)"
+        }
+      ],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -898000000,
+      "_type": "request"
+    },
+    {
+      "_id": "req_dashboard_summary",
+      "parentId": "fld_combined",
+      "modified": 1727487600000,
+      "created": 1727487600000,
+      "url": "{{ _.baseUrl }}/api/evidence/by-state",
+      "name": "Dashboard Summary - Small Sample",
+      "description": "Get small sample from each KPI state for dashboard preview",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        {
+          "id": "pair_1",
+          "name": "states",
+          "value": "compliant,pending-review,missing-evidence,risk-blocked",
+          "description": "All KPI states"
+        },
+        {
+          "id": "pair_2",
+          "name": "page",
+          "value": "0",
+          "description": "Page number"
+        },
+        {
+          "id": "pair_3",
+          "name": "size",
+          "value": "3",
+          "description": "Small sample size for preview"
+        }
+      ],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -897000000,
+      "_type": "request"
+    },
+    {
+      "_id": "env_kpi",
+      "parentId": "wrk_kpi_states",
+      "modified": 1727487600000,
+      "created": 1727487600000,
+      "name": "Local Development",
+      "data": {
+        "baseUrl": "http://localhost:8080"
+      },
+      "dataPropertyOrder": {
+        "&": [
+          "baseUrl"
+        ]
+      },
+      "color": null,
+      "isPrivate": false,
+      "metaSortKey": 1727487600000,
+      "_type": "environment"
+    }
+  ]
+}
