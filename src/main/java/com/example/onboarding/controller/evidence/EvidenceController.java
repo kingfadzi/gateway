@@ -556,15 +556,21 @@ public class EvidenceController {
      * GET /api/evidence/by-state/compliant?appId=APM100001&page=0&size=10
      */
     @GetMapping("/evidence/by-state/compliant")
-    public ResponseEntity<List<com.example.onboarding.dto.evidence.KpiEvidenceSummary>> getCompliantEvidence(
+    public ResponseEntity<PageResponse<com.example.onboarding.dto.evidence.KpiEvidenceSummary>> getCompliantEvidence(
             @RequestParam(required = false) String appId,
-            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(required = false) String criticality,
+            @RequestParam(required = false) String domain,
+            @RequestParam(required = false) String fieldKey,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        log.debug("Getting compliant evidence for appId: {}, page: {}, size: {}", appId, page, size);
+        log.debug("Getting compliant evidence for appId: {}, criticality: {}, domain: {}, fieldKey: {}, search: {}, page: {}, size: {}",
+                appId, criticality, domain, fieldKey, search, page, size);
         try {
-            List<com.example.onboarding.dto.evidence.KpiEvidenceSummary> evidence = evidenceService.getCompliantEvidence(appId, page, size);
-            log.debug("Found {} compliant evidence items", evidence.size());
+            PageResponse<com.example.onboarding.dto.evidence.KpiEvidenceSummary> evidence =
+                evidenceService.getCompliantEvidence(appId, criticality, domain, fieldKey, search, page, size);
+            log.debug("Found {} compliant evidence items (page {} of {})", evidence.items().size(), evidence.page(), Math.ceil((double) evidence.total() / evidence.pageSize()));
             return ResponseEntity.ok(evidence);
         } catch (Exception e) {
             log.error("Error getting compliant evidence: {}", e.getMessage(), e);
@@ -574,18 +580,24 @@ public class EvidenceController {
 
     /**
      * Get evidence by KPI state: PENDING REVIEW
-     * GET /api/evidence/by-state/pending-review?appId=APM100001&page=0&size=10
+     * GET /api/evidence/by-state/pending-review?appId=APM100001&page=1&size=10
      */
     @GetMapping("/evidence/by-state/pending-review")
-    public ResponseEntity<List<com.example.onboarding.dto.evidence.KpiEvidenceSummary>> getPendingReviewEvidence(
+    public ResponseEntity<PageResponse<com.example.onboarding.dto.evidence.KpiEvidenceSummary>> getPendingReviewEvidence(
             @RequestParam(required = false) String appId,
-            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(required = false) String criticality,
+            @RequestParam(required = false) String domain,
+            @RequestParam(required = false) String fieldKey,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        log.debug("Getting pending review evidence for appId: {}, page: {}, size: {}", appId, page, size);
+        log.debug("Getting pending review evidence for appId: {}, criticality: {}, domain: {}, fieldKey: {}, search: {}, page: {}, size: {}",
+                appId, criticality, domain, fieldKey, search, page, size);
         try {
-            List<com.example.onboarding.dto.evidence.KpiEvidenceSummary> evidence = evidenceService.getPendingReviewEvidence(appId, page, size);
-            log.debug("Found {} pending review evidence items", evidence.size());
+            PageResponse<com.example.onboarding.dto.evidence.KpiEvidenceSummary> evidence =
+                evidenceService.getPendingReviewEvidence(appId, criticality, domain, fieldKey, search, page, size);
+            log.debug("Found {} pending review evidence items (page {} of {})", evidence.items().size(), evidence.page(), Math.ceil((double) evidence.total() / evidence.pageSize()));
             return ResponseEntity.ok(evidence);
         } catch (Exception e) {
             log.error("Error getting pending review evidence: {}", e.getMessage(), e);
@@ -595,18 +607,24 @@ public class EvidenceController {
 
     /**
      * Get profile fields by KPI state: MISSING EVIDENCE
-     * GET /api/evidence/by-state/missing-evidence?appId=APM100001&page=0&size=10
+     * GET /api/evidence/by-state/missing-evidence?appId=APM100001&page=1&size=10
      */
     @GetMapping("/evidence/by-state/missing-evidence")
-    public ResponseEntity<List<Map<String, Object>>> getMissingEvidenceFields(
+    public ResponseEntity<PageResponse<Map<String, Object>>> getMissingEvidenceFields(
             @RequestParam(required = false) String appId,
-            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(required = false) String criticality,
+            @RequestParam(required = false) String domain,
+            @RequestParam(required = false) String fieldKey,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        log.debug("Getting missing evidence fields for appId: {}, page: {}, size: {}", appId, page, size);
+        log.debug("Getting missing evidence fields for appId: {}, criticality: {}, domain: {}, fieldKey: {}, search: {}, page: {}, size: {}",
+                appId, criticality, domain, fieldKey, search, page, size);
         try {
-            List<Map<String, Object>> fields = evidenceService.getMissingEvidenceFields(appId, page, size);
-            log.debug("Found {} profile fields missing evidence", fields.size());
+            PageResponse<Map<String, Object>> fields =
+                evidenceService.getMissingEvidenceFields(appId, criticality, domain, fieldKey, search, page, size);
+            log.debug("Found {} profile fields missing evidence (page {} of {})", fields.items().size(), fields.page(), Math.ceil((double) fields.total() / fields.pageSize()));
             return ResponseEntity.ok(fields);
         } catch (Exception e) {
             log.error("Error getting missing evidence fields: {}", e.getMessage(), e);
@@ -616,18 +634,24 @@ public class EvidenceController {
 
     /**
      * Get risks by KPI state: RISK BLOCKED
-     * GET /api/evidence/by-state/risk-blocked?appId=APM100001&page=0&size=10
+     * GET /api/evidence/by-state/risk-blocked?appId=APM100001&page=1&size=10
      */
     @GetMapping("/evidence/by-state/risk-blocked")
-    public ResponseEntity<List<Map<String, Object>>> getRiskBlockedItems(
+    public ResponseEntity<PageResponse<com.example.onboarding.dto.evidence.RiskBlockedItem>> getRiskBlockedItems(
             @RequestParam(required = false) String appId,
-            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(required = false) String criticality,
+            @RequestParam(required = false) String domain,
+            @RequestParam(required = false) String fieldKey,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        log.debug("Getting risk blocked items for appId: {}, page: {}, size: {}", appId, page, size);
+        log.debug("Getting risk blocked items for appId: {}, criticality: {}, domain: {}, fieldKey: {}, search: {}, page: {}, size: {}",
+                appId, criticality, domain, fieldKey, search, page, size);
         try {
-            List<Map<String, Object>> risks = evidenceService.getRiskBlockedItems(appId, page, size);
-            log.debug("Found {} risk blocked items", risks.size());
+            PageResponse<com.example.onboarding.dto.evidence.RiskBlockedItem> risks =
+                evidenceService.getRiskBlockedItems(appId, criticality, domain, fieldKey, search, page, size);
+            log.debug("Found {} risk blocked items (page {} of {})", risks.items().size(), risks.page(), Math.ceil((double) risks.total() / risks.pageSize()));
             return ResponseEntity.ok(risks);
         } catch (Exception e) {
             log.error("Error getting risk blocked items: {}", e.getMessage(), e);
@@ -637,16 +661,21 @@ public class EvidenceController {
 
     /**
      * Get evidence by multiple KPI states in a single call
-     * GET /api/evidence/by-state?states=compliant,pending-review&appId=APM100001&page=0&size=10
+     * GET /api/evidence/by-state?states=compliant,pending-review&appId=APM100001&page=1&size=10
      */
     @GetMapping("/evidence/by-state")
     public ResponseEntity<Map<String, Object>> getEvidenceByStates(
             @RequestParam(required = false) String appId,
+            @RequestParam(required = false) String criticality,
+            @RequestParam(required = false) String domain,
+            @RequestParam(required = false) String fieldKey,
+            @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "compliant,pending-review,missing-evidence,risk-blocked") String states,
-            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        log.debug("Getting evidence by states: {} for appId: {}, page: {}, size: {}", states, appId, page, size);
+        log.debug("Getting evidence by states: {} for appId: {}, criticality: {}, domain: {}, fieldKey: {}, search: {}, page: {}, size: {}",
+                states, appId, criticality, domain, fieldKey, search, page, size);
         try {
             Map<String, Object> result = new HashMap<>();
             String[] stateArray = states.split(",");
@@ -655,16 +684,16 @@ public class EvidenceController {
                 state = state.trim();
                 switch (state) {
                     case "compliant":
-                        result.put("compliant", evidenceService.getCompliantEvidence(appId, page, size));
+                        result.put("compliant", evidenceService.getCompliantEvidence(appId, criticality, domain, fieldKey, search, page, size));
                         break;
                     case "pending-review":
-                        result.put("pendingReview", evidenceService.getPendingReviewEvidence(appId, page, size));
+                        result.put("pendingReview", evidenceService.getPendingReviewEvidence(appId, criticality, domain, fieldKey, search, page, size));
                         break;
                     case "missing-evidence":
-                        result.put("missingEvidence", evidenceService.getMissingEvidenceFields(appId, page, size));
+                        result.put("missingEvidence", evidenceService.getMissingEvidenceFields(appId, criticality, domain, fieldKey, search, page, size));
                         break;
                     case "risk-blocked":
-                        result.put("riskBlocked", evidenceService.getRiskBlockedItems(appId, page, size));
+                        result.put("riskBlocked", evidenceService.getRiskBlockedItems(appId, criticality, domain, fieldKey, search, page, size));
                         break;
                     default:
                         log.warn("Unknown state requested: {}", state);

@@ -835,38 +835,58 @@ public class EvidenceServiceImpl implements EvidenceService {
     }
 
     @Override
-    public List<com.example.onboarding.dto.evidence.KpiEvidenceSummary> getCompliantEvidence(String appId, int page, int size) {
-        int safePage = Math.max(page, 0);
+    public PageResponse<com.example.onboarding.dto.evidence.KpiEvidenceSummary> getCompliantEvidence(
+            String appId, String criticality, String domain, String fieldKey, String search, int page, int size) {
+        int safePage = Math.max(page, 1);
         int safeSize = Math.max(size, 1);
-        int offset = safePage * safeSize;
+        int offset = (safePage - 1) * safeSize;
 
-        return evidenceRepository.findCompliantEvidence(appId, safeSize, offset);
+        List<com.example.onboarding.dto.evidence.KpiEvidenceSummary> items = evidenceRepository.findCompliantEvidence(
+                appId, criticality, domain, fieldKey, search, safeSize, offset);
+        long total = evidenceRepository.countCompliantEvidence(appId, criticality, domain, fieldKey, search);
+
+        return new PageResponse<>(safePage, safeSize, total, items);
     }
 
     @Override
-    public List<com.example.onboarding.dto.evidence.KpiEvidenceSummary> getPendingReviewEvidence(String appId, int page, int size) {
-        int safePage = Math.max(page, 0);
+    public PageResponse<com.example.onboarding.dto.evidence.KpiEvidenceSummary> getPendingReviewEvidence(
+            String appId, String criticality, String domain, String fieldKey, String search, int page, int size) {
+        int safePage = Math.max(page, 1);
         int safeSize = Math.max(size, 1);
-        int offset = safePage * safeSize;
+        int offset = (safePage - 1) * safeSize;
 
-        return evidenceRepository.findPendingReviewEvidence(appId, safeSize, offset);
+        List<com.example.onboarding.dto.evidence.KpiEvidenceSummary> items = evidenceRepository.findPendingReviewEvidence(
+                appId, criticality, domain, fieldKey, search, safeSize, offset);
+        long total = evidenceRepository.countPendingReviewEvidence(appId, criticality, domain, fieldKey, search);
+
+        return new PageResponse<>(safePage, safeSize, total, items);
     }
 
     @Override
-    public List<Map<String, Object>> getMissingEvidenceFields(String appId, int page, int size) {
-        int safePage = Math.max(page, 0);
+    public PageResponse<Map<String, Object>> getMissingEvidenceFields(
+            String appId, String criticality, String domain, String fieldKey, String search, int page, int size) {
+        int safePage = Math.max(page, 1);
         int safeSize = Math.max(size, 1);
-        int offset = safePage * safeSize;
+        int offset = (safePage - 1) * safeSize;
 
-        return evidenceRepository.findMissingEvidenceFields(appId, safeSize, offset);
+        List<Map<String, Object>> items = evidenceRepository.findMissingEvidenceFields(
+                appId, criticality, domain, fieldKey, search, safeSize, offset);
+        long total = evidenceRepository.countMissingEvidenceFields(appId, criticality, domain, fieldKey, search);
+
+        return new PageResponse<>(safePage, safeSize, total, items);
     }
 
     @Override
-    public List<Map<String, Object>> getRiskBlockedItems(String appId, int page, int size) {
-        int safePage = Math.max(page, 0);
+    public PageResponse<com.example.onboarding.dto.evidence.RiskBlockedItem> getRiskBlockedItems(
+            String appId, String criticality, String domain, String fieldKey, String search, int page, int size) {
+        int safePage = Math.max(page, 1);
         int safeSize = Math.max(size, 1);
-        int offset = safePage * safeSize;
+        int offset = (safePage - 1) * safeSize;
 
-        return evidenceRepository.findRiskBlockedItems(appId, safeSize, offset);
+        List<com.example.onboarding.dto.evidence.RiskBlockedItem> items = evidenceRepository.findRiskBlockedItems(
+                appId, criticality, domain, fieldKey, search, safeSize, offset);
+        long total = evidenceRepository.countRiskBlockedItems(appId, criticality, domain, fieldKey, search);
+
+        return new PageResponse<>(safePage, safeSize, total, items);
     }
 }

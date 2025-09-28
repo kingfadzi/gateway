@@ -48,7 +48,10 @@ public record KpiEvidenceSummary(
         String applicationTier,     // Application tier (1, 2, 3, etc.)
         String architectureType,    // Architecture type (monolith, microservices, etc.)
         String installType,         // Install type (cloud, on-premise, hybrid)
-        String appCriticality       // App criticality assessment (A, B, C, etc.)
+        String appCriticality,      // App criticality assessment (A, B, C, etc.)
+
+        // Profile version
+        Integer profileVersion      // Profile version number
 ) {
     /**
      * Derive domain from the derivedFrom field

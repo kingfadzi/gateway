@@ -125,20 +125,24 @@ public interface EvidenceService {
     /**
      * Get evidence by KPI state: COMPLIANT
      */
-    List<com.example.onboarding.dto.evidence.KpiEvidenceSummary> getCompliantEvidence(String appId, int page, int size);
+    PageResponse<com.example.onboarding.dto.evidence.KpiEvidenceSummary> getCompliantEvidence(
+            String appId, String criticality, String domain, String fieldKey, String search, int page, int size);
 
     /**
      * Get evidence by KPI state: PENDING REVIEW
      */
-    List<com.example.onboarding.dto.evidence.KpiEvidenceSummary> getPendingReviewEvidence(String appId, int page, int size);
+    PageResponse<com.example.onboarding.dto.evidence.KpiEvidenceSummary> getPendingReviewEvidence(
+            String appId, String criticality, String domain, String fieldKey, String search, int page, int size);
 
     /**
      * Get profile fields by KPI state: MISSING EVIDENCE
      */
-    List<Map<String, Object>> getMissingEvidenceFields(String appId, int page, int size);
+    PageResponse<Map<String, Object>> getMissingEvidenceFields(
+            String appId, String criticality, String domain, String fieldKey, String search, int page, int size);
 
     /**
      * Get risks by KPI state: RISK BLOCKED
      */
-    List<Map<String, Object>> getRiskBlockedItems(String appId, int page, int size);
+    PageResponse<com.example.onboarding.dto.evidence.RiskBlockedItem> getRiskBlockedItems(
+            String appId, String criticality, String domain, String fieldKey, String search, int page, int size);
 }
