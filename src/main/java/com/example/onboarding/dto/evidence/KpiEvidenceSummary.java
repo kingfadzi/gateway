@@ -41,6 +41,7 @@ public record KpiEvidenceSummary(
         // Profile field context
         String fieldKey,            // Profile field key
         String derivedFrom,         // Used to derive domain
+        String domainRating,        // Domain rating value (e.g., A1, B, C)
 
         // Application context (requested by frontend)
         String appName,             // Application name

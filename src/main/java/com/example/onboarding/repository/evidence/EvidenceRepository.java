@@ -456,6 +456,8 @@ public class EvidenceRepository {
                    pf.field_key, pf.derived_from,
                    app.name as app_name, app.product_owner, app.application_tier,
                    app.architecture_type, app.install_type, app.app_criticality_assessment,
+                   app.security_rating, app.confidentiality_rating, app.integrity_rating,
+                   app.availability_rating, app.resilience_rating,
                    p.version as profile_version
             FROM evidence e
             JOIN evidence_field_link efl ON e.evidence_id = efl.evidence_id
@@ -495,7 +497,7 @@ public class EvidenceRepository {
         // Add domain filter (matches derivedFrom pattern)
         if (domain != null && !domain.trim().isEmpty()) {
             sqlBuilder.append(" AND pf.derived_from = :derivedFrom");
-            params.put("derivedFrom", domain.trim() + "_rating");
+            params.put("derivedFrom", domain.trim());
         }
 
         // Add field key filter
@@ -534,6 +536,8 @@ public class EvidenceRepository {
                    pf.field_key, pf.derived_from,
                    app.name as app_name, app.product_owner, app.application_tier,
                    app.architecture_type, app.install_type, app.app_criticality_assessment,
+                   app.security_rating, app.confidentiality_rating, app.integrity_rating,
+                   app.availability_rating, app.resilience_rating,
                    p.version as profile_version
             FROM evidence e
             JOIN evidence_field_link efl ON e.evidence_id = efl.evidence_id
@@ -579,7 +583,7 @@ public class EvidenceRepository {
         // Add domain filter (matches derivedFrom pattern)
         if (domain != null && !domain.trim().isEmpty()) {
             sqlBuilder.append(" AND pf.derived_from = :derivedFrom");
-            params.put("derivedFrom", domain.trim() + "_rating");
+            params.put("derivedFrom", domain.trim());
         }
 
         // Add field key filter
@@ -650,7 +654,7 @@ public class EvidenceRepository {
         // Add domain filter (matches derivedFrom pattern)
         if (domain != null && !domain.trim().isEmpty()) {
             sqlBuilder.append(" AND pf.derived_from = :derivedFrom");
-            params.put("derivedFrom", domain.trim() + "_rating");
+            params.put("derivedFrom", domain.trim());
         }
 
         // Add field key filter
@@ -679,17 +683,21 @@ public class EvidenceRepository {
     public List<com.example.onboarding.dto.evidence.RiskBlockedItem> findRiskBlockedItems(
             String appId, String criticality, String domain, String fieldKey, String search, int limit, int offset) {
         StringBuilder sqlBuilder = new StringBuilder("""
-            SELECT rs.risk_id, rs.app_id, rs.field_key, rs.status as risk_status,
+            SELECT DISTINCT rs.risk_id, rs.app_id, rs.field_key, rs.status as risk_status,
                    rs.assigned_sme, rs.created_at, rs.updated_at,
                    rs.triggering_evidence_id, rs.title, rs.hypothesis,
                    app.name as app_name, app.product_owner,
                    app.application_tier, app.architecture_type,
                    app.install_type, app.app_criticality_assessment,
+                   app.security_rating, app.confidentiality_rating, app.integrity_rating,
+                   app.availability_rating, app.resilience_rating,
                    pf.field_key as control_field, pf.derived_from
             FROM risk_story rs
             LEFT JOIN application app ON rs.app_id = app.app_id
+            LEFT JOIN profile p ON rs.app_id = p.app_id
+                AND p.version = (SELECT MAX(version) FROM profile p2 WHERE p2.app_id = rs.app_id)
             LEFT JOIN profile_field pf ON rs.field_key = pf.field_key
-            LEFT JOIN profile p ON pf.profile_id = p.profile_id
+                AND pf.profile_id = p.profile_id
             WHERE rs.status IN ('PENDING_SME_REVIEW', 'UNDER_REVIEW', 'OPEN')
             """);
 
@@ -722,7 +730,7 @@ public class EvidenceRepository {
         // Add domain filter (matches derivedFrom pattern)
         if (domain != null && !domain.trim().isEmpty()) {
             sqlBuilder.append(" AND pf.derived_from = :derivedFrom");
-            params.put("derivedFrom", domain.trim() + "_rating");
+            params.put("derivedFrom", domain.trim());
         }
 
         // Add field key filter
@@ -865,6 +873,7 @@ public class EvidenceRepository {
             // Profile field context
             rs.getString("field_key"),
             rs.getString("derived_from"),
+            extractDomainRating(rs, rs.getString("derived_from")),
             // Application context
             rs.getString("app_name"),
             rs.getString("product_owner"),
@@ -875,6 +884,23 @@ public class EvidenceRepository {
             // Profile version
             rs.getObject("profile_version", Integer.class)
         );
+    }
+
+    /**
+     * Extract domain rating value based on derivedFrom field
+     */
+    private String extractDomainRating(ResultSet rs, String derivedFrom) throws SQLException {
+        if (derivedFrom == null) return null;
+
+        return switch (derivedFrom) {
+            case "security_rating" -> rs.getString("security_rating");
+            case "confidentiality_rating" -> rs.getString("confidentiality_rating");
+            case "integrity_rating" -> rs.getString("integrity_rating");
+            case "availability_rating" -> rs.getString("availability_rating");
+            case "resilience_rating" -> rs.getString("resilience_rating");
+            case "app_criticality_assessment" -> rs.getString("app_criticality_assessment");
+            default -> null;
+        };
     }
 
     /**
@@ -901,7 +927,8 @@ public class EvidenceRepository {
             rs.getString("app_criticality_assessment"),
             // Profile field context
             rs.getString("control_field"),
-            rs.getString("derived_from")
+            rs.getString("derived_from"),
+            extractDomainRating(rs, rs.getString("derived_from"))
         );
     }
 
@@ -1022,7 +1049,7 @@ public class EvidenceRepository {
 
         if (domain != null && !domain.trim().isEmpty()) {
             sqlBuilder.append(" AND pf.derived_from = :derivedFrom");
-            params.put("derivedFrom", domain.trim() + "_rating");
+            params.put("derivedFrom", domain.trim());
         }
 
         if (fieldKey != null && !fieldKey.trim().isEmpty()) {
@@ -1042,24 +1069,192 @@ public class EvidenceRepository {
      * Count pending review evidence records
      */
     public long countPendingReviewEvidence(String appId, String criticality, String domain, String fieldKey, String search) {
-        // Simplified stub for now - can be enhanced with full filter logic later
-        return 581L; // Temporary hardcoded value for demo
+        StringBuilder sqlBuilder = new StringBuilder("""
+            SELECT COUNT(DISTINCT e.evidence_id)
+            FROM evidence e
+            JOIN evidence_field_link efl ON e.evidence_id = efl.evidence_id
+            JOIN profile_field pf ON e.profile_field_id = pf.id
+            JOIN profile p ON pf.profile_id = p.profile_id
+            LEFT JOIN document d ON e.document_id = d.document_id
+            LEFT JOIN application app ON e.app_id = app.app_id
+            WHERE efl.link_status IN ('PENDING_PO_REVIEW', 'PENDING_SME_REVIEW')
+            AND NOT EXISTS (
+                SELECT 1 FROM evidence e2
+                JOIN evidence_field_link efl2 ON efl2.evidence_id = e2.evidence_id
+                WHERE e2.profile_field_id = pf.id
+                AND efl2.link_status IN ('APPROVED', 'USER_ATTESTED')
+            )
+            """);
+
+        java.util.Map<String, Object> params = new java.util.HashMap<>();
+
+        // Add profile version filtering (KPI-style logic)
+        if (appId != null && !appId.trim().isEmpty()) {
+            sqlBuilder.append(" AND p.app_id = :appId");
+            sqlBuilder.append(" AND p.version = (SELECT MAX(version) FROM profile WHERE app_id = :appId)");
+            params.put("appId", appId.trim());
+        } else {
+            // For portfolio-wide searches, ensure we only get latest versions for each app
+            sqlBuilder.append(" AND p.version = (SELECT MAX(version) FROM profile p2 WHERE p2.app_id = p.app_id)");
+        }
+
+        // Add criticality filter
+        if (criticality != null && !criticality.trim().isEmpty()) {
+            String[] criticalityValues = criticality.split(",");
+            sqlBuilder.append(" AND app.app_criticality_assessment IN (");
+            for (int i = 0; i < criticalityValues.length; i++) {
+                sqlBuilder.append(":criticality").append(i);
+                if (i < criticalityValues.length - 1) {
+                    sqlBuilder.append(", ");
+                }
+                params.put("criticality" + i, criticalityValues[i].trim());
+            }
+            sqlBuilder.append(")");
+        }
+
+        // Add domain filter (matches derivedFrom pattern)
+        if (domain != null && !domain.trim().isEmpty()) {
+            sqlBuilder.append(" AND pf.derived_from = :derivedFrom");
+            params.put("derivedFrom", domain.trim());
+        }
+
+        // Add field key filter
+        if (fieldKey != null && !fieldKey.trim().isEmpty()) {
+            sqlBuilder.append(" AND pf.field_key = :fieldKey");
+            params.put("fieldKey", fieldKey.trim());
+        }
+
+        // Add text search filter
+        if (search != null && !search.trim().isEmpty()) {
+            sqlBuilder.append(" AND (e.uri ILIKE :search OR d.title ILIKE :search OR pf.field_key ILIKE :search)");
+            params.put("search", "%" + search.trim() + "%");
+        }
+
+        return jdbc.queryForObject(sqlBuilder.toString(), params, Long.class);
     }
 
     /**
      * Count missing evidence profile fields
      */
     public long countMissingEvidenceFields(String appId, String criticality, String domain, String fieldKey, String search) {
-        // Simplified stub for now - can be enhanced with full filter logic later
-        return 15L; // Temporary hardcoded value for demo
+        StringBuilder sqlBuilder = new StringBuilder("""
+            SELECT COUNT(DISTINCT pf.id)
+            FROM profile p
+            JOIN profile_field pf ON p.profile_id = pf.profile_id
+            LEFT JOIN application app ON p.app_id = app.app_id
+            WHERE NOT EXISTS (
+                SELECT 1 FROM evidence e
+                WHERE e.profile_field_id = pf.id
+            )
+            """);
+
+        java.util.Map<String, Object> params = new java.util.HashMap<>();
+
+        // Add profile version filtering (KPI-style logic)
+        if (appId != null && !appId.trim().isEmpty()) {
+            sqlBuilder.append(" AND p.app_id = :appId");
+            sqlBuilder.append(" AND p.version = (SELECT MAX(version) FROM profile WHERE app_id = :appId)");
+            params.put("appId", appId.trim());
+        } else {
+            // For portfolio-wide searches, ensure we only get latest versions for each app
+            sqlBuilder.append(" AND p.version = (SELECT MAX(version) FROM profile p2 WHERE p2.app_id = p.app_id)");
+        }
+
+        // Add criticality filter
+        if (criticality != null && !criticality.trim().isEmpty()) {
+            String[] criticalityValues = criticality.split(",");
+            sqlBuilder.append(" AND app.app_criticality_assessment IN (");
+            for (int i = 0; i < criticalityValues.length; i++) {
+                sqlBuilder.append(":criticality").append(i);
+                if (i < criticalityValues.length - 1) {
+                    sqlBuilder.append(", ");
+                }
+                params.put("criticality" + i, criticalityValues[i].trim());
+            }
+            sqlBuilder.append(")");
+        }
+
+        // Add domain filter (matches derivedFrom pattern)
+        if (domain != null && !domain.trim().isEmpty()) {
+            sqlBuilder.append(" AND pf.derived_from = :derivedFrom");
+            params.put("derivedFrom", domain.trim());
+        }
+
+        // Add field key filter
+        if (fieldKey != null && !fieldKey.trim().isEmpty()) {
+            sqlBuilder.append(" AND pf.field_key = :fieldKey");
+            params.put("fieldKey", fieldKey.trim());
+        }
+
+        // Add text search filter (for missing evidence, search only field_key and app_name)
+        if (search != null && !search.trim().isEmpty()) {
+            sqlBuilder.append(" AND (pf.field_key ILIKE :search OR app.name ILIKE :search)");
+            params.put("search", "%" + search.trim() + "%");
+        }
+
+        return jdbc.queryForObject(sqlBuilder.toString(), params, Long.class);
     }
 
     /**
      * Count risk blocked items
      */
     public long countRiskBlockedItems(String appId, String criticality, String domain, String fieldKey, String search) {
-        // Simplified stub for now - can be enhanced with full filter logic later
-        return 8L; // Temporary hardcoded value for demo
+        StringBuilder sqlBuilder = new StringBuilder("""
+            SELECT COUNT(DISTINCT rs.risk_id)
+            FROM risk_story rs
+            LEFT JOIN application app ON rs.app_id = app.app_id
+            LEFT JOIN profile p ON rs.app_id = p.app_id
+                AND p.version = (SELECT MAX(version) FROM profile p2 WHERE p2.app_id = rs.app_id)
+            LEFT JOIN profile_field pf ON rs.field_key = pf.field_key
+                AND pf.profile_id = p.profile_id
+            WHERE rs.status IN ('PENDING_SME_REVIEW', 'UNDER_REVIEW', 'OPEN')
+            """);
+
+        java.util.Map<String, Object> params = new java.util.HashMap<>();
+
+        // Add profile version filtering (KPI-style logic)
+        if (appId != null && !appId.trim().isEmpty()) {
+            sqlBuilder.append(" AND rs.app_id = :appId");
+            sqlBuilder.append(" AND p.version = (SELECT MAX(version) FROM profile WHERE app_id = :appId)");
+            params.put("appId", appId.trim());
+        } else {
+            // For portfolio-wide searches, ensure we only get latest versions for each app
+            sqlBuilder.append(" AND p.version = (SELECT MAX(version) FROM profile p2 WHERE p2.app_id = p.app_id)");
+        }
+
+        // Add criticality filter
+        if (criticality != null && !criticality.trim().isEmpty()) {
+            String[] criticalityValues = criticality.split(",");
+            sqlBuilder.append(" AND app.app_criticality_assessment IN (");
+            for (int i = 0; i < criticalityValues.length; i++) {
+                sqlBuilder.append(":criticality").append(i);
+                if (i < criticalityValues.length - 1) {
+                    sqlBuilder.append(", ");
+                }
+                params.put("criticality" + i, criticalityValues[i].trim());
+            }
+            sqlBuilder.append(")");
+        }
+
+        // Add domain filter (matches derivedFrom pattern)
+        if (domain != null && !domain.trim().isEmpty()) {
+            sqlBuilder.append(" AND pf.derived_from = :derivedFrom");
+            params.put("derivedFrom", domain.trim());
+        }
+
+        // Add field key filter
+        if (fieldKey != null && !fieldKey.trim().isEmpty()) {
+            sqlBuilder.append(" AND pf.field_key = :fieldKey");
+            params.put("fieldKey", fieldKey.trim());
+        }
+
+        // Add text search filter (search in title, hypothesis, and field_key)
+        if (search != null && !search.trim().isEmpty()) {
+            sqlBuilder.append(" AND (rs.title ILIKE :search OR rs.hypothesis ILIKE :search OR rs.field_key ILIKE :search OR app.name ILIKE :search)");
+            params.put("search", "%" + search.trim() + "%");
+        }
+
+        return jdbc.queryForObject(sqlBuilder.toString(), params, Long.class);
     }
 
     /**

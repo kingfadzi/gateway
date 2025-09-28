@@ -1,0 +1,106 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2025-09-28T16:50:00.000Z",
+  "__export_source": "gemini-cli",
+  "resources": [
+    {
+      "_id": "wrk_1",
+      "parentId": null,
+      "modified": 1678886400000,
+      "created": 1678886400000,
+      "name": "Profile Registry API",
+      "description": "",
+      "scope": "collection",
+      "_type": "workspace"
+    },
+    {
+      "_id": "env_1",
+      "parentId": "wrk_1",
+      "modified": 1678886400000,
+      "created": 1678886400000,
+      "name": "Base Environment",
+      "data": {
+        "baseUrl": "http://localhost:8080"
+      },
+      "dataPropertyOrder": {
+        "&": [
+          "baseUrl"
+        ]
+      },
+      "color": null,
+      "isPrivate": false,
+      "metaSortKey": 1678886400000,
+      "_type": "environment"
+    },
+    {
+      "_id": "req_1",
+      "parentId": "wrk_1",
+      "modified": 1678886400000,
+      "created": 1678886400000,
+      "url": "{{ _.baseUrl }}/internal/profile-fields-registry",
+      "name": "Get Full Registry",
+      "description": "",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -1678886400000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_2",
+      "parentId": "wrk_1",
+      "modified": 1678886400000,
+      "created": 1678886400000,
+      "url": "{{ _.baseUrl }}/internal/profile-fields-registry/domains",
+      "name": "List All Domains",
+      "description": "",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -1678886300000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_3",
+      "parentId": "wrk_1",
+      "modified": 1678886400000,
+      "created": 1678886400000,
+      "url": "{{ _.baseUrl }}/internal/profile-fields-registry/domains/security_rating/controls",
+      "name": "List Controls for Domain",
+      "description": "",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -1678886200000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    }
+  ]
+}

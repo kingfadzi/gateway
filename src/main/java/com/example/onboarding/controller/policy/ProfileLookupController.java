@@ -1,6 +1,7 @@
 package com.example.onboarding.controller.policy;
 
 import com.example.onboarding.service.policy.ProfileLookupService;
+import com.example.onboarding.service.profile.ProfileFieldRegistryService;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
@@ -12,9 +13,11 @@ import java.util.Map;
 public class ProfileLookupController {
 
     private final ProfileLookupService service;
+    private final ProfileFieldRegistryService registryService;
 
-    public ProfileLookupController(ProfileLookupService service) {
+    public ProfileLookupController(ProfileLookupService service, ProfileFieldRegistryService registryService) {
         this.service = service;
+        this.registryService = registryService;
     }
 
     /** List field keys for the app’s latest profile. */
@@ -31,6 +34,21 @@ public class ProfileLookupController {
             throw new FieldNotFoundException("fieldKey '%s' not found for app %s".formatted(key, appId));
         }
         return Map.of("fieldKey", key, "profileFieldId", idOpt.get());
+    }
+
+    @GetMapping("/profile-fields-registry")
+    public Map<String, Object> getProfileFieldRegistry() {
+        return registryService.getRawRegistry();
+    }
+
+    @GetMapping("/profile-fields-registry/domains")
+    public List<String> listDomains() {
+        return registryService.getDomains();
+    }
+
+    @GetMapping("/profile-fields-registry/domains/{domain}/controls")
+    public List<String> listControlsByDomain(@PathVariable String domain) {
+        return registryService.getControlsByDomain(domain);
     }
 
     @ResponseStatus(HttpStatus.NOT_FOUND)

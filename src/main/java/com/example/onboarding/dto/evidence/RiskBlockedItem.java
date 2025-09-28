@@ -28,7 +28,8 @@ public record RiskBlockedItem(
 
         // Profile field context
         String controlField,            // Profile field key for control context
-        String derivedFrom              // Used to derive domain
+        String derivedFrom,             // Used to derive domain
+        String domainRating             // Domain rating value (e.g., A1, B, C)
 ) {
     /**
      * Derive domain from the derivedFrom field

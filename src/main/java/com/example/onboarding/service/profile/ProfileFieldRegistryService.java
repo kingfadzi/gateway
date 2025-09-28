@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import jakarta.annotation.PostConstruct;
 import java.io.IOException;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class ProfileFieldRegistryService {
@@ -23,13 +24,14 @@ public class ProfileFieldRegistryService {
     
     private List<ProfileFieldTypeInfo> profileFieldTypes = new ArrayList<>();
     private Map<String, FieldRiskConfig> fieldRiskConfigs = new HashMap<>();
+    private Map<String, Object> rawRegistry;
     
     @PostConstruct
     public void loadProfileFieldRegistry() {
         try {
             ClassPathResource resource = new ClassPathResource("profile-fields.registry.yaml");
-            Map<String, Object> registry = yamlMapper.readValue(resource.getInputStream(), Map.class);
-            parseRegistry(registry);
+            rawRegistry = yamlMapper.readValue(resource.getInputStream(), Map.class);
+            parseRegistry(rawRegistry);
             log.info("Loaded {} profile field types and {} risk configurations from registry", 
                     profileFieldTypes.size(), fieldRiskConfigs.size());
         } catch (IOException e) {
@@ -256,5 +258,23 @@ public class ProfileFieldRegistryService {
     public Optional<RiskCreationRule> getRiskRule(String fieldKey, String appCriticality) {
         return getFieldRiskConfig(fieldKey)
                 .map(config -> config.getRuleForCriticality(appCriticality));
+    }
+
+    public Map<String, Object> getRawRegistry() {
+        return rawRegistry;
+    }
+
+    public List<String> getDomains() {
+        return profileFieldTypes.stream()
+                .map(ProfileFieldTypeInfo::derivedFrom)
+                .distinct()
+                .collect(Collectors.toList());
+    }
+
+    public List<String> getControlsByDomain(String domain) {
+        return profileFieldTypes.stream()
+                .filter(fieldType -> domain.equals(fieldType.derivedFrom()))
+                .map(ProfileFieldTypeInfo::fieldKey)
+                .collect(Collectors.toList());
     }
 }

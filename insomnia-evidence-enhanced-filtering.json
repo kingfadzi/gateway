@@ -333,7 +333,7 @@
         {
           "id": "pair_1",
           "name": "domain",
-          "value": "security",
+          "value": "security_rating",
           "description": "Security domain controls"
         },
         {
@@ -368,8 +368,8 @@
         {
           "id": "pair_1",
           "name": "domain",
-          "value": "operations",
-          "description": "Operations domain controls"
+          "value": "availability_rating",
+          "description": "Operations/availability domain controls"
         },
         {
           "id": "pair_2",
@@ -403,8 +403,8 @@
         {
           "id": "pair_1",
           "name": "domain",
-          "value": "compliance",
-          "description": "Compliance domain controls"
+          "value": "confidentiality_rating",
+          "description": "Compliance/confidentiality domain controls"
         },
         {
           "id": "pair_2",
@@ -689,7 +689,7 @@
         {
           "id": "pair_2",
           "name": "domain",
-          "value": "security",
+          "value": "security_rating",
           "description": "Security domain only"
         },
         {
@@ -771,7 +771,7 @@
         {
           "id": "pair_2",
           "name": "domain",
-          "value": "security",
+          "value": "security_rating",
           "description": "Security domain"
         },
         {
@@ -824,7 +824,7 @@
         {
           "id": "pair_2",
           "name": "domain",
-          "value": "security",
+          "value": "security_rating",
           "description": "Security domain"
         },
         {
@@ -877,7 +877,7 @@
         {
           "id": "pair_3",
           "name": "domain",
-          "value": "security",
+          "value": "security_rating",
           "description": "Security domain"
         },
         {
@@ -1011,7 +1011,7 @@
         {
           "id": "pair_2",
           "name": "domain",
-          "value": "security",
+          "value": "security_rating",
           "description": "Further filter"
         },
         {
