@@ -21,12 +21,18 @@ import com.example.onboarding.config.AutoProfileProperties;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import dev.controlplane.auditkit.annotations.Audited;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 import java.util.List;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/api/apps")
+@Tag(name = "Applications", description = "Application management API")
 public class ApplicationController {
 
     private final AutoProfileService autoProfileService;
@@ -53,11 +59,20 @@ public class ApplicationController {
     }
 
     @GetMapping
+    @Operation(summary = "Search applications", description = "Search and filter applications with various criteria")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Applications retrieved successfully")
+    })
     public ResponseEntity<AppsResponse> search(
+            @Parameter(description = "Search term for application name or description")
             @RequestParam(required = false) String search,
+            @Parameter(description = "Filter by application criticality")
             @RequestParam(required = false) String criticality,
+            @Parameter(description = "Filter by application type")
             @RequestParam(required = false) String applicationType,
+            @Parameter(description = "Filter by architecture type")
             @RequestParam(required = false) String architectureType,
+            @Parameter(description = "Filter by installation type")
             @RequestParam(required = false) String installType
     ) {
         // Get total count (all apps)
@@ -102,7 +117,13 @@ public class ApplicationController {
     }
 
     @GetMapping("/{appId}")
-    public ResponseEntity<com.example.onboarding.dto.application.Application> getApplication(@PathVariable String appId) {
+    @Operation(summary = "Get application by ID", description = "Retrieve a specific application by its ID")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Application retrieved successfully"),
+        @ApiResponse(responseCode = "404", description = "Application not found")
+    })
+    public ResponseEntity<com.example.onboarding.dto.application.Application> getApplication(
+            @Parameter(description = "Application ID") @PathVariable String appId) {
         try {
             com.example.onboarding.dto.application.Application app = applicationManagementService.get(appId);
             return ResponseEntity.ok(app);
@@ -119,8 +140,15 @@ public class ApplicationController {
 
     /** Minimal create: caller provides only appId; server fetches CIA+S+R and builds profile */
     @PostMapping
-    public ResponseEntity<?> create(@RequestBody CreateAppRequest req,
-                                    @RequestParam(name="autoProfile", defaultValue = "true") boolean autoProfile) {
+    @Operation(summary = "Create new application", description = "Create a new application with auto-profiling")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Application created successfully"),
+        @ApiResponse(responseCode = "400", description = "Invalid request")
+    })
+    public ResponseEntity<?> create(
+            @Parameter(description = "Application creation request") @RequestBody CreateAppRequest req,
+            @Parameter(description = "Enable auto-profiling")
+            @RequestParam(name="autoProfile", defaultValue = "true") boolean autoProfile) {
         if (req == null || req.appId() == null || req.appId().isBlank()) {
             return ResponseEntity.badRequest().body("appId is required");
         }
