@@ -1,7 +1,6 @@
 package com.example.gateway.application.repository;
 
 import com.example.gateway.application.model.ApplicationMetadata;
-import com.example.gateway.deliveryunit.dto.EnvironmentInstance;
 import com.example.gateway.util.SqlLoader;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -22,7 +21,6 @@ public class ApplicationMetadataRepositoryImpl implements ApplicationMetadataRep
     private final JdbcTemplate jdbc;
     private final String appMetaSql = SqlLoader.load("app_metadata.sql");
     private final String appChildrenSql = SqlLoader.load("app_children.sql");
-    private final String appEnvironmentsSql = SqlLoader.load("app_environments.sql");
 
     public ApplicationMetadataRepositoryImpl(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
@@ -67,31 +65,6 @@ public class ApplicationMetadataRepositoryImpl implements ApplicationMetadataRep
             return Collections.emptyList();
         }
     }
-
-    public List<EnvironmentInstance> findEnvironmentsByAppId(String appId) {
-        try {
-            List<EnvironmentInstance> instances = jdbc.query(appEnvironmentsSql, (rs, rowNum) -> mapEnvironment(rs), appId);
-            logger.debug("findEnvironmentsByAppId({}): Found {} instances", appId, instances.size());
-            return instances;
-        } catch (Exception e) {
-            logger.error("Error retrieving environments for appId={}", appId, e);
-            return Collections.emptyList();
-        }
-    }
-
-    private EnvironmentInstance mapEnvironment(ResultSet rs) throws SQLException {
-        EnvironmentInstance ei = new EnvironmentInstance();
-        ei.setServiceCorrelationId(rs.getString("service_correlation_id"));
-        ei.setServiceName(rs.getString("service"));
-        ei.setAppCorrelationId(rs.getString("correlation_id"));
-        ei.setAppName(rs.getString("business_application_name"));
-        ei.setInstanceCorrelationId(rs.getString("instance_correlation_id"));
-        ei.setInstanceName(rs.getString("it_service_instance"));
-        ei.setEnvironment(rs.getString("environment"));
-        ei.setInstallType(rs.getString("install_type"));
-        return ei;
-    }
-
 
     private ApplicationMetadata mapRow(ResultSet rs) throws SQLException {
         ApplicationMetadata meta = new ApplicationMetadata();

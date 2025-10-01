@@ -2,7 +2,6 @@ package com.example.gateway.application.service;
 
 import com.example.gateway.application.model.AppMetadataResponse;
 import com.example.gateway.application.model.ApplicationMetadata;
-import com.example.gateway.deliveryunit.dto.EnvironmentInstance;
 import com.example.gateway.application.repository.ApplicationMetadataRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,17 +68,4 @@ public class ApplicationMetadataService {
         }
     }
 
-    /**
-     * Retrieve all environment instances for the specified application.
-     */
-    public List<EnvironmentInstance> getEnvironmentsForApp(String appId) {
-        try {
-            List<EnvironmentInstance> instances = repo.findEnvironmentsByAppId(appId);
-            logger.debug("Retrieved {} environment instances for appId={}", instances.size(), appId);
-            return instances;
-        } catch (Exception e) {
-            logger.error("Error retrieving environment instances for appId={}", appId, e);
-            return Collections.emptyList();
-        }
-    }
 }
