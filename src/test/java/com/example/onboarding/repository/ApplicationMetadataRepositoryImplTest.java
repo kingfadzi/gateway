@@ -1,7 +1,7 @@
 package com.example.onboarding.repository;
 
-import com.example.onboarding.application.model.ApplicationMetadata;
-import com.example.onboarding.application.repository.ApplicationMetadataRepositoryImpl;
+import com.example.gateway.application.model.ApplicationMetadata;
+import com.example.gateway.application.repository.ApplicationMetadataRepositoryImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;

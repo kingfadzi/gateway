@@ -1,14 +1,14 @@
 package com.example.onboarding.service;
 
-import com.example.onboarding.config.FieldRegistryConfig;
-import com.example.onboarding.evidence.dto.EvidenceSearchRequest;
-import com.example.onboarding.evidence.dto.WorkbenchEvidenceItem;
-import com.example.onboarding.evidence.repository.EvidenceRepository;
-import com.example.onboarding.profile.respository.ProfileRepository;
-import com.example.onboarding.document.service.DocumentService;
-import com.example.onboarding.evidence.service.EvidenceFieldLinkService;
-import com.example.onboarding.evidence.service.EvidenceServiceImpl;
-import com.example.onboarding.evidence.service.UnifiedFreshnessCalculator;
+import com.example.gateway.config.FieldRegistryConfig;
+import com.example.gateway.evidence.dto.EvidenceSearchRequest;
+import com.example.gateway.evidence.dto.WorkbenchEvidenceItem;
+import com.example.gateway.evidence.repository.EvidenceRepository;
+import com.example.gateway.profile.respository.ProfileRepository;
+import com.example.gateway.document.service.DocumentService;
+import com.example.gateway.evidence.service.EvidenceFieldLinkService;
+import com.example.gateway.evidence.service.EvidenceServiceImpl;
+import com.example.gateway.evidence.service.UnifiedFreshnessCalculator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;

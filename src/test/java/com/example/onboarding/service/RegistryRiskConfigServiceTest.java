@@ -1,8 +1,8 @@
 package com.example.onboarding.service;
 
-import com.example.onboarding.registry.dto.RegistryRuleEvaluation;
-import com.example.onboarding.registry.service.RegistryRiskConfigService;
-import com.example.onboarding.profile.service.ProfileFieldRegistryService;
+import com.example.gateway.registry.dto.RegistryRuleEvaluation;
+import com.example.gateway.registry.service.RegistryRiskConfigService;
+import com.example.gateway.profile.service.ProfileFieldRegistryService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;

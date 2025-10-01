@@ -1,11 +1,11 @@
 package com.example.onboarding.service;
 
-import com.example.onboarding.profile.dto.ProfileFieldTypeInfo;
-import com.example.onboarding.registry.dto.ComplianceFramework;
-import com.example.onboarding.registry.dto.FieldRiskConfig;
-import com.example.onboarding.registry.dto.RiskCreationRule;
-import com.example.onboarding.registry.service.ComplianceContextService;
-import com.example.onboarding.profile.service.ProfileFieldRegistryService;
+import com.example.gateway.profile.dto.ProfileFieldTypeInfo;
+import com.example.gateway.registry.dto.ComplianceFramework;
+import com.example.gateway.registry.dto.FieldRiskConfig;
+import com.example.gateway.registry.dto.RiskCreationRule;
+import com.example.gateway.registry.service.ComplianceContextService;
+import com.example.gateway.profile.service.ProfileFieldRegistryService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
