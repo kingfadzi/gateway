@@ -1,6 +1,6 @@
 package com.example.onboarding.web;
 
-import com.example.onboarding.exception.DataIntegrityException;
+import com.example.onboarding.application.dto.exception.DataIntegrityException;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 

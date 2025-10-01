@@ -5,9 +5,9 @@ import com.example.onboarding.config.OpaProperties;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
-import com.example.onboarding.dto.policy.OpaRequest;
-import com.example.onboarding.dto.policy.OpaResponse;
-import com.example.onboarding.dto.policy.PolicyDecision;
+import com.example.onboarding.policy.dto.OpaRequest;
+import com.example.onboarding.policy.dto.OpaResponse;
+import com.example.onboarding.policy.dto.PolicyDecision;
 
 
 @Service

@@ -1,22 +1,20 @@
 package com.example.onboarding.service;
 
 import com.example.onboarding.config.FieldRegistryConfig;
-import com.example.onboarding.dto.evidence.EvidenceSearchRequest;
-import com.example.onboarding.dto.evidence.WorkbenchEvidenceItem;
-import com.example.onboarding.dto.profile.ProfileField;
-import com.example.onboarding.repository.evidence.EvidenceRepository;
-import com.example.onboarding.repository.profile.ProfileRepository;
-import com.example.onboarding.service.document.DocumentService;
-import com.example.onboarding.service.evidence.EvidenceFieldLinkService;
-import com.example.onboarding.service.evidence.EvidenceServiceImpl;
-import com.example.onboarding.service.evidence.UnifiedFreshnessCalculator;
+import com.example.onboarding.evidence.dto.EvidenceSearchRequest;
+import com.example.onboarding.evidence.dto.WorkbenchEvidenceItem;
+import com.example.onboarding.evidence.repository.EvidenceRepository;
+import com.example.onboarding.profile.respository.ProfileRepository;
+import com.example.onboarding.document.service.DocumentService;
+import com.example.onboarding.evidence.service.EvidenceFieldLinkService;
+import com.example.onboarding.evidence.service.EvidenceServiceImpl;
+import com.example.onboarding.evidence.service.UnifiedFreshnessCalculator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
-import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 

@@ -1,0 +1,17 @@
+package com.example.onboarding.deliveryunit.repository;
+
+import com.example.onboarding.deliveryunit.dto.Tool;
+import com.example.onboarding.deliveryunit.dto.ToolMappings;
+
+import java.util.List;
+
+public interface ComponentMappingRepository {
+    ToolMappings resolveMappings(String componentId);
+
+    List<Tool> findByComponentIdAndToolType(String componentId, String toolType);
+
+    Long findComponentIdByAppId(String appId);
+    List<Tool> findToolsByMappingType(Long componentId, String mappingType);
+
+    List<Tool> findAllTools(Long componentId);
+}

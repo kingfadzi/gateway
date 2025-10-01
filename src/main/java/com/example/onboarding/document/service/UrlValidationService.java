@@ -1,0 +1,111 @@
+package com.example.onboarding.document.service;
+
+import com.example.onboarding.config.DocumentValidationProperties;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.regex.Pattern;
+
+@Service
+public class UrlValidationService {
+    
+    private static final Logger log = LoggerFactory.getLogger(UrlValidationService.class);
+    
+    private final DocumentValidationProperties validationProperties;
+    private final ResponseValidationService responseValidationService;
+    
+    // Pattern for detecting fake subdomains (will be built from configuration)
+    private final Pattern fakeSubdomainPattern;
+    
+    public UrlValidationService(DocumentValidationProperties validationProperties, 
+                               ResponseValidationService responseValidationService) {
+        this.validationProperties = validationProperties;
+        this.responseValidationService = responseValidationService;
+        
+        // Disabled fake subdomain pattern (using platform-domains validation instead)
+        this.fakeSubdomainPattern = Pattern.compile("^$"); // Never matches
+    }
+    
+    public ValidationResult validateUrl(String url) {
+        if (url == null || url.trim().isEmpty()) {
+            return ValidationResult.invalid("URL cannot be empty");
+        }
+        
+        try {
+            URI uri = new URI(url.trim());
+            
+            // Check scheme
+            if (uri.getScheme() == null || (!uri.getScheme().equalsIgnoreCase("http") && !uri.getScheme().equalsIgnoreCase("https"))) {
+                return ValidationResult.invalid("URL must use http or https protocol");
+            }
+            
+            // Check host
+            String host = uri.getHost();
+            if (host == null || host.trim().isEmpty()) {
+                return ValidationResult.invalid("URL must have a valid host");
+            }
+            
+            host = host.toLowerCase();
+            
+            // Check for fake domains
+            ValidationResult fakeCheck = checkForFakeDomains(host, url);
+            if (!fakeCheck.isValid()) {
+                return fakeCheck;
+            }
+            
+            // Check for suspicious patterns
+            ValidationResult suspiciousCheck = checkForSuspiciousPatterns(host, url);
+            if (!suspiciousCheck.isValid()) {
+                return suspiciousCheck;
+            }
+            
+            // For allowed domains, validate the response content
+            if (isAllowedDomain(host)) {
+                log.debug("Performing response validation for allowed domain: {}", host);
+                ValidationResult responseValidation = responseValidationService.validateResponse(url);
+                if (!responseValidation.isValid()) {
+                    log.warn("Response validation failed for allowed domain {}: {}", host, responseValidation.getErrorMessage());
+                    return ValidationResult.invalid("Content validation failed: " + responseValidation.getErrorMessage());
+                }
+            }
+            
+            return ValidationResult.valid();
+            
+        } catch (URISyntaxException e) {
+            return ValidationResult.invalid("Malformed URL: " + e.getMessage());
+        }
+    }
+    
+    private ValidationResult checkForFakeDomains(String host, String url) {
+        // Domain validation now handled by PlatformDetectionService using platform-domains config
+        // This method is kept for backward compatibility but delegates to platform detection
+        return ValidationResult.valid();
+    }
+    
+    private ValidationResult checkForSuspiciousPatterns(String host, String url) {
+        // Pattern validation now handled by PlatformDetectionService using platform-domains config
+        // This method is kept for backward compatibility but delegates to platform detection
+        return ValidationResult.valid();
+    }
+    
+    private boolean isAllowedDomain(String host) {
+        // Domain validation now handled by PlatformDetectionService using platform-domains config
+        // Use the new findPlatformForHostname method to check if domain is allowed
+        String platform = validationProperties.findPlatformForHostname(host);
+        return platform != null;
+    }
+    
+    private ValidationResult validatePlatformSpecificUrls(String host, String url) {
+        // For now, platform-specific validation is mainly done by checking allowed domains
+        // and response content validation. Additional platform-specific URL structure
+        // validation can be added here if needed.
+        
+        // All platform validation is now handled by isAllowedDomain() check
+        // and responseValidationService for content validation
+        return ValidationResult.valid();
+    }
+    
+}

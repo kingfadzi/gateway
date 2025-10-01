@@ -1,17 +1,16 @@
 package com.example.onboarding.util;
 
-import com.example.onboarding.dto.application.ServiceInstanceRow;
-import com.example.onboarding.dto.application.SourceRow;
-import com.example.onboarding.dto.evidence.Evidence;
-import com.example.onboarding.dto.profile.FieldRow;
-import com.example.onboarding.dto.profile.ProfileField;
-import com.example.onboarding.dto.profile.ProfileMeta;
+import com.example.onboarding.application.dto.ServiceInstanceRow;
+import com.example.onboarding.application.dto.SourceRow;
+import com.example.onboarding.evidence.dto.Evidence;
+import com.example.onboarding.profile.dto.FieldRow;
+import com.example.onboarding.profile.dto.ProfileField;
+import com.example.onboarding.profile.dto.ProfileMeta;
 import org.springframework.jdbc.core.RowMapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.sql.ResultSet;
 import java.sql.SQLException;

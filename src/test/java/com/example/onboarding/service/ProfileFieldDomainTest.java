@@ -1,7 +1,7 @@
 package com.example.onboarding.service;
 
-import com.example.onboarding.dto.profile.ProfileFieldTypeInfo;
-import com.example.onboarding.service.profile.ProfileFieldRegistryService;
+import com.example.onboarding.profile.dto.ProfileFieldTypeInfo;
+import com.example.onboarding.profile.service.ProfileFieldRegistryService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;

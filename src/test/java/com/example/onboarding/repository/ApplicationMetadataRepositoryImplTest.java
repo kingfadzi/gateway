@@ -1,15 +1,14 @@
 package com.example.onboarding.repository;
 
-import com.example.onboarding.model.ApplicationMetadata;
+import com.example.onboarding.application.model.ApplicationMetadata;
+import com.example.onboarding.application.repository.ApplicationMetadataRepositoryImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentMatchers;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.ResultSetExtractor;
 import org.springframework.jdbc.core.RowMapper;
 
 import java.sql.ResultSet;
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 

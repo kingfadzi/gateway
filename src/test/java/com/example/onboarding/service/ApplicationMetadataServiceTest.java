@@ -1,8 +1,9 @@
 package com.example.onboarding.service;
 
-import com.example.onboarding.model.ApplicationMetadata;
-import com.example.onboarding.model.AppMetadataResponse;
-import com.example.onboarding.repository.ApplicationMetadataRepository;
+import com.example.onboarding.application.model.ApplicationMetadata;
+import com.example.onboarding.application.model.AppMetadataResponse;
+import com.example.onboarding.application.repository.ApplicationMetadataRepository;
+import com.example.onboarding.application.service.ApplicationMetadataService;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
