@@ -1,7 +1,7 @@
-package com.example.gateway.sme.controller;
+package com.example.gateway.risk.controller;
 
-import com.example.gateway.sme.dto.SmeRiskQueueResponse;
-import com.example.gateway.sme.service.SmeRiskService;
+import com.example.gateway.risk.dto.SmeRiskQueueResponse;
+import com.example.gateway.risk.service.SmeRiskService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 

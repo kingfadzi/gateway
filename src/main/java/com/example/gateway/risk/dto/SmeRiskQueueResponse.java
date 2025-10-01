@@ -1,4 +1,4 @@
-package com.example.gateway.sme.dto;
+package com.example.gateway.risk.dto;
 
 import com.example.gateway.risk.model.RiskStatus;
 import com.example.gateway.risk.model.RiskStory;

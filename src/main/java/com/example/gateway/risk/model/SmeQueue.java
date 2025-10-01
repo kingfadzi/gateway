@@ -1,4 +1,4 @@
-package com.example.gateway.sme.model;
+package com.example.gateway.risk.model;
 
 import jakarta.persistence.*;
 import lombok.Data;

@@ -1,6 +1,6 @@
-package com.example.gateway.sme.service;
+package com.example.gateway.risk.service;
 
-import com.example.gateway.sme.dto.SmeRiskQueueResponse;
+import com.example.gateway.risk.dto.SmeRiskQueueResponse;
 
 import java.util.List;
 
