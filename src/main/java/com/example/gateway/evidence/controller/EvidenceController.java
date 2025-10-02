@@ -3,6 +3,7 @@ package com.example.gateway.evidence.controller;
 import com.example.gateway.evidence.dto.*;
 import com.example.gateway.application.dto.PageResponse;
 import com.example.gateway.evidence.service.EvidenceService;
+import com.example.gateway.evidence.service.EvidenceOrchestrationService;
 import com.example.gateway.document.service.DocumentService;
 import com.example.gateway.evidence.service.EvidenceFieldLinkService;
 import com.example.gateway.evidence.service.EvidenceAttestationService;
@@ -23,13 +24,18 @@ public class EvidenceController {
     private static final Logger log = LoggerFactory.getLogger(EvidenceController.class);
     
     private final EvidenceService evidenceService;
+    private final EvidenceOrchestrationService evidenceOrchestrationService;
     private final DocumentService documentService;
     private final EvidenceFieldLinkService evidenceFieldLinkService;
     private final EvidenceAttestationService evidenceAttestationService;
-    
-    public EvidenceController(EvidenceService evidenceService, DocumentService documentService, 
-                             EvidenceFieldLinkService evidenceFieldLinkService, EvidenceAttestationService evidenceAttestationService) {
+
+    public EvidenceController(EvidenceService evidenceService,
+                             EvidenceOrchestrationService evidenceOrchestrationService,
+                             DocumentService documentService,
+                             EvidenceFieldLinkService evidenceFieldLinkService,
+                             EvidenceAttestationService evidenceAttestationService) {
         this.evidenceService = evidenceService;
+        this.evidenceOrchestrationService = evidenceOrchestrationService;
         this.documentService = documentService;
         this.evidenceFieldLinkService = evidenceFieldLinkService;
         this.evidenceAttestationService = evidenceAttestationService;
@@ -199,7 +205,7 @@ public class EvidenceController {
                                                                                    @RequestBody CreateEvidenceWithDocumentRequest request) {
         log.info("Creating evidence with document for app {} with request: {}", appId, request);
         try {
-            EvidenceWithDocumentResponse response = evidenceService.createEvidenceWithDocument(appId, request);
+            EvidenceWithDocumentResponse response = evidenceOrchestrationService.createEvidenceWithDocument(appId, request);
             log.info("Successfully created evidence {} with document {} for app {}", 
                 response.evidenceId(), response.document().documentId(), appId);
             return ResponseEntity.status(201).body(response);

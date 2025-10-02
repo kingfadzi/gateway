@@ -53,11 +53,6 @@ public interface EvidenceService {
     Evidence revokeEvidence(String evidenceId, String reviewedBy);
     
     /**
-     * Create evidence with a new document in a single atomic operation
-     */
-    EvidenceWithDocumentResponse createEvidenceWithDocument(String appId, CreateEvidenceWithDocumentRequest request);
-    
-    /**
      * Get all documents currently attached as evidence to a profile field
      */
     AttachedDocumentsResponse getAttachedDocuments(String appId, String profileFieldId);
