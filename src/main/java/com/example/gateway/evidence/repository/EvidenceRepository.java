@@ -138,7 +138,7 @@ public class EvidenceRepository {
      * Uses KPI-style profile version filtering
      */
     public List<EnhancedEvidenceSummary> findEvidenceByApp(String appId, int limit, int offset) {
-        String sql = """
+        StringBuilder sql = new StringBuilder("""
             SELECT e.evidence_id, e.app_id, e.profile_field_id, e.claim_id, e.uri, e.type, e.status,
                    e.submitted_by, e.valid_from, e.valid_until, e.track_id, e.document_id, e.doc_version_id,
                    e.created_at, e.updated_at,
@@ -151,22 +151,32 @@ public class EvidenceRepository {
             JOIN profile_field pf ON e.profile_field_id = pf.id
             JOIN profile p ON pf.profile_id = p.profile_id
             LEFT JOIN document d ON e.document_id = d.document_id
-            WHERE p.app_id = :appId
-            AND p.version = (SELECT MAX(version) FROM profile WHERE app_id = :appId)
-            ORDER BY e.created_at DESC
-            LIMIT :limit OFFSET :offset
-            """;
+            WHERE 1=1
+            """);
 
-        return jdbc.query(sql, Map.of("appId", appId, "limit", limit, "offset", offset),
-            this::mapEnhancedEvidenceSummary);
+        java.util.Map<String, Object> params = new java.util.HashMap<>();
+
+        // Add profile version filter
+        SqlFilterBuilder.addProfileVersionFilter(sql, params, appId, "p");
+
+        // Add ordering and pagination
+        SqlFilterBuilder.addOrderBy(sql, "e.created_at DESC");
+        SqlFilterBuilder.addPagination(sql, params, limit, offset);
+
+        return jdbc.query(sql.toString(), params, this::mapEnhancedEvidenceSummary);
     }
     
     /**
      * Count evidence by app
      */
     public long countEvidenceByApp(String appId) {
-        String sql = "SELECT COUNT(*) FROM evidence WHERE app_id = :appId";
-        Integer count = jdbc.queryForObject(sql, Map.of("appId", appId), Integer.class);
+        StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM evidence WHERE 1=1");
+        java.util.Map<String, Object> params = new java.util.HashMap<>();
+
+        // Add app ID filter
+        SqlFilterBuilder.addAppIdFilter(sql, params, appId, "app_id");
+
+        Integer count = jdbc.queryForObject(sql.toString(), params, Integer.class);
         return count != null ? count : 0;
     }
     
@@ -175,7 +185,7 @@ public class EvidenceRepository {
      * Uses KPI-style profile version filtering
      */
     public List<EnhancedEvidenceSummary> findEvidenceByProfileField(String profileFieldId, int limit, int offset) {
-        String sql = """
+        StringBuilder sql = new StringBuilder("""
             SELECT e.evidence_id, e.app_id, e.profile_field_id, e.claim_id, e.uri, e.type, e.status,
                    e.submitted_by, e.valid_from, e.valid_until, e.track_id, e.document_id, e.doc_version_id,
                    e.created_at, e.updated_at,
@@ -189,13 +199,19 @@ public class EvidenceRepository {
             JOIN profile p ON pf.profile_id = p.profile_id
             LEFT JOIN document d ON e.document_id = d.document_id
             WHERE e.profile_field_id = :profileFieldId
-            AND p.version = (SELECT MAX(version) FROM profile p2 WHERE p2.app_id = p.app_id)
-            ORDER BY e.created_at DESC
-            LIMIT :limit OFFSET :offset
-            """;
+            """);
 
-        return jdbc.query(sql, Map.of("profileFieldId", profileFieldId, "limit", limit, "offset", offset),
-            this::mapEnhancedEvidenceSummary);
+        java.util.Map<String, Object> params = new java.util.HashMap<>();
+        params.put("profileFieldId", profileFieldId);
+
+        // Add profile version filter (portfolio-wide, no specific appId)
+        SqlFilterBuilder.addProfileVersionFilter(sql, params, null, "p");
+
+        // Add ordering and pagination
+        SqlFilterBuilder.addOrderBy(sql, "e.created_at DESC");
+        SqlFilterBuilder.addPagination(sql, params, limit, offset);
+
+        return jdbc.query(sql.toString(), params, this::mapEnhancedEvidenceSummary);
     }
 
     /**
@@ -237,7 +253,7 @@ public class EvidenceRepository {
      * Uses KPI-style profile version filtering
      */
     public List<EnhancedEvidenceSummary> findEvidenceByClaim(String claimId, int limit, int offset) {
-        String sql = """
+        StringBuilder sql = new StringBuilder("""
             SELECT e.evidence_id, e.app_id, e.profile_field_id, e.claim_id, e.uri, e.type, e.status,
                    e.submitted_by, e.valid_from, e.valid_until, e.track_id, e.document_id, e.doc_version_id,
                    e.created_at, e.updated_at,
@@ -251,13 +267,19 @@ public class EvidenceRepository {
             JOIN profile p ON pf.profile_id = p.profile_id
             LEFT JOIN document d ON e.document_id = d.document_id
             WHERE e.claim_id = :claimId
-            AND p.version = (SELECT MAX(version) FROM profile p2 WHERE p2.app_id = p.app_id)
-            ORDER BY e.created_at DESC
-            LIMIT :limit OFFSET :offset
-            """;
+            """);
 
-        return jdbc.query(sql, Map.of("claimId", claimId, "limit", limit, "offset", offset),
-            this::mapEnhancedEvidenceSummary);
+        java.util.Map<String, Object> params = new java.util.HashMap<>();
+        params.put("claimId", claimId);
+
+        // Add profile version filter (portfolio-wide, no specific appId)
+        SqlFilterBuilder.addProfileVersionFilter(sql, params, null, "p");
+
+        // Add ordering and pagination
+        SqlFilterBuilder.addOrderBy(sql, "e.created_at DESC");
+        SqlFilterBuilder.addPagination(sql, params, limit, offset);
+
+        return jdbc.query(sql.toString(), params, this::mapEnhancedEvidenceSummary);
     }
     
     /**
@@ -265,7 +287,7 @@ public class EvidenceRepository {
      * Uses KPI-style profile version filtering
      */
     public List<EnhancedEvidenceSummary> findEvidenceByTrack(String trackId, int limit, int offset) {
-        String sql = """
+        StringBuilder sql = new StringBuilder("""
             SELECT e.evidence_id, e.app_id, e.profile_field_id, e.claim_id, e.uri, e.type, e.status,
                    e.submitted_by, e.valid_from, e.valid_until, e.track_id, e.document_id, e.doc_version_id,
                    e.created_at, e.updated_at,
@@ -279,13 +301,19 @@ public class EvidenceRepository {
             JOIN profile p ON pf.profile_id = p.profile_id
             LEFT JOIN document d ON e.document_id = d.document_id
             WHERE e.track_id = :trackId
-            AND p.version = (SELECT MAX(version) FROM profile p2 WHERE p2.app_id = p.app_id)
-            ORDER BY e.created_at DESC
-            LIMIT :limit OFFSET :offset
-            """;
+            """);
 
-        return jdbc.query(sql, Map.of("trackId", trackId, "limit", limit, "offset", offset),
-            this::mapEnhancedEvidenceSummary);
+        java.util.Map<String, Object> params = new java.util.HashMap<>();
+        params.put("trackId", trackId);
+
+        // Add profile version filter (portfolio-wide, no specific appId)
+        SqlFilterBuilder.addProfileVersionFilter(sql, params, null, "p");
+
+        // Add ordering and pagination
+        SqlFilterBuilder.addOrderBy(sql, "e.created_at DESC");
+        SqlFilterBuilder.addPagination(sql, params, limit, offset);
+
+        return jdbc.query(sql.toString(), params, this::mapEnhancedEvidenceSummary);
     }
     
     /**
@@ -1041,254 +1069,6 @@ public class EvidenceRepository {
         return jdbc.getJdbcTemplate().queryForList(sql, appId, profileFieldId);
     }
 
-    /**
-     * Count compliant evidence records
-     */
-    public long countCompliantEvidence(String appId, String criticality, String domain, String fieldKey, String search) {
-        StringBuilder sqlBuilder = new StringBuilder("""
-            SELECT COUNT(DISTINCT e.evidence_id)
-            FROM evidence e
-            JOIN evidence_field_link efl ON e.evidence_id = efl.evidence_id
-            JOIN profile_field pf ON e.profile_field_id = pf.id
-            JOIN profile p ON pf.profile_id = p.profile_id
-            LEFT JOIN document d ON e.document_id = d.document_id
-            LEFT JOIN application app ON e.app_id = app.app_id
-            WHERE efl.link_status IN ('APPROVED', 'USER_ATTESTED')
-            """);
-        java.util.Map<String, Object> params = new java.util.HashMap<>();
-        // Add profile version filtering (KPI-style logic)
-        if (appId != null && !appId.trim().isEmpty()) {
-            sqlBuilder.append(" AND p.app_id = :appId");
-            sqlBuilder.append(" AND p.version = (SELECT MAX(version) FROM profile WHERE app_id = :appId)");
-            params.put("appId", appId.trim());
-        } else {
-            // For portfolio-wide searches, ensure we only get latest versions for each app
-            sqlBuilder.append(" AND p.version = (SELECT MAX(version) FROM profile p2 WHERE p2.app_id = p.app_id)");
-        }
-
-        // Add same filter logic as find method
-        if (criticality != null && !criticality.trim().isEmpty()) {
-            String[] criticalityValues = criticality.split(",");
-            sqlBuilder.append(" AND app.app_criticality_assessment IN (");
-            for (int i = 0; i < criticalityValues.length; i++) {
-                sqlBuilder.append(":criticality").append(i);
-                if (i < criticalityValues.length - 1) {
-                    sqlBuilder.append(", ");
-                }
-                params.put("criticality" + i, criticalityValues[i].trim());
-            }
-            sqlBuilder.append(")");
-        }
-
-        if (domain != null && !domain.trim().isEmpty()) {
-            sqlBuilder.append(" AND pf.derived_from = :derivedFrom");
-            params.put("derivedFrom", domain.trim());
-        }
-
-        if (fieldKey != null && !fieldKey.trim().isEmpty()) {
-            sqlBuilder.append(" AND pf.field_key = :fieldKey");
-            params.put("fieldKey", fieldKey.trim());
-        }
-
-        if (search != null && !search.trim().isEmpty()) {
-            sqlBuilder.append(" AND (e.uri ILIKE :search OR d.title ILIKE :search OR pf.field_key ILIKE :search)");
-            params.put("search", "%" + search.trim() + "%");
-        }
-
-        return jdbc.queryForObject(sqlBuilder.toString(), params, Long.class);
-    }
-
-    /**
-     * Count pending review evidence records
-     */
-    public long countPendingReviewEvidence(String appId, String criticality, String domain, String fieldKey, String search) {
-        StringBuilder sqlBuilder = new StringBuilder("""
-            SELECT COUNT(DISTINCT e.evidence_id)
-            FROM evidence e
-            JOIN evidence_field_link efl ON e.evidence_id = efl.evidence_id
-            JOIN profile_field pf ON e.profile_field_id = pf.id
-            JOIN profile p ON pf.profile_id = p.profile_id
-            LEFT JOIN document d ON e.document_id = d.document_id
-            LEFT JOIN application app ON e.app_id = app.app_id
-            WHERE efl.link_status IN ('PENDING_PO_REVIEW', 'PENDING_SME_REVIEW')
-            AND NOT EXISTS (
-                SELECT 1 FROM evidence e2
-                JOIN evidence_field_link efl2 ON efl2.evidence_id = e2.evidence_id
-                WHERE e2.profile_field_id = pf.id
-                AND efl2.link_status IN ('APPROVED', 'USER_ATTESTED')
-            )
-            """);
-
-        java.util.Map<String, Object> params = new java.util.HashMap<>();
-
-        // Add profile version filtering (KPI-style logic)
-        if (appId != null && !appId.trim().isEmpty()) {
-            sqlBuilder.append(" AND p.app_id = :appId");
-            sqlBuilder.append(" AND p.version = (SELECT MAX(version) FROM profile WHERE app_id = :appId)");
-            params.put("appId", appId.trim());
-        } else {
-            // For portfolio-wide searches, ensure we only get latest versions for each app
-            sqlBuilder.append(" AND p.version = (SELECT MAX(version) FROM profile p2 WHERE p2.app_id = p.app_id)");
-        }
-
-        // Add criticality filter
-        if (criticality != null && !criticality.trim().isEmpty()) {
-            String[] criticalityValues = criticality.split(",");
-            sqlBuilder.append(" AND app.app_criticality_assessment IN (");
-            for (int i = 0; i < criticalityValues.length; i++) {
-                sqlBuilder.append(":criticality").append(i);
-                if (i < criticalityValues.length - 1) {
-                    sqlBuilder.append(", ");
-                }
-                params.put("criticality" + i, criticalityValues[i].trim());
-            }
-            sqlBuilder.append(")");
-        }
-
-        // Add domain filter (matches derivedFrom pattern)
-        if (domain != null && !domain.trim().isEmpty()) {
-            sqlBuilder.append(" AND pf.derived_from = :derivedFrom");
-            params.put("derivedFrom", domain.trim());
-        }
-
-        // Add field key filter
-        if (fieldKey != null && !fieldKey.trim().isEmpty()) {
-            sqlBuilder.append(" AND pf.field_key = :fieldKey");
-            params.put("fieldKey", fieldKey.trim());
-        }
-
-        // Add text search filter
-        if (search != null && !search.trim().isEmpty()) {
-            sqlBuilder.append(" AND (e.uri ILIKE :search OR d.title ILIKE :search OR pf.field_key ILIKE :search)");
-            params.put("search", "%" + search.trim() + "%");
-        }
-
-        return jdbc.queryForObject(sqlBuilder.toString(), params, Long.class);
-    }
-
-    /**
-     * Count missing evidence profile fields
-     */
-    public long countMissingEvidenceFields(String appId, String criticality, String domain, String fieldKey, String search) {
-        StringBuilder sqlBuilder = new StringBuilder("""
-            SELECT COUNT(DISTINCT pf.id)
-            FROM profile p
-            JOIN profile_field pf ON p.profile_id = pf.profile_id
-            LEFT JOIN application app ON p.app_id = app.app_id
-            WHERE NOT EXISTS (
-                SELECT 1 FROM evidence e
-                WHERE e.profile_field_id = pf.id
-            )
-            """);
-
-        java.util.Map<String, Object> params = new java.util.HashMap<>();
-
-        // Add profile version filtering (KPI-style logic)
-        if (appId != null && !appId.trim().isEmpty()) {
-            sqlBuilder.append(" AND p.app_id = :appId");
-            sqlBuilder.append(" AND p.version = (SELECT MAX(version) FROM profile WHERE app_id = :appId)");
-            params.put("appId", appId.trim());
-        } else {
-            // For portfolio-wide searches, ensure we only get latest versions for each app
-            sqlBuilder.append(" AND p.version = (SELECT MAX(version) FROM profile p2 WHERE p2.app_id = p.app_id)");
-        }
-
-        // Add criticality filter
-        if (criticality != null && !criticality.trim().isEmpty()) {
-            String[] criticalityValues = criticality.split(",");
-            sqlBuilder.append(" AND app.app_criticality_assessment IN (");
-            for (int i = 0; i < criticalityValues.length; i++) {
-                sqlBuilder.append(":criticality").append(i);
-                if (i < criticalityValues.length - 1) {
-                    sqlBuilder.append(", ");
-                }
-                params.put("criticality" + i, criticalityValues[i].trim());
-            }
-            sqlBuilder.append(")");
-        }
-
-        // Add domain filter (matches derivedFrom pattern)
-        if (domain != null && !domain.trim().isEmpty()) {
-            sqlBuilder.append(" AND pf.derived_from = :derivedFrom");
-            params.put("derivedFrom", domain.trim());
-        }
-
-        // Add field key filter
-        if (fieldKey != null && !fieldKey.trim().isEmpty()) {
-            sqlBuilder.append(" AND pf.field_key = :fieldKey");
-            params.put("fieldKey", fieldKey.trim());
-        }
-
-        // Add text search filter (for missing evidence, search only field_key and app_name)
-        if (search != null && !search.trim().isEmpty()) {
-            sqlBuilder.append(" AND (pf.field_key ILIKE :search OR app.name ILIKE :search)");
-            params.put("search", "%" + search.trim() + "%");
-        }
-
-        return jdbc.queryForObject(sqlBuilder.toString(), params, Long.class);
-    }
-
-    /**
-     * Count risk blocked items
-     */
-    public long countRiskBlockedItems(String appId, String criticality, String domain, String fieldKey, String search) {
-        StringBuilder sqlBuilder = new StringBuilder("""
-            SELECT COUNT(DISTINCT rs.risk_id)
-            FROM risk_story rs
-            LEFT JOIN application app ON rs.app_id = app.app_id
-            LEFT JOIN profile p ON rs.app_id = p.app_id
-                AND p.version = (SELECT MAX(version) FROM profile p2 WHERE p2.app_id = rs.app_id)
-            LEFT JOIN profile_field pf ON rs.field_key = pf.field_key
-                AND pf.profile_id = p.profile_id
-            WHERE rs.status IN ('PENDING_SME_REVIEW', 'UNDER_REVIEW', 'OPEN')
-            """);
-
-        java.util.Map<String, Object> params = new java.util.HashMap<>();
-
-        // Add profile version filtering (KPI-style logic)
-        if (appId != null && !appId.trim().isEmpty()) {
-            sqlBuilder.append(" AND rs.app_id = :appId");
-            sqlBuilder.append(" AND p.version = (SELECT MAX(version) FROM profile WHERE app_id = :appId)");
-            params.put("appId", appId.trim());
-        } else {
-            // For portfolio-wide searches, ensure we only get latest versions for each app
-            sqlBuilder.append(" AND p.version = (SELECT MAX(version) FROM profile p2 WHERE p2.app_id = p.app_id)");
-        }
-
-        // Add criticality filter
-        if (criticality != null && !criticality.trim().isEmpty()) {
-            String[] criticalityValues = criticality.split(",");
-            sqlBuilder.append(" AND app.app_criticality_assessment IN (");
-            for (int i = 0; i < criticalityValues.length; i++) {
-                sqlBuilder.append(":criticality").append(i);
-                if (i < criticalityValues.length - 1) {
-                    sqlBuilder.append(", ");
-                }
-                params.put("criticality" + i, criticalityValues[i].trim());
-            }
-            sqlBuilder.append(")");
-        }
-
-        // Add domain filter (matches derivedFrom pattern)
-        if (domain != null && !domain.trim().isEmpty()) {
-            sqlBuilder.append(" AND pf.derived_from = :derivedFrom");
-            params.put("derivedFrom", domain.trim());
-        }
-
-        // Add field key filter
-        if (fieldKey != null && !fieldKey.trim().isEmpty()) {
-            sqlBuilder.append(" AND pf.field_key = :fieldKey");
-            params.put("fieldKey", fieldKey.trim());
-        }
-
-        // Add text search filter (search in title, hypothesis, and field_key)
-        if (search != null && !search.trim().isEmpty()) {
-            sqlBuilder.append(" AND (rs.title ILIKE :search OR rs.hypothesis ILIKE :search OR rs.field_key ILIKE :search OR app.name ILIKE :search)");
-            params.put("search", "%" + search.trim() + "%");
-        }
-
-        return jdbc.queryForObject(sqlBuilder.toString(), params, Long.class);
-    }
 
     /**
      * Delete evidence records by app, profile field, and document ID
