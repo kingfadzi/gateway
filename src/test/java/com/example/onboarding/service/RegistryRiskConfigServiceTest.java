@@ -1,15 +1,18 @@
 package com.example.onboarding.service;
 
+import com.example.gateway.GatewayApplication;
 import com.example.gateway.registry.dto.RegistryRuleEvaluation;
 import com.example.gateway.registry.service.RegistryRiskConfigService;
 import com.example.gateway.profile.service.ProfileFieldRegistryService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest
+@SpringBootTest(classes = GatewayApplication.class)
+@ActiveProfiles("test")
 public class RegistryRiskConfigServiceTest {
 
     @Autowired

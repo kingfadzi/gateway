@@ -1,14 +1,17 @@
 package com.example.onboarding.service;
 
+import com.example.gateway.GatewayApplication;
 import com.example.gateway.profile.dto.ProfileFieldTypeInfo;
 import com.example.gateway.profile.service.ProfileFieldRegistryService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-@SpringBootTest
+@SpringBootTest(classes = GatewayApplication.class)
+@ActiveProfiles("test")
 class ProfileFieldDomainTest {
 
     @Autowired
