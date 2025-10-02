@@ -197,13 +197,13 @@ public class DocumentRepository {
     public List<DocumentSummary> getDocumentsByApp(String appId, int limit, int offset) {
         String sql = """
             SELECT d.*,
-                   dv.doc_version_id, dv.version_id, dv.url_at_version, dv.author, dv.source_date, 
+                   dv.doc_version_id, dv.version_id, dv.url_at_version, dv.author, dv.source_date,
                    dv.created_at as version_created_at,
                    ARRAY_AGG(DISTINCT dt.field_key) as related_evidence_fields
             FROM document d
             LEFT JOIN document_version dv ON d.document_id = dv.document_id
-                                         AND dv.created_at = (SELECT MAX(created_at) 
-                                                             FROM document_version 
+                                         AND dv.created_at = (SELECT MAX(created_at)
+                                                             FROM document_version
                                                              WHERE document_id = d.document_id)
             LEFT JOIN document_related_evidence_field dt ON d.document_id = dt.document_id
             WHERE d.app_id = :appId
@@ -213,39 +213,8 @@ public class DocumentRepository {
             ORDER BY d.updated_at DESC
             LIMIT :limit OFFSET :offset
             """;
-        
-        return jdbc.query(sql, Map.of("appId", appId, "limit", limit, "offset", offset), (rs, rowNum) -> {
-            @SuppressWarnings("unchecked")
-            String[] relatedFields = (String[]) rs.getArray("related_evidence_fields").getArray();
-            List<String> relatedEvidenceFields = relatedFields != null ? List.of(relatedFields) : List.of();
-            
-            DocumentVersionInfo versionInfo = null;
-            String docVersionId = rs.getString("doc_version_id");
-            if (docVersionId != null) {
-                versionInfo = new DocumentVersionInfo(
-                        docVersionId,
-                        rs.getString("version_id"),
-                        rs.getString("url_at_version"),
-                        rs.getString("author"),
-                        rs.getObject("source_date", OffsetDateTime.class),
-                        rs.getObject("version_created_at", OffsetDateTime.class)
-                );
-            }
-            
-            return new DocumentSummary(
-                    rs.getString("document_id"),
-                    rs.getString("app_id"),
-                    rs.getString("title"),
-                    rs.getString("canonical_url"),
-                    rs.getString("source_type"),
-                    rs.getString("owners"),
-                    (Integer) rs.getObject("link_health"),
-                    relatedEvidenceFields,
-                    versionInfo,
-                    rs.getObject("created_at", OffsetDateTime.class),
-                    rs.getObject("updated_at", OffsetDateTime.class)
-            );
-        });
+
+        return jdbc.query(sql, Map.of("appId", appId, "limit", limit, "offset", offset), this::mapDocumentSummary);
     }
     
     /**
@@ -268,14 +237,14 @@ public class DocumentRepository {
     public List<DocumentSummary> getDocumentsByFieldType(String appId, String fieldKey) {
         String sql = """
             SELECT d.*,
-                   dv.doc_version_id, dv.version_id, dv.url_at_version, dv.author, dv.source_date, 
+                   dv.doc_version_id, dv.version_id, dv.url_at_version, dv.author, dv.source_date,
                    dv.created_at as version_created_at,
                    ARRAY_AGG(DISTINCT dt.field_key) as related_evidence_fields
             FROM document d
             JOIN document_related_evidence_field dt ON d.document_id = dt.document_id AND dt.field_key = :fieldKey
             LEFT JOIN document_version dv ON d.document_id = dv.document_id
-                                         AND dv.created_at = (SELECT MAX(created_at) 
-                                                             FROM document_version 
+                                         AND dv.created_at = (SELECT MAX(created_at)
+                                                             FROM document_version
                                                              WHERE document_id = d.document_id)
             WHERE d.app_id = :appId
             GROUP BY d.document_id, d.app_id, d.title, d.canonical_url, d.source_type, d.owners,
@@ -283,41 +252,10 @@ public class DocumentRepository {
                      dv.doc_version_id, dv.version_id, dv.url_at_version, dv.author, dv.source_date, dv.created_at
             ORDER BY d.updated_at DESC
             """;
-        
+
         return jdbc.query(sql, new MapSqlParameterSource()
                 .addValue("appId", appId)
-                .addValue("fieldKey", fieldKey), (rs, rowNum) -> {
-            @SuppressWarnings("unchecked")
-            String[] relatedFields = (String[]) rs.getArray("related_evidence_fields").getArray();
-            List<String> relatedEvidenceFields = relatedFields != null ? List.of(relatedFields) : List.of();
-            
-            DocumentVersionInfo versionInfo = null;
-            String docVersionId = rs.getString("doc_version_id");
-            if (docVersionId != null) {
-                versionInfo = new DocumentVersionInfo(
-                        docVersionId,
-                        rs.getString("version_id"),
-                        rs.getString("url_at_version"),
-                        rs.getString("author"),
-                        rs.getObject("source_date", OffsetDateTime.class),
-                        rs.getObject("version_created_at", OffsetDateTime.class)
-                );
-            }
-            
-            return new DocumentSummary(
-                    rs.getString("document_id"),
-                    rs.getString("app_id"),
-                    rs.getString("title"),
-                    rs.getString("canonical_url"),
-                    rs.getString("source_type"),
-                    rs.getString("owners"),
-                    (Integer) rs.getObject("link_health"),
-                    relatedEvidenceFields,
-                    versionInfo,
-                    rs.getObject("created_at", OffsetDateTime.class),
-                    rs.getObject("updated_at", OffsetDateTime.class)
-            );
-        });
+                .addValue("fieldKey", fieldKey), this::mapDocumentSummary);
     }
     
     /**
@@ -468,18 +406,54 @@ public class DocumentRepository {
      */
     public OffsetDateTime getSourceDateByVersionId(String docVersionId) {
         String sql = """
-            SELECT source_date 
-            FROM document_version 
+            SELECT source_date
+            FROM document_version
             WHERE doc_version_id = :docVersionId
             """;
-        
+
         try {
-            return jdbc.queryForObject(sql, 
-                new MapSqlParameterSource("docVersionId", docVersionId), 
+            return jdbc.queryForObject(sql,
+                new MapSqlParameterSource("docVersionId", docVersionId),
                 OffsetDateTime.class);
         } catch (Exception e) {
             log.warn("Failed to get source date for document version {}: {}", docVersionId, e.getMessage());
             return null;
         }
+    }
+
+    /**
+     * Shared row mapper for DocumentSummary to eliminate duplication
+     */
+    private DocumentSummary mapDocumentSummary(java.sql.ResultSet rs, int rowNum) throws java.sql.SQLException {
+        @SuppressWarnings("unchecked")
+        String[] relatedFields = (String[]) rs.getArray("related_evidence_fields").getArray();
+        List<String> relatedEvidenceFields = relatedFields != null ? List.of(relatedFields) : List.of();
+
+        DocumentVersionInfo versionInfo = null;
+        String docVersionId = rs.getString("doc_version_id");
+        if (docVersionId != null) {
+            versionInfo = new DocumentVersionInfo(
+                    docVersionId,
+                    rs.getString("version_id"),
+                    rs.getString("url_at_version"),
+                    rs.getString("author"),
+                    rs.getObject("source_date", OffsetDateTime.class),
+                    rs.getObject("version_created_at", OffsetDateTime.class)
+            );
+        }
+
+        return new DocumentSummary(
+                rs.getString("document_id"),
+                rs.getString("app_id"),
+                rs.getString("title"),
+                rs.getString("canonical_url"),
+                rs.getString("source_type"),
+                rs.getString("owners"),
+                (Integer) rs.getObject("link_health"),
+                relatedEvidenceFields,
+                versionInfo,
+                rs.getObject("created_at", OffsetDateTime.class),
+                rs.getObject("updated_at", OffsetDateTime.class)
+        );
     }
 }
