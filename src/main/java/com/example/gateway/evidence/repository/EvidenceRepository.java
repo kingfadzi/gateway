@@ -13,6 +13,7 @@ import org.springframework.stereotype.Repository;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.OffsetDateTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -196,8 +197,41 @@ public class EvidenceRepository {
         return jdbc.query(sql, Map.of("profileFieldId", profileFieldId, "limit", limit, "offset", offset),
             this::mapEnhancedEvidenceSummary);
     }
-    
-    
+
+    /**
+     * Batch find enhanced evidence for multiple profile fields.
+     * This method eliminates N+1 query problems by loading evidence for all fields in a single query.
+     *
+     * @param profileFieldIds List of profile field IDs to load evidence for
+     * @return List of enhanced evidence summaries for all requested fields
+     */
+    public List<EnhancedEvidenceSummary> findEvidenceByProfileFieldsBatch(List<String> profileFieldIds) {
+        if (profileFieldIds == null || profileFieldIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        String sql = """
+            SELECT e.evidence_id, e.app_id, e.profile_field_id, e.claim_id, e.uri, e.type, e.status,
+                   e.submitted_by, e.valid_from, e.valid_until, e.track_id, e.document_id, e.doc_version_id,
+                   e.created_at, e.updated_at,
+                   efl.link_status, efl.linked_by, efl.linked_at,
+                   efl.reviewed_by, efl.reviewed_at, efl.review_comment,
+                   d.title as document_title, d.source_type as document_source_type,
+                   d.owners as document_owners, d.link_health as document_link_health
+            FROM evidence e
+            JOIN evidence_field_link efl ON e.evidence_id = efl.evidence_id
+            JOIN profile_field pf ON e.profile_field_id = pf.id
+            JOIN profile p ON pf.profile_id = p.profile_id
+            LEFT JOIN document d ON e.document_id = d.document_id
+            WHERE e.profile_field_id IN (:profileFieldIds)
+            AND p.version = (SELECT MAX(version) FROM profile p2 WHERE p2.app_id = p.app_id)
+            ORDER BY e.profile_field_id, e.created_at DESC
+            """;
+
+        return jdbc.query(sql, Map.of("profileFieldIds", profileFieldIds), this::mapEnhancedEvidenceSummary);
+    }
+
+
     /**
      * Find enhanced evidence by claim with EvidenceFieldLink metadata and document source info
      * Uses KPI-style profile version filtering

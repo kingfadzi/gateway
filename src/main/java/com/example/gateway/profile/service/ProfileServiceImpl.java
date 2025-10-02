@@ -206,20 +206,31 @@ public class ProfileServiceImpl implements ProfileService {
         
         // Group fields by derived_from (domain)
         Map<String, List<ProfileField>> fieldsByDomain = fields.stream()
-                .collect(Collectors.groupingBy(field -> 
+                .collect(Collectors.groupingBy(field ->
                     fieldRegistryConfig.getDerivedFromByFieldKey(field.fieldKey())));
-        
+
+        // Batch load enhanced evidence for all fields (eliminates N+1 query problem)
+        List<String> allFieldIds = fields.stream()
+                .map(ProfileField::fieldId)
+                .collect(Collectors.toList());
+
+        Map<String, List<EnhancedEvidenceSummary>> enhancedEvidenceByField =
+            evidenceRepository.findEvidenceByProfileFieldsBatch(allFieldIds)
+                .stream()
+                .collect(Collectors.groupingBy(EnhancedEvidenceSummary::profileFieldId));
+
         List<DomainPayload> domainPayloads = new ArrayList<>();
         for (Map.Entry<String, List<ProfileField>> entry : fieldsByDomain.entrySet()) {
             String domainKey = entry.getKey();
             List<ProfileField> domainFields = entry.getValue();
-            
+
             List<FieldGraphPayload> fieldPayloads = new ArrayList<>();
             for (ProfileField field : domainFields) {
                 List<Evidence> evForField = evidenceByField.getOrDefault(field.fieldId(), Collections.emptyList());
-                
-                // Get enhanced evidence for status calculations
-                List<EnhancedEvidenceSummary> enhancedEvidence = evidenceRepository.findEvidenceByProfileField(field.fieldId(), 100, 0);
+
+                // Get enhanced evidence for status calculations (from batch-loaded map)
+                List<EnhancedEvidenceSummary> enhancedEvidence =
+                    enhancedEvidenceByField.getOrDefault(field.fieldId(), Collections.emptyList());
                 
                 // Calculate approval and freshness statuses
                 String approvalStatus = evidenceStatusCalculator.calculateApprovalStatus(enhancedEvidence);
