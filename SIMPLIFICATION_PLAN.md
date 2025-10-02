@@ -9,8 +9,8 @@
 
 ## 📊 PROGRESS SUMMARY
 
-**Completed:** 9 major refactoring commits (2 sessions)
-**Lines Removed:** ~1,115 lines of duplicate/complex code
+**Completed:** 16 major refactoring commits (3 sessions)
+**Lines Removed:** ~1,349 lines of duplicate/complex code
 **Performance Gains:** 33x faster profile loading (500ms → 15ms)
 **Test Status:** ✅ All tests passing
 
@@ -22,8 +22,16 @@
 5. **Phase 3** - Orchestration Service Extraction ✅
 6. **DocumentRepository** - Row mapper extraction ✅
 7. **RiskStoryServiceImpl** - Row mapper extraction ✅
+8. **Controller Error Handling** - @ControllerAdvice extraction ✅
+9. **Platform API Client** - HTTP utility extraction ✅
 
-### 📝 Recent Commits (Session 2):
+### 📝 Recent Commits (Session 3):
+- `439b6c1` - Extract PlatformApiClient HTTP utility (-118 lines)
+- `4c8ea20` - Remove duplicate error handling from remaining controllers (-61 lines)
+- `09bdcc8` - Remove duplicate error handling from EvidenceController (-55 lines)
+- `ea2aa7c` - Update SIMPLIFICATION_PLAN with Session 2 results
+
+### 📝 Previous Commits (Session 2):
 - `dc0e003` - Extract RiskStoryRowMapper (-189 lines, -46%)
 - `f550527` - Extract DocumentRepository row mapper (-26 lines)
 - `14f5a9d` - Update documentation with Session 1 results
@@ -189,6 +197,44 @@
 
 ---
 
+### **6. GitLabMetadataService & ConfluenceMetadataService** ✅ COMPLETED
+**Location:** `src/main/java/com/example/gateway/document/service/`
+
+**Status:** ✅ **COMPLETED** (Commit: 439b6c1)
+
+**Problem:** Duplicate HTTP call patterns across platform API services ✅ SOLVED
+
+**What We Did:**
+1. Created `PlatformApiClient` utility (84 lines)
+   - get() for Bearer token authentication
+   - getRaw() for raw string responses
+   - getWithBasicAuth() for Basic authentication
+   - Centralized error handling and logging
+   - Consistent User-Agent headers
+
+2. Refactored GitLabMetadataService (508 → 423 lines, -85 lines, -17%)
+   - getProject(): 28 lines → 4 lines
+   - getLatestCommit(): 32 lines → 5 lines
+   - getCodeowners(): 36 lines → 24 lines
+   - getFile(): 23 lines → 6 lines
+   - Removed createHeaders() method
+
+3. Refactored ConfluenceMetadataService (348 → 315 lines, -33 lines, -9%)
+   - getPage(): 27 lines → 11 lines
+   - Removed createHeaders() method
+
+**Impact Achieved:**
+- Eliminated 118 lines of duplicate HTTP boilerplate
+- Created reusable PlatformApiClient: 84 lines
+- Centralized error handling and logging patterns
+- Improved maintainability with single responsibility
+- Consistent API call patterns across all platform integrations
+
+**Effort:** Completed in 2 hours
+**Risk:** Low - All tests passing ✅
+
+---
+
 ## 📊 SIMPLIFICATION METRICS
 
 ### ✅ Completed Work
@@ -206,20 +252,25 @@
 | DocumentRepository | 484 | 458 | -26 lines (-5%) | ✅ Row mapper extracted |
 | RiskStoryServiceImpl | 411 | 222 | -189 lines (-46%) | ✅ Row mapper extracted |
 | RiskStoryRowMapper | - | 207 | Created | ✅ Reusable utility |
+| EvidenceController | 704 | 588 | -116 lines (-16%) | ✅ @ControllerAdvice extracted |
+| GitLabMetadataService | 508 | 423 | -85 lines (-17%) | ✅ PlatformApiClient |
+| ConfluenceMetadataService | 348 | 315 | -33 lines (-9%) | ✅ PlatformApiClient |
+| PlatformApiClient | - | 84 | Created | ✅ Reusable HTTP utility |
 
-**Total Lines Removed:** ~1,115 lines
-**New Utility Code:** +558 lines (reusable patterns)
-**Net Reduction:** ~557 lines of business logic
+**Total Lines Removed:** ~1,349 lines
+**New Utility Code:** +642 lines (reusable patterns)
+**Net Reduction:** ~707 lines of business logic
 **Performance Gains:** 33x faster profile loading
 
 ### ⏳ Remaining Opportunities
 
-| File | Current Lines | Opportunity | Priority |
-|------|---------------|-------------|----------|
-| EvidenceController | 704 | 25 duplicate try-catch blocks (@ControllerAdvice) | Medium |
-| GitLabMetadataService | 508 | Repetitive HTTP call patterns | Low |
-| ConfluenceMetadataService | 347 | Similar to GitLab patterns | Low |
-| ProfileServiceImpl | 503 | Optional graph extraction | Low |
+| File | Current Lines | Opportunity | Priority | Status |
+|------|---------------|-------------|----------|--------|
+| EvidenceController | 704 → 588 | ~~25 duplicate try-catch blocks (@ControllerAdvice)~~ | Medium | ✅ COMPLETED |
+| GitLabMetadataService | 508 → 423 | ~~Repetitive HTTP call patterns~~ | Low | ✅ COMPLETED |
+| ConfluenceMetadataService | 347 → 315 | ~~Similar to GitLab patterns~~ | Low | ✅ COMPLETED |
+| ProfileServiceImpl | 503 | Optional graph extraction | Low | ⏳ Optional |
+| Wildcard Imports | 39 files | Replace wildcards with explicit imports | Code Quality | ⏳ Optional |
 
 ---
 
