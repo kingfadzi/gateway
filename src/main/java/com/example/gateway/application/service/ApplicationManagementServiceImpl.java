@@ -5,67 +5,25 @@ import com.example.gateway.application.dto.PageResponse;
 import com.example.gateway.application.dto.UpdateAppRequest;
 import com.example.gateway.application.dto.Application;
 import com.example.gateway.application.dto.ChildApplication;
+import com.example.gateway.application.mapper.ApplicationRowMapper;
 import org.springframework.dao.EmptyResultDataAccessException;
-import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Timestamp;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.*;
 
 @Service
 public class ApplicationManagementServiceImpl implements ApplicationManagementService {
 
     private final NamedParameterJdbcTemplate jdbc;
+    private final ApplicationRowMapper applicationRowMapper;
 
-    public ApplicationManagementServiceImpl(NamedParameterJdbcTemplate jdbc) {
+    public ApplicationManagementServiceImpl(NamedParameterJdbcTemplate jdbc,
+                                           ApplicationRowMapper applicationRowMapper) {
         this.jdbc = jdbc;
+        this.applicationRowMapper = applicationRowMapper;
     }
-
-    /* -------- time util: convert JDBC Timestamp -> OffsetDateTime(UTC) -------- */
-    private static OffsetDateTime odt(ResultSet rs, String col) throws SQLException {
-        Timestamp ts = rs.getTimestamp(col);
-        return ts == null ? null : ts.toInstant().atOffset(ZoneOffset.UTC);
-    }
-
-    private static final RowMapper<Application> APP_MAPPER = new RowMapper<>() {
-        @Override public Application mapRow(ResultSet rs, int rowNum) throws SQLException {
-            return new Application(
-                    rs.getString("app_id"),
-                    rs.getString("parent_app_id"),
-                    rs.getString("name"),
-                    rs.getString("app_criticality_assessment"),
-                    rs.getString("business_service_name"), // NEW
-                    rs.getString("jira_backlog_id"),
-                    rs.getString("lean_control_service_id"),
-                    rs.getString("repo_id"),
-                    rs.getString("operational_status"),
-                    rs.getString("transaction_cycle"),
-                    rs.getString("application_type"),
-                    rs.getString("application_tier"),
-                    rs.getString("architecture_type"),
-                    rs.getString("install_type"),
-                    rs.getString("house_position"),
-                    rs.getString("product_owner"),
-                    rs.getString("product_owner_brid"),
-                    rs.getString("onboarding_status"),
-                    rs.getString("owner_id"),
-                    rs.getString("security_rating"),
-                    rs.getString("confidentiality_rating"),
-                    rs.getString("integrity_rating"),
-                    rs.getString("availability_rating"),
-                    rs.getString("resilience_rating"),
-                    odt(rs, "created_at"),
-                    odt(rs, "updated_at"),
-                    (Boolean) rs.getObject("has_children")
-            );
-        }
-    };
 
     @Override
     public PageResponse<Application> list(String q, String ownerId, String onboardingStatus, String operationalStatus,
@@ -116,7 +74,7 @@ public class ApplicationManagementServiceImpl implements ApplicationManagementSe
             FROM application a
         """ + where + orderBy + " LIMIT :limit OFFSET :offset";
 
-        List<Application> items = jdbc.query(sql, new MapSqlParameterSource(params), APP_MAPPER);
+        List<Application> items = jdbc.query(sql, new MapSqlParameterSource(params), applicationRowMapper);
         return new PageResponse<>(Math.max(page,1), Math.max(pageSize,1), total, items);
     }
 
@@ -129,7 +87,7 @@ public class ApplicationManagementServiceImpl implements ApplicationManagementSe
           WHERE a.app_id = :id
         """;
         try {
-            return jdbc.queryForObject(sql, Map.of("id", appId), APP_MAPPER);
+            return jdbc.queryForObject(sql, Map.of("id", appId), applicationRowMapper);
         } catch (EmptyResultDataAccessException ex) {
             throw notFound("Application not found: " + appId);
         }
@@ -269,7 +227,7 @@ public class ApplicationManagementServiceImpl implements ApplicationManagementSe
             ORDER BY name ASC
             """;
         
-        RowMapper<ChildApplication> childMapper = (rs, rowNum) -> new ChildApplication(
+        var childMapper = (org.springframework.jdbc.core.RowMapper<ChildApplication>) (rs, rowNum) -> new ChildApplication(
                 rs.getString("app_id"),
                 rs.getString("name"),
                 rs.getString("app_criticality_assessment"),

@@ -94,26 +94,6 @@ public class EvidenceReuseRepository {
         return rows.stream().findFirst();
     }
 
-
-    private static RowMapper<ReuseCandidate> mapper() {
-        return new RowMapper<>() {
-            @Override public ReuseCandidate mapRow(ResultSet rs, int rowNum) throws SQLException {
-                return new ReuseCandidate(
-                        rs.getString("evidence_id"),
-                        getOdt(rs, "valid_from"),
-                        getOdt(rs, "valid_until"),
-                        rs.getString("confidence"),
-                        rs.getString("method"),
-                        rs.getString("uri"),
-                        rs.getString("sha256"),
-                        rs.getString("type"),
-                        rs.getString("source_system"),
-                        getOdt(rs, "created_at")
-                );
-            }
-        };
-    }
-
     private static OffsetDateTime getOdt(ResultSet rs, String col) throws SQLException {
         var ts = rs.getTimestamp(col);
         return ts == null ? null : ts.toInstant().atOffset(ZoneOffset.UTC);
