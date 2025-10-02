@@ -1,19 +1,13 @@
 package com.example.gateway.document.service;
 
+import com.example.gateway.document.util.PlatformApiClient;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Base64;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestTemplate;
 
-import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
@@ -23,13 +17,13 @@ import java.util.Optional;
 
 @Service
 public class GitLabMetadataService {
-    
+
     private static final Logger log = LoggerFactory.getLogger(GitLabMetadataService.class);
-    
-    private final RestTemplate restTemplate;
-    
-    public GitLabMetadataService(RestTemplate restTemplate) {
-        this.restTemplate = restTemplate;
+
+    private final PlatformApiClient apiClient;
+
+    public GitLabMetadataService(PlatformApiClient apiClient) {
+        this.apiClient = apiClient;
     }
     
     public Optional<GitLabMetadata> extractMetadata(PlatformDetectionService.GitLabUrlInfo gitlabInfo, String accessToken) {
@@ -98,99 +92,44 @@ public class GitLabMetadataService {
     }
     
     private Optional<GitLabProject> getProject(PlatformDetectionService.GitLabUrlInfo gitlabInfo, String accessToken) {
-        try {
-            // Properly encode the project path for GitLab API
-            String encodedProjectPath = URLEncoder.encode(gitlabInfo.getProjectPath(), StandardCharsets.UTF_8);
-            String url = String.format("%s/projects/%s", gitlabInfo.getApiBaseUrl(), encodedProjectPath);
-            log.debug("Fetching GitLab project from API: {}", url);
-            
-            HttpHeaders headers = createHeaders(accessToken);
-            HttpEntity<String> entity = new HttpEntity<>(headers);
-            
-            ResponseEntity<GitLabProject> response = restTemplate.exchange(
-                    URI.create(url), HttpMethod.GET, entity, GitLabProject.class);
-            
-            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                log.debug("Successfully fetched GitLab project: {} (ID: {})", 
-                         response.getBody().getName(), response.getBody().getId());
-                return Optional.of(response.getBody());
-            } else {
-                log.warn("GitLab API returned non-success status: {} for project {}", 
-                        response.getStatusCode(), gitlabInfo.getProjectPath());
-            }
-            
-        } catch (RestClientException e) {
-            log.error("Failed to fetch GitLab project {} from {}: {}", 
-                     gitlabInfo.getProjectPath(), gitlabInfo.getProjectApiUrl(), e.getMessage());
-        }
-        
-        return Optional.empty();
+        String encodedProjectPath = URLEncoder.encode(gitlabInfo.getProjectPath(), StandardCharsets.UTF_8);
+        String url = String.format("%s/projects/%s", gitlabInfo.getApiBaseUrl(), encodedProjectPath);
+        return apiClient.get(url, accessToken, GitLabProject.class, "GitLab project");
     }
     
-    private Optional<GitLabCommit> getLatestCommit(PlatformDetectionService.GitLabUrlInfo gitlabInfo, 
+    private Optional<GitLabCommit> getLatestCommit(PlatformDetectionService.GitLabUrlInfo gitlabInfo,
                                                  String accessToken, Long projectId, String ref) {
-        try {
-            String url = String.format("%s/projects/%d/repository/commits/%s",
-                    gitlabInfo.getApiBaseUrl(), projectId, ref);
-            log.debug("Fetching GitLab commit from API: {} for ref: {}", url, ref);
-            
-            HttpHeaders headers = createHeaders(accessToken);
-            HttpEntity<String> entity = new HttpEntity<>(headers);
-            
-            ResponseEntity<GitLabCommit> response = restTemplate.exchange(
-                    URI.create(url), HttpMethod.GET, entity, GitLabCommit.class);
-            
-            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                log.debug("Successfully fetched GitLab commit: {} by {} at {}", 
-                         response.getBody().getShortId(), 
-                         response.getBody().getAuthorName(),
-                         response.getBody().getCommittedDate());
-                return Optional.of(response.getBody());
-            } else {
-                log.warn("GitLab API returned non-success status: {} for commit ref {}", 
-                        response.getStatusCode(), ref);
-            }
-            
-        } catch (RestClientException e) {
-            log.error("Failed to fetch GitLab commit for ref {} from {}: {}", ref, gitlabInfo.getApiBaseUrl(), e.getMessage());
-        }
-        
-        return Optional.empty();
+        String url = String.format("%s/projects/%d/repository/commits/%s",
+                gitlabInfo.getApiBaseUrl(), projectId, ref);
+        return apiClient.get(url, accessToken, GitLabCommit.class, "GitLab commit");
     }
     
     private Optional<String> getCodeowners(PlatformDetectionService.GitLabUrlInfo gitlabInfo,
                                          String accessToken, Long projectId, String ref) {
         // Try common CODEOWNERS file locations
         String[] codeownersLocations = {".gitlab/CODEOWNERS", "CODEOWNERS", ".github/CODEOWNERS"};
-        
+
         for (String location : codeownersLocations) {
-            try {
-                String encodedFilePath = URLEncoder.encode(location, StandardCharsets.UTF_8);
-                String url = String.format("%s/projects/%d/repository/files/%s?ref=%s",
-                        gitlabInfo.getApiBaseUrl(), projectId, encodedFilePath, ref);
-                HttpHeaders headers = createHeaders(accessToken);
-                HttpEntity<String> entity = new HttpEntity<>(headers);
-                
-                ResponseEntity<GitLabFileContent> response = restTemplate.exchange(
-                        URI.create(url), HttpMethod.GET, entity, GitLabFileContent.class);
-                
-                if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                    String content = response.getBody().getDecodedContent();
-                    if (content != null && !content.trim().isEmpty()) {
-                        // Parse CODEOWNERS content and extract owners
-                        String owners = parseCodeowners(content, gitlabInfo.getFilePath());
-                        if (owners != null && !owners.trim().isEmpty()) {
-                            log.debug("Found CODEOWNERS in {} with owners: {}", location, owners);
-                            return Optional.of(owners);
-                        }
+            String encodedFilePath = URLEncoder.encode(location, StandardCharsets.UTF_8);
+            String url = String.format("%s/projects/%d/repository/files/%s?ref=%s",
+                    gitlabInfo.getApiBaseUrl(), projectId, encodedFilePath, ref);
+
+            Optional<GitLabFileContent> fileContent = apiClient.get(url, accessToken, GitLabFileContent.class,
+                    "CODEOWNERS file at " + location);
+
+            if (fileContent.isPresent()) {
+                String content = fileContent.get().getDecodedContent();
+                if (content != null && !content.trim().isEmpty()) {
+                    // Parse CODEOWNERS content and extract owners
+                    String owners = parseCodeowners(content, gitlabInfo.getFilePath());
+                    if (owners != null && !owners.trim().isEmpty()) {
+                        log.debug("Found CODEOWNERS in {} with owners: {}", location, owners);
+                        return Optional.of(owners);
                     }
                 }
-                
-            } catch (RestClientException e) {
-                log.debug("CODEOWNERS file not found at {}: {}", location, e.getMessage());
             }
         }
-        
+
         return Optional.empty();
     }
     
@@ -234,36 +173,12 @@ public class GitLabMetadataService {
     
     private Optional<GitLabFile> getFile(PlatformDetectionService.GitLabUrlInfo gitlabInfo,
                                        String accessToken, Long projectId, String ref) {
-        try {
-            String encodedFilePath = URLEncoder.encode(gitlabInfo.getFilePath(), StandardCharsets.UTF_8);
-            String url = String.format("%s/projects/%d/repository/files/%s?ref=%s",
-                    gitlabInfo.getApiBaseUrl(), projectId, encodedFilePath, ref);
-            HttpHeaders headers = createHeaders(accessToken);
-            HttpEntity<String> entity = new HttpEntity<>(headers);
-            
-            ResponseEntity<GitLabFile> response = restTemplate.exchange(
-                    URI.create(url), HttpMethod.GET, entity, GitLabFile.class);
-            
-            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                return Optional.of(response.getBody());
-            }
-            
-        } catch (RestClientException e) {
-            log.debug("Failed to fetch GitLab file {}: {}", gitlabInfo.getFilePath(), e.getMessage());
-        }
-        
-        return Optional.empty();
+        String encodedFilePath = URLEncoder.encode(gitlabInfo.getFilePath(), StandardCharsets.UTF_8);
+        String url = String.format("%s/projects/%d/repository/files/%s?ref=%s",
+                gitlabInfo.getApiBaseUrl(), projectId, encodedFilePath, ref);
+        return apiClient.get(url, accessToken, GitLabFile.class, "GitLab file");
     }
-    
-    private HttpHeaders createHeaders(String accessToken) {
-        HttpHeaders headers = new HttpHeaders();
-        if (accessToken != null && !accessToken.trim().isEmpty()) {
-            headers.set("Authorization", "Bearer " + accessToken);
-        }
-        headers.set("User-Agent", "DocumentManagementService/1.0");
-        return headers;
-    }
-    
+
     // DTOs for GitLab API responses
     
     @JsonIgnoreProperties(ignoreUnknown = true)

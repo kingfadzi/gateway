@@ -1,16 +1,11 @@
 package com.example.gateway.document.service;
 
+import com.example.gateway.document.util.PlatformApiClient;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestTemplate;
 
 import java.util.Optional;
 
@@ -18,11 +13,11 @@ import java.util.Optional;
 public class ConfluenceMetadataService {
     
     private static final Logger log = LoggerFactory.getLogger(ConfluenceMetadataService.class);
-    
-    private final RestTemplate restTemplate;
-    
-    public ConfluenceMetadataService(RestTemplate restTemplate) {
-        this.restTemplate = restTemplate;
+
+    private final PlatformApiClient apiClient;
+
+    public ConfluenceMetadataService(PlatformApiClient apiClient) {
+        this.apiClient = apiClient;
     }
     
     public Optional<ConfluenceMetadata> extractMetadata(PlatformDetectionService.ConfluenceUrlInfo confluenceInfo, 
@@ -82,38 +77,11 @@ public class ConfluenceMetadataService {
             log.debug("No page ID available for Confluence metadata extraction");
             return Optional.empty();
         }
-        
-        try {
-            String url = String.format("%s/content/%s?expand=space,version,history.createdBy,version.by",
-                    confluenceInfo.getApiBaseUrl(), confluenceInfo.getPageId());
-            
-            HttpHeaders headers = createHeaders(username, apiToken);
-            HttpEntity<String> entity = new HttpEntity<>(headers);
-            
-            ResponseEntity<ConfluencePage> response = restTemplate.exchange(
-                    url, HttpMethod.GET, entity, ConfluencePage.class);
-            
-            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                return Optional.of(response.getBody());
-            }
-            
-        } catch (RestClientException e) {
-            log.debug("Failed to fetch Confluence page {}: {}", confluenceInfo.getPageId(), e.getMessage());
-        }
-        
-        return Optional.empty();
-    }
-    
-    private HttpHeaders createHeaders(String username, String apiToken) {
-        HttpHeaders headers = new HttpHeaders();
-        if (username != null && apiToken != null && !username.trim().isEmpty() && !apiToken.trim().isEmpty()) {
-            String auth = java.util.Base64.getEncoder()
-                    .encodeToString((username + ":" + apiToken).getBytes());
-            headers.set("Authorization", "Basic " + auth);
-        }
-        headers.set("User-Agent", "DocumentManagementService/1.0");
-        headers.set("Accept", "application/json");
-        return headers;
+
+        String url = String.format("%s/content/%s?expand=space,version,history.createdBy,version.by",
+                confluenceInfo.getApiBaseUrl(), confluenceInfo.getPageId());
+
+        return apiClient.getWithBasicAuth(url, username, apiToken, ConfluencePage.class, "Confluence page");
     }
     
     // DTOs for Confluence API responses
