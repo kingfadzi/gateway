@@ -30,10 +30,10 @@ public class EvidenceController {
     private final EvidenceAttestationService evidenceAttestationService;
 
     public EvidenceController(EvidenceService evidenceService,
-                             EvidenceOrchestrationService evidenceOrchestrationService,
-                             DocumentService documentService,
-                             EvidenceFieldLinkService evidenceFieldLinkService,
-                             EvidenceAttestationService evidenceAttestationService) {
+                 EvidenceOrchestrationService evidenceOrchestrationService,
+                 DocumentService documentService,
+                 EvidenceFieldLinkService evidenceFieldLinkService,
+                 EvidenceAttestationService evidenceAttestationService) {
         this.evidenceService = evidenceService;
         this.evidenceOrchestrationService = evidenceOrchestrationService;
         this.documentService = documentService;
@@ -47,19 +47,11 @@ public class EvidenceController {
      */
     @PostMapping("/apps/{appId}/evidence")
     public ResponseEntity<Evidence> createEvidence(@PathVariable String appId,
-                                                  @RequestBody CreateEvidenceRequest request) {
-        log.info("Creating evidence for app {} with request: {}", appId, request);
-        try {
-            Evidence evidence = evidenceService.createEvidence(appId, request);
-            log.info("Successfully created evidence {} for app {}", evidence.evidenceId(), appId);
-            return ResponseEntity.status(201).body(evidence);
-        } catch (IllegalArgumentException e) {
-            log.error("Validation error creating evidence for app {}: {}", appId, e.getMessage(), e);
-            return ResponseEntity.badRequest().build();
-        } catch (Exception e) {
-            log.error("Unexpected error creating evidence for app {}: {}", appId, e.getMessage(), e);
-            return ResponseEntity.internalServerError().build();
-        }
+                                      @RequestBody CreateEvidenceRequest request) {
+        log.info("Creating evidence for app {}", appId);
+        Evidence evidence = evidenceService.createEvidence(appId, request);
+        log.info("Successfully created evidence {} for app {}", evidence.evidenceId(), appId);
+        return ResponseEntity.status(201).body(evidence);
     }
     
     /**
@@ -68,19 +60,11 @@ public class EvidenceController {
      */
     @PutMapping("/evidence/{evidenceId}")
     public ResponseEntity<Evidence> updateEvidence(@PathVariable String evidenceId,
-                                                  @RequestBody UpdateEvidenceRequest request) {
-        log.info("Updating evidence {} with request: {}", evidenceId, request);
-        try {
-            Evidence evidence = evidenceService.updateEvidence(evidenceId, request);
-            log.info("Successfully updated evidence {}", evidenceId);
-            return ResponseEntity.ok(evidence);
-        } catch (IllegalArgumentException e) {
-            log.error("Validation error updating evidence {}: {}", evidenceId, e.getMessage(), e);
-            return ResponseEntity.badRequest().build();
-        } catch (Exception e) {
-            log.error("Unexpected error updating evidence {}: {}", evidenceId, e.getMessage(), e);
-            return ResponseEntity.internalServerError().build();
-        }
+                                      @RequestBody UpdateEvidenceRequest request) {
+        log.info("Updating evidence {}", evidenceId);
+        Evidence evidence = evidenceService.updateEvidence(evidenceId, request);
+        log.info("Successfully updated evidence {}", evidenceId);
+        return ResponseEntity.ok(evidence);
     }
     
     /**
@@ -105,14 +89,9 @@ public class EvidenceController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int pageSize) {
         log.debug("Getting evidence for app {} (page={}, pageSize={})", appId, page, pageSize);
-        try {
-            PageResponse<EnhancedEvidenceSummary> evidence = evidenceService.getEvidenceByApp(appId, page, pageSize);
-            log.debug("Found {} evidence items for app {}", evidence.items().size(), appId);
-            return ResponseEntity.ok(evidence);
-        } catch (Exception e) {
-            log.error("Error getting evidence for app {}: {}", appId, e.getMessage(), e);
-            return ResponseEntity.internalServerError().build();
-        }
+        PageResponse<EnhancedEvidenceSummary> evidence = evidenceService.getEvidenceByApp(appId, page, pageSize);
+        log.debug("Found {} evidence items for app {}", evidence.items().size(), appId);
+        return ResponseEntity.ok(evidence);
     }
     
     /**
@@ -125,14 +104,9 @@ public class EvidenceController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int pageSize) {
         log.debug("Getting enhanced evidence for profile field {} (page={}, pageSize={})", profileFieldId, page, pageSize);
-        try {
-            PageResponse<EnhancedEvidenceSummary> evidence = evidenceService.getEvidenceByProfileField(profileFieldId, page, pageSize);
-            log.debug("Found {} enhanced evidence items for profile field {}", evidence.items().size(), profileFieldId);
-            return ResponseEntity.ok(evidence);
-        } catch (Exception e) {
-            log.error("Error getting enhanced evidence for profile field {}: {}", profileFieldId, e.getMessage(), e);
-            return ResponseEntity.internalServerError().build();
-        }
+        PageResponse<EnhancedEvidenceSummary> evidence = evidenceService.getEvidenceByProfileField(profileFieldId, page, pageSize);
+        log.debug("Found {} enhanced evidence items for profile field {}", evidence.items().size(), profileFieldId);
+        return ResponseEntity.ok(evidence);
     }
     
     /**
@@ -145,14 +119,9 @@ public class EvidenceController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int pageSize) {
         log.debug("Getting evidence for claim {} (page={}, pageSize={})", claimId, page, pageSize);
-        try {
-            PageResponse<EnhancedEvidenceSummary> evidence = evidenceService.getEvidenceByClaim(claimId, page, pageSize);
-            log.debug("Found {} evidence items for claim {}", evidence.items().size(), claimId);
-            return ResponseEntity.ok(evidence);
-        } catch (Exception e) {
-            log.error("Error getting evidence for claim {}: {}", claimId, e.getMessage(), e);
-            return ResponseEntity.internalServerError().build();
-        }
+        PageResponse<EnhancedEvidenceSummary> evidence = evidenceService.getEvidenceByClaim(claimId, page, pageSize);
+        log.debug("Found {} evidence items for claim {}", evidence.items().size(), claimId);
+        return ResponseEntity.ok(evidence);
     }
     
     /**
@@ -165,14 +134,9 @@ public class EvidenceController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int pageSize) {
         log.debug("Getting evidence for track {} (page={}, pageSize={})", trackId, page, pageSize);
-        try {
-            PageResponse<EnhancedEvidenceSummary> evidence = evidenceService.getEvidenceByTrack(trackId, page, pageSize);
-            log.debug("Found {} evidence items for track {}", evidence.items().size(), trackId);
-            return ResponseEntity.ok(evidence);
-        } catch (Exception e) {
-            log.error("Error getting evidence for track {}: {}", trackId, e.getMessage(), e);
-            return ResponseEntity.internalServerError().build();
-        }
+        PageResponse<EnhancedEvidenceSummary> evidence = evidenceService.getEvidenceByTrack(trackId, page, pageSize);
+        log.debug("Found {} evidence items for track {}", evidence.items().size(), trackId);
+        return ResponseEntity.ok(evidence);
     }
     
     /**
@@ -181,19 +145,11 @@ public class EvidenceController {
      */
     @PostMapping("/evidence/{evidenceId}/revoke")
     public ResponseEntity<Evidence> revokeEvidence(@PathVariable String evidenceId,
-                                                  @RequestParam String reviewedBy) {
+                                      @RequestParam String reviewedBy) {
         log.info("Revoking evidence {} by {}", evidenceId, reviewedBy);
-        try {
-            Evidence evidence = evidenceService.revokeEvidence(evidenceId, reviewedBy);
-            log.info("Successfully revoked evidence {} by {}", evidenceId, reviewedBy);
-            return ResponseEntity.ok(evidence);
-        } catch (IllegalArgumentException e) {
-            log.error("Validation error revoking evidence {}: {}", evidenceId, e.getMessage(), e);
-            return ResponseEntity.badRequest().build();
-        } catch (Exception e) {
-            log.error("Unexpected error revoking evidence {}: {}", evidenceId, e.getMessage(), e);
-            return ResponseEntity.internalServerError().build();
-        }
+        Evidence evidence = evidenceService.revokeEvidence(evidenceId, reviewedBy);
+        log.info("Successfully revoked evidence {} by {}", evidenceId, reviewedBy);
+        return ResponseEntity.ok(evidence);
     }
     
     /**
@@ -202,20 +158,12 @@ public class EvidenceController {
      */
     @PostMapping("/apps/{appId}/evidence/with-document")
     public ResponseEntity<EvidenceWithDocumentResponse> createEvidenceWithDocument(@PathVariable String appId,
-                                                                                   @RequestBody CreateEvidenceWithDocumentRequest request) {
+                                                                       @RequestBody CreateEvidenceWithDocumentRequest request) {
         log.info("Creating evidence with document for app {} with request: {}", appId, request);
-        try {
-            EvidenceWithDocumentResponse response = evidenceOrchestrationService.createEvidenceWithDocument(appId, request);
-            log.info("Successfully created evidence {} with document {} for app {}", 
+        EvidenceWithDocumentResponse response = evidenceOrchestrationService.createEvidenceWithDocument(appId, request);
+        log.info("Successfully created evidence {} with document {} for app {}", 
                 response.evidenceId(), response.document().documentId(), appId);
-            return ResponseEntity.status(201).body(response);
-        } catch (IllegalArgumentException e) {
-            log.error("Validation error creating evidence with document for app {}: {}", appId, e.getMessage(), e);
-            return ResponseEntity.badRequest().build();
-        } catch (Exception e) {
-            log.error("Unexpected error creating evidence with document for app {}: {}", appId, e.getMessage(), e);
-            return ResponseEntity.internalServerError().build();
-        }
+        return ResponseEntity.status(201).body(response);
     }
 
     /**
@@ -230,14 +178,9 @@ public class EvidenceController {
         log.info("Getting {} attached documents for profile field {} in app {}", 
             enhanced ? "enhanced" : "basic", profileFieldId, appId);
         
-        try {
-            EnhancedAttachedDocumentsResponse response = evidenceService.getEnhancedAttachedDocuments(appId, profileFieldId);
-            log.debug("Found {} attached documents for profile field {}", response.documents().size(), profileFieldId);
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            log.error("Error getting attached documents for profile field {} in app {}: {}", profileFieldId, appId, e.getMessage(), e);
-            return ResponseEntity.internalServerError().build();
-        }
+        EnhancedAttachedDocumentsResponse response = evidenceService.getEnhancedAttachedDocuments(appId, profileFieldId);
+        log.debug("Found {} attached documents for profile field {}", response.documents().size(), profileFieldId);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -251,22 +194,14 @@ public class EvidenceController {
             @PathVariable String documentId) {
         log.info("Attaching document {} to profile field {} in app {}", documentId, profileFieldId, appId);
         
-        try {
-            // Fetch document details
-            DocumentResponse document = documentService.getDocumentById(documentId)
+        // Fetch document details
+        DocumentResponse document = documentService.getDocumentById(documentId)
                 .orElseThrow(() -> new IllegalArgumentException("Document not found: " + documentId));
             
-            EvidenceWithDocumentResponse response = evidenceService.attachDocumentToField(appId, profileFieldId, document);
-            log.info("Successfully attached document {} to profile field {} as evidence {}", 
+        EvidenceWithDocumentResponse response = evidenceService.attachDocumentToField(appId, profileFieldId, document);
+        log.info("Successfully attached document {} to profile field {} as evidence {}", 
                 documentId, profileFieldId, response.evidenceId());
-            return ResponseEntity.status(201).body(response);
-        } catch (IllegalArgumentException e) {
-            log.error("Validation error attaching document {} to profile field {}: {}", documentId, profileFieldId, e.getMessage(), e);
-            return ResponseEntity.badRequest().build();
-        } catch (Exception e) {
-            log.error("Unexpected error attaching document {} to profile field {}: {}", documentId, profileFieldId, e.getMessage(), e);
-            return ResponseEntity.internalServerError().build();
-        }
+        return ResponseEntity.status(201).body(response);
     }
 
     /**
@@ -280,21 +215,13 @@ public class EvidenceController {
             @PathVariable String documentId) {
         log.info("Detaching document {} from profile field {} in app {}", documentId, profileFieldId, appId);
         
-        try {
-            // Fetch document details
-            DocumentResponse document = documentService.getDocumentById(documentId)
+        // Fetch document details
+        DocumentResponse document = documentService.getDocumentById(documentId)
                 .orElseThrow(() -> new IllegalArgumentException("Document not found: " + documentId));
             
-            EvidenceWithDocumentResponse response = evidenceService.detachDocumentFromField(appId, profileFieldId, document);
-            log.info("Successfully detached document {} from profile field {}", documentId, profileFieldId);
-            return ResponseEntity.ok(response);
-        } catch (IllegalArgumentException e) {
-            log.error("Validation error detaching document {} from profile field {}: {}", documentId, profileFieldId, e.getMessage(), e);
-            return ResponseEntity.badRequest().build();
-        } catch (Exception e) {
-            log.error("Unexpected error detaching document {} from profile field {}: {}", documentId, profileFieldId, e.getMessage(), e);
-            return ResponseEntity.internalServerError().build();
-        }
+        EvidenceWithDocumentResponse response = evidenceService.detachDocumentFromField(appId, profileFieldId, document);
+        log.info("Successfully detached document {} from profile field {}", documentId, profileFieldId);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -309,18 +236,10 @@ public class EvidenceController {
             @RequestBody AttachEvidenceToFieldRequest request) {
         log.info("Attaching evidence {} to profile field {} in app {}", evidenceId, profileFieldId, appId);
         
-        try {
-            EvidenceFieldLinkResponse response = evidenceService.attachEvidenceToProfileField(
-                    evidenceId, profileFieldId, appId, request);
-            log.info("Successfully attached evidence {} to profile field {}", evidenceId, profileFieldId);
-            return ResponseEntity.status(201).body(response);
-        } catch (IllegalArgumentException e) {
-            log.error("Validation error attaching evidence {} to field {}: {}", evidenceId, profileFieldId, e.getMessage());
-            return ResponseEntity.badRequest().build();
-        } catch (Exception e) {
-            log.error("Unexpected error attaching evidence {} to field {}: {}", evidenceId, profileFieldId, e.getMessage(), e);
-            return ResponseEntity.internalServerError().build();
-        }
+        EvidenceFieldLinkResponse response = evidenceService.attachEvidenceToProfileField(
+        evidenceId, profileFieldId, appId, request);
+        log.info("Successfully attached evidence {} to profile field {}", evidenceId, profileFieldId);
+        return ResponseEntity.status(201).body(response);
     }
 
     /**
@@ -333,17 +252,9 @@ public class EvidenceController {
             @PathVariable String profileFieldId) {
         log.info("Detaching evidence {} from profile field {}", evidenceId, profileFieldId);
         
-        try {
-            evidenceService.detachEvidenceFromProfileField(evidenceId, profileFieldId);
-            log.info("Successfully detached evidence {} from profile field {}", evidenceId, profileFieldId);
-            return ResponseEntity.noContent().build();
-        } catch (IllegalArgumentException e) {
-            log.error("Validation error detaching evidence {} from field {}: {}", evidenceId, profileFieldId, e.getMessage());
-            return ResponseEntity.badRequest().build();
-        } catch (Exception e) {
-            log.error("Unexpected error detaching evidence {} from field {}: {}", evidenceId, profileFieldId, e.getMessage(), e);
-            return ResponseEntity.internalServerError().build();
-        }
+        evidenceService.detachEvidenceFromProfileField(evidenceId, profileFieldId);
+        log.info("Successfully detached evidence {} from profile field {}", evidenceId, profileFieldId);
+        return ResponseEntity.noContent().build();
     }
 
     /**
@@ -354,15 +265,10 @@ public class EvidenceController {
     public ResponseEntity<EvidenceUsageResponse> getEvidenceUsage(@PathVariable String evidenceId) {
         log.info("Getting usage information for evidence {}", evidenceId);
         
-        try {
-            EvidenceUsageResponse response = evidenceService.getEvidenceUsage(evidenceId);
-            log.debug("Found {} field usages and {} risk usages for evidence {}", 
-                    response.fieldUsages().size(), response.riskUsages().size(), evidenceId);
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            log.error("Error getting usage for evidence {}: {}", evidenceId, e.getMessage(), e);
-            return ResponseEntity.internalServerError().build();
-        }
+        EvidenceUsageResponse response = evidenceService.getEvidenceUsage(evidenceId);
+        log.debug("Found {} field usages and {} risk usages for evidence {}", 
+        response.fieldUsages().size(), response.riskUsages().size(), evidenceId);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -392,8 +298,7 @@ public class EvidenceController {
 
         log.debug("Searching evidence with filters: linkStatus={}, appId={}, fieldKey={}, enhanced={}",
                  linkStatus, appId, fieldKey, enhanced);
-        try {
-            if (enhanced) {
+        if (enhanced) {
                 // Create request object for workbench-style search
                 EvidenceSearchRequest request = new EvidenceSearchRequest();
                 request.setApprovalStatus(linkStatus);
@@ -415,14 +320,10 @@ public class EvidenceController {
                 return ResponseEntity.ok(evidence);
             } else {
                 List<EnhancedEvidenceSummary> evidence = evidenceService.searchEvidence(
-                    linkStatus, appId, fieldKey, assignedPo, assignedSme, evidenceStatus, documentSourceType, page, size);
+        linkStatus, appId, fieldKey, assignedPo, assignedSme, evidenceStatus, documentSourceType, page, size);
                 log.debug("Found {} evidence items matching search criteria", evidence.size());
                 return ResponseEntity.ok(evidence);
             }
-        } catch (Exception e) {
-            log.error("Error searching evidence: {}", e.getMessage(), e);
-            return ResponseEntity.internalServerError().build();
-        }
     }
 
     /**
@@ -433,16 +334,11 @@ public class EvidenceController {
     public ResponseEntity<List<EnhancedEvidenceSummary>> getPendingPoReviewEvidence(
             @RequestParam String assignedPo) {
         log.debug("Getting pending PO review evidence for: {}", assignedPo);
-        try {
-            // Use the search method with linkStatus filter
-            List<EnhancedEvidenceSummary> evidence = evidenceService.searchEvidence(
+        // Use the search method with linkStatus filter
+        List<EnhancedEvidenceSummary> evidence = evidenceService.searchEvidence(
                 "PENDING_PO_REVIEW", null, null, assignedPo, null, null, null, 0, 100);
-            log.debug("Found {} evidence items pending PO review", evidence.size());
-            return ResponseEntity.ok(evidence);
-        } catch (Exception e) {
-            log.error("Error getting pending PO review evidence: {}", e.getMessage(), e);
-            return ResponseEntity.internalServerError().build();
-        }
+        log.debug("Found {} evidence items pending PO review", evidence.size());
+        return ResponseEntity.ok(evidence);
     }
 
     /**
@@ -453,16 +349,11 @@ public class EvidenceController {
     public ResponseEntity<List<EnhancedEvidenceSummary>> getPendingSmeReviewEvidence(
             @RequestParam String assignedSme) {
         log.debug("Getting pending SME review evidence for: {}", assignedSme);
-        try {
-            // Use the search method with linkStatus filter
-            List<EnhancedEvidenceSummary> evidence = evidenceService.searchEvidence(
+        // Use the search method with linkStatus filter
+        List<EnhancedEvidenceSummary> evidence = evidenceService.searchEvidence(
                 "PENDING_SME_REVIEW", null, null, null, assignedSme, null, null, 0, 100);
-            log.debug("Found {} evidence items pending SME review", evidence.size());
-            return ResponseEntity.ok(evidence);
-        } catch (Exception e) {
-            log.error("Error getting pending SME review evidence: {}", e.getMessage(), e);
-            return ResponseEntity.internalServerError().build();
-        }
+        log.debug("Found {} evidence items pending SME review", evidence.size());
+        return ResponseEntity.ok(evidence);
     }
 
     /**
@@ -476,74 +367,11 @@ public class EvidenceController {
             @RequestParam String reviewedBy,
             @RequestParam(required = false) String reviewComment) {
         log.debug("PO attesting evidence {} for field {} by {}", evidenceId, profileFieldId, reviewedBy);
-        try {
-            EvidenceFieldLinkResponse response = evidenceAttestationService.attestEvidenceFieldLink(
+        EvidenceFieldLinkResponse response = evidenceAttestationService.attestEvidenceFieldLink(
                 evidenceId, profileFieldId, reviewedBy, 
                 reviewComment != null ? reviewComment : "Attested by Product Owner", "po-approval");
-            log.info("Evidence {} approved by PO {} for field {}", evidenceId, reviewedBy, profileFieldId);
-            return ResponseEntity.ok(response);
-        } catch (IllegalArgumentException e) {
-            log.warn("Evidence link not found: {} -> {}", evidenceId, profileFieldId);
-            return ResponseEntity.notFound().build();
-        } catch (Exception e) {
-            log.error("Error approving evidence {} as PO: {}", evidenceId, e.getMessage(), e);
-            return ResponseEntity.internalServerError().build();
-        }
-    }
-
-    /**
-     * Reject evidence as Product Owner
-     * POST /api/evidence/{evidenceId}/po-reject
-     */
-    @PostMapping("/evidence/{evidenceId}/po-reject")
-    @Audited(action = "PO_REJECT_EVIDENCE", subjectType = "profile_field", subject = "#profileFieldId",
-             context = {"evidenceId=#evidenceId", "reviewedBy=#reviewedBy", "attestationType=PO_REJECTION"})
-    public ResponseEntity<EvidenceFieldLinkResponse> rejectEvidenceAsPo(
-            @PathVariable String evidenceId,
-            @RequestParam String profileFieldId, 
-            @RequestParam String reviewedBy,
-            @RequestParam(required = false) String reviewComment) {
-        log.debug("PO rejecting evidence {} for field {} by {}", evidenceId, profileFieldId, reviewedBy);
-        try {
-            EvidenceFieldLinkResponse response = evidenceFieldLinkService.reviewEvidenceFieldLink(
-                evidenceId, profileFieldId, reviewedBy,
-                reviewComment != null ? reviewComment : "Rejected by Product Owner", false);
-            log.info("Evidence {} rejected by PO {} for field {}", evidenceId, reviewedBy, profileFieldId);
-            return ResponseEntity.ok(response);
-        } catch (IllegalArgumentException e) {
-            log.warn("Evidence link not found: {} -> {}", evidenceId, profileFieldId);
-            return ResponseEntity.notFound().build();
-        } catch (Exception e) {
-            log.error("Error rejecting evidence {} as PO: {}", evidenceId, e.getMessage(), e);
-            return ResponseEntity.internalServerError().build();
-        }
-    }
-
-    /**
-     * Review an evidence-field link
-     * POST /api/evidence/{evidenceId}/field-link/{profileFieldId}/review
-     */
-    @PostMapping("/evidence/{evidenceId}/field-link/{profileFieldId}/review")
-    public ResponseEntity<EvidenceFieldLinkResponse> reviewEvidenceFieldLink(
-            @PathVariable String evidenceId,
-            @PathVariable String profileFieldId,
-            @RequestParam String reviewedBy,
-            @RequestParam String comment,
-            @RequestParam boolean approved) {
-        log.info("Reviewing evidence field link: {} -> {}, approved: {}", evidenceId, profileFieldId, approved);
-        
-        try {
-            EvidenceFieldLinkResponse response = evidenceService.reviewEvidenceFieldLink(
-                    evidenceId, profileFieldId, reviewedBy, comment, approved);
-            log.info("Successfully reviewed evidence field link: {} -> {}", evidenceId, profileFieldId);
-            return ResponseEntity.ok(response);
-        } catch (IllegalArgumentException e) {
-            log.error("Validation error reviewing evidence field link {} -> {}: {}", evidenceId, profileFieldId, e.getMessage());
-            return ResponseEntity.badRequest().build();
-        } catch (Exception e) {
-            log.error("Unexpected error reviewing evidence field link {} -> {}: {}", evidenceId, profileFieldId, e.getMessage(), e);
-            return ResponseEntity.internalServerError().build();
-        }
+        log.info("Evidence {} approved by PO {} for field {}", evidenceId, reviewedBy, profileFieldId);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -562,15 +390,10 @@ public class EvidenceController {
 
         log.debug("Getting compliant evidence for appId: {}, criticality: {}, domain: {}, fieldKey: {}, search: {}, page: {}, size: {}",
                 appId, criticality, domain, fieldKey, search, page, size);
-        try {
-            PageResponse<KpiEvidenceSummary> evidence =
+        PageResponse<KpiEvidenceSummary> evidence =
                 evidenceService.getCompliantEvidence(appId, criticality, domain, fieldKey, search, page, size);
-            log.debug("Found {} compliant evidence items (page {} of {})", evidence.items().size(), evidence.page(), Math.ceil((double) evidence.total() / evidence.pageSize()));
-            return ResponseEntity.ok(evidence);
-        } catch (Exception e) {
-            log.error("Error getting compliant evidence: {}", e.getMessage(), e);
-            return ResponseEntity.internalServerError().build();
-        }
+        log.debug("Found {} compliant evidence items (page {} of {})", evidence.items().size(), evidence.page(), Math.ceil((double) evidence.total() / evidence.pageSize()));
+        return ResponseEntity.ok(evidence);
     }
 
     /**
@@ -589,15 +412,10 @@ public class EvidenceController {
 
         log.debug("Getting pending review evidence for appId: {}, criticality: {}, domain: {}, fieldKey: {}, search: {}, page: {}, size: {}",
                 appId, criticality, domain, fieldKey, search, page, size);
-        try {
-            PageResponse<KpiEvidenceSummary> evidence =
+        PageResponse<KpiEvidenceSummary> evidence =
                 evidenceService.getPendingReviewEvidence(appId, criticality, domain, fieldKey, search, page, size);
-            log.debug("Found {} pending review evidence items (page {} of {})", evidence.items().size(), evidence.page(), Math.ceil((double) evidence.total() / evidence.pageSize()));
-            return ResponseEntity.ok(evidence);
-        } catch (Exception e) {
-            log.error("Error getting pending review evidence: {}", e.getMessage(), e);
-            return ResponseEntity.internalServerError().build();
-        }
+        log.debug("Found {} pending review evidence items (page {} of {})", evidence.items().size(), evidence.page(), Math.ceil((double) evidence.total() / evidence.pageSize()));
+        return ResponseEntity.ok(evidence);
     }
 
     /**
@@ -616,15 +434,10 @@ public class EvidenceController {
 
         log.debug("Getting missing evidence fields for appId: {}, criticality: {}, domain: {}, fieldKey: {}, search: {}, page: {}, size: {}",
                 appId, criticality, domain, fieldKey, search, page, size);
-        try {
-            PageResponse<Map<String, Object>> fields =
+        PageResponse<Map<String, Object>> fields =
                 evidenceService.getMissingEvidenceFields(appId, criticality, domain, fieldKey, search, page, size);
-            log.debug("Found {} profile fields missing evidence (page {} of {})", fields.items().size(), fields.page(), Math.ceil((double) fields.total() / fields.pageSize()));
-            return ResponseEntity.ok(fields);
-        } catch (Exception e) {
-            log.error("Error getting missing evidence fields: {}", e.getMessage(), e);
-            return ResponseEntity.internalServerError().build();
-        }
+        log.debug("Found {} profile fields missing evidence (page {} of {})", fields.items().size(), fields.page(), Math.ceil((double) fields.total() / fields.pageSize()));
+        return ResponseEntity.ok(fields);
     }
 
     /**
@@ -643,15 +456,10 @@ public class EvidenceController {
 
         log.debug("Getting risk blocked items for appId: {}, criticality: {}, domain: {}, fieldKey: {}, search: {}, page: {}, size: {}",
                 appId, criticality, domain, fieldKey, search, page, size);
-        try {
-            PageResponse<RiskBlockedItem> risks =
+        PageResponse<RiskBlockedItem> risks =
                 evidenceService.getRiskBlockedItems(appId, criticality, domain, fieldKey, search, page, size);
-            log.debug("Found {} risk blocked items (page {} of {})", risks.items().size(), risks.page(), Math.ceil((double) risks.total() / risks.pageSize()));
-            return ResponseEntity.ok(risks);
-        } catch (Exception e) {
-            log.error("Error getting risk blocked items: {}", e.getMessage(), e);
-            return ResponseEntity.internalServerError().build();
-        }
+        log.debug("Found {} risk blocked items (page {} of {})", risks.items().size(), risks.page(), Math.ceil((double) risks.total() / risks.pageSize()));
+        return ResponseEntity.ok(risks);
     }
 
     /**
@@ -671,35 +479,30 @@ public class EvidenceController {
 
         log.debug("Getting evidence by states: {} for appId: {}, criticality: {}, domain: {}, fieldKey: {}, search: {}, page: {}, size: {}",
                 states, appId, criticality, domain, fieldKey, search, page, size);
-        try {
-            Map<String, Object> result = new HashMap<>();
-            String[] stateArray = states.split(",");
+        Map<String, Object> result = new HashMap<>();
+        String[] stateArray = states.split(",");
 
             for (String state : stateArray) {
                 state = state.trim();
                 switch (state) {
-                    case "compliant":
-                        result.put("compliant", evidenceService.getCompliantEvidence(appId, criticality, domain, fieldKey, search, page, size));
-                        break;
-                    case "pending-review":
-                        result.put("pendingReview", evidenceService.getPendingReviewEvidence(appId, criticality, domain, fieldKey, search, page, size));
-                        break;
-                    case "missing-evidence":
-                        result.put("missingEvidence", evidenceService.getMissingEvidenceFields(appId, criticality, domain, fieldKey, search, page, size));
-                        break;
-                    case "risk-blocked":
-                        result.put("riskBlocked", evidenceService.getRiskBlockedItems(appId, criticality, domain, fieldKey, search, page, size));
-                        break;
-                    default:
-                        log.warn("Unknown state requested: {}", state);
+                case "compliant":
+        result.put("compliant", evidenceService.getCompliantEvidence(appId, criticality, domain, fieldKey, search, page, size));
+            break;
+                case "pending-review":
+        result.put("pendingReview", evidenceService.getPendingReviewEvidence(appId, criticality, domain, fieldKey, search, page, size));
+            break;
+                case "missing-evidence":
+        result.put("missingEvidence", evidenceService.getMissingEvidenceFields(appId, criticality, domain, fieldKey, search, page, size));
+            break;
+                case "risk-blocked":
+        result.put("riskBlocked", evidenceService.getRiskBlockedItems(appId, criticality, domain, fieldKey, search, page, size));
+            break;
+                default:
+        log.warn("Unknown state requested: {}", state);
                 }
             }
 
-            log.debug("Retrieved evidence for {} states", result.size());
-            return ResponseEntity.ok(result);
-        } catch (Exception e) {
-            log.error("Error getting evidence by states: {}", e.getMessage(), e);
-            return ResponseEntity.internalServerError().build();
-        }
+        log.debug("Retrieved evidence for {} states", result.size());
+        return ResponseEntity.ok(result);
     }
 }
