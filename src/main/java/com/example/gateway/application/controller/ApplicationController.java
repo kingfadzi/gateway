@@ -123,12 +123,8 @@ public class ApplicationController {
     })
     public ResponseEntity<com.example.gateway.application.dto.Application> getApplication(
             @Parameter(description = "Application ID") @PathVariable String appId) {
-        try {
-            com.example.gateway.application.dto.Application app = applicationManagementService.get(appId);
-            return ResponseEntity.ok(app);
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
+        com.example.gateway.application.dto.Application app = applicationManagementService.get(appId);
+        return ResponseEntity.ok(app);
     }
 
     @GetMapping("/{appId}/children")
@@ -227,21 +223,15 @@ public class ApplicationController {
             return ResponseEntity.status(404)
                 .body(AttestationErrorResponse.notFound("Application not found with ID: " + appId));
         }
-        
-        try {
-            // Process individual attestation
-            IndividualAttestationResponse response = evidenceFieldLinkService.processIndividualAttestation(appId, request);
-            
-            // Return appropriate HTTP status based on response
-            if ("success".equals(response.status())) {
-                return ResponseEntity.ok(response);
-            } else {
-                return ResponseEntity.badRequest().body(response);
-            }
-            
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError()
-                .body(AttestationErrorResponse.internalError("Unexpected error: " + e.getMessage()));
+
+        // Process individual attestation
+        IndividualAttestationResponse response = evidenceFieldLinkService.processIndividualAttestation(appId, request);
+
+        // Return appropriate HTTP status based on response
+        if ("success".equals(response.status())) {
+            return ResponseEntity.ok(response);
+        } else {
+            return ResponseEntity.badRequest().body(response);
         }
     }
 }

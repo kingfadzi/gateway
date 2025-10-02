@@ -34,12 +34,8 @@ public class DocumentController {
     @PostMapping("/apps/{appId}/documents")
     public ResponseEntity<DocumentResponse> createDocument(@PathVariable String appId,
                                                           @RequestBody CreateDocumentRequest request) {
-        try {
-            DocumentResponse response = documentService.createDocument(appId, request);
-            return ResponseEntity.ok(response);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().build();
-        }
+        DocumentResponse response = documentService.createDocument(appId, request);
+        return ResponseEntity.ok(response);
     }
     
     /**

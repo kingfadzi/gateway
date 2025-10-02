@@ -29,44 +29,10 @@ public class TrackController {
     @PostMapping("/apps/{appId}/tracks")
     public ResponseEntity<Track> createTrack(@PathVariable String appId,
                                            @RequestBody CreateTrackRequest request) {
-        log.info("Creating track for app {} with request: {}", appId, request);
-        try {
-            Track track = trackService.createTrack(appId, request);
-            log.info("Successfully created track {} for app {}", track.trackId(), appId);
-            return ResponseEntity.status(201).body(track);
-        } catch (IllegalArgumentException e) {
-            String errorMessage = e.getMessage();
-            
-            // Handle duplicate track case specifically
-            if (errorMessage != null && errorMessage.contains("Track already exists")) {
-                log.info("Track already exists for app {}, returning existing track instead of failing", appId);
-                
-                // Try to find and return the existing track
-                if (request.provider() != null && request.resourceType() != null && request.resourceId() != null) {
-                    try {
-                        var existingTrack = trackService.getTrackByResource(
-                            request.provider(), request.resourceType(), request.resourceId()
-                        );
-                        if (existingTrack.isPresent()) {
-                            log.info("Successfully returned existing track {} for duplicate create request", existingTrack.get().trackId());
-                            return ResponseEntity.ok(existingTrack.get()); // 200 OK with existing track
-                        }
-                    } catch (Exception ex) {
-                        log.warn("Could not retrieve existing track: {}", ex.getMessage());
-                    }
-                }
-                
-                log.error("Track exists but could not retrieve it for app {}", appId);
-                return ResponseEntity.internalServerError().build();
-            }
-            
-            // Handle other validation errors
-            log.error("Validation error creating track for app {}: {}", appId, errorMessage, e);
-            return ResponseEntity.badRequest().build();
-        } catch (Exception e) {
-            log.error("Unexpected error creating track for app {}: {}", appId, e.getMessage(), e);
-            return ResponseEntity.internalServerError().build();
-        }
+        log.info("Creating track for app {}", appId);
+        Track track = trackService.createTrack(appId, request);
+        log.info("Successfully created track {} for app {}", track.trackId(), appId);
+        return ResponseEntity.status(201).body(track);
     }
     
     /**
@@ -76,35 +42,23 @@ public class TrackController {
     @PutMapping("/apps/{appId}/tracks")
     public ResponseEntity<Track> upsertTrack(@PathVariable String appId,
                                            @RequestBody CreateTrackRequest request) {
-        log.info("Upserting track for app {} with request: {}", appId, request);
-        
+        log.info("Upserting track for app {}", appId);
+
         // First try to find existing track
         if (request.provider() != null && request.resourceType() != null && request.resourceId() != null) {
-            try {
-                var existingTrack = trackService.getTrackByResource(
-                    request.provider(), request.resourceType(), request.resourceId()
-                );
-                if (existingTrack.isPresent()) {
-                    log.info("Found existing track {} for upsert request", existingTrack.get().trackId());
-                    return ResponseEntity.ok(existingTrack.get());
-                }
-            } catch (Exception e) {
-                log.warn("Error checking for existing track during upsert: {}", e.getMessage());
+            var existingTrack = trackService.getTrackByResource(
+                request.provider(), request.resourceType(), request.resourceId()
+            );
+            if (existingTrack.isPresent()) {
+                log.info("Found existing track {} for upsert request", existingTrack.get().trackId());
+                return ResponseEntity.ok(existingTrack.get());
             }
         }
-        
+
         // No existing track found, create new one
-        try {
-            Track track = trackService.createTrack(appId, request);
-            log.info("Successfully created new track {} for upsert", track.trackId());
-            return ResponseEntity.status(201).body(track);
-        } catch (IllegalArgumentException e) {
-            log.error("Validation error during upsert for app {}: {}", appId, e.getMessage(), e);
-            return ResponseEntity.badRequest().build();
-        } catch (Exception e) {
-            log.error("Unexpected error during upsert for app {}: {}", appId, e.getMessage(), e);
-            return ResponseEntity.internalServerError().build();
-        }
+        Track track = trackService.createTrack(appId, request);
+        log.info("Successfully created new track {} for upsert", track.trackId());
+        return ResponseEntity.status(201).body(track);
     }
     
     /**
@@ -114,12 +68,8 @@ public class TrackController {
     @PutMapping("/tracks/{trackId}")
     public ResponseEntity<Track> updateTrack(@PathVariable String trackId,
                                            @RequestBody UpdateTrackRequest request) {
-        try {
-            Track track = trackService.updateTrack(trackId, request);
-            return ResponseEntity.ok(track);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().build();
-        }
+        Track track = trackService.updateTrack(trackId, request);
+        return ResponseEntity.ok(track);
     }
     
     /**
@@ -142,12 +92,8 @@ public class TrackController {
             @PathVariable String appId,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int pageSize) {
-        try {
-            PageResponse<TrackSummary> tracks = trackService.getTracksByApp(appId, page, pageSize);
-            return ResponseEntity.ok(tracks);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().build();
-        }
+        PageResponse<TrackSummary> tracks = trackService.getTracksByApp(appId, page, pageSize);
+        return ResponseEntity.ok(tracks);
     }
     
     /**
@@ -159,12 +105,8 @@ public class TrackController {
             @RequestParam String provider,
             @RequestParam String resourceType,
             @RequestParam String resourceId) {
-        try {
-            return trackService.getTrackByResource(provider, resourceType, resourceId)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().build();
-        }
+        return trackService.getTrackByResource(provider, resourceType, resourceId)
+            .map(ResponseEntity::ok)
+            .orElse(ResponseEntity.notFound().build());
     }
 }
