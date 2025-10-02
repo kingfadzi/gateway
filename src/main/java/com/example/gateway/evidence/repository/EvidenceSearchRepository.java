@@ -58,51 +58,40 @@ public class EvidenceSearchRepository {
 
         Map<String, Object> params = new HashMap<>();
 
-        // Add profile version filtering (KPI-style logic)
-        if (appId != null && !appId.trim().isEmpty()) {
-            sqlBuilder.append(" AND p.app_id = :appId");
-            sqlBuilder.append(" AND p.version = (SELECT MAX(version) FROM profile WHERE app_id = :appId)");
-            params.put("appId", appId.trim());
-        } else {
-            // For portfolio-wide searches, ensure we only get latest versions for each app
-            sqlBuilder.append(" AND p.version = (SELECT MAX(version) FROM profile p2 WHERE p2.app_id = p.app_id)");
-        }
+        SqlFilterBuilder.addProfileVersionFilter(sqlBuilder, params, appId, "p");
+        SqlFilterBuilder.addFieldKeyFilter(sqlBuilder, params, fieldKey, "pf.field_key");
 
-        // Add dynamic filters
+        // Link status filter (single value)
         if (linkStatus != null && !linkStatus.trim().isEmpty()) {
             sqlBuilder.append(" AND efl.link_status = :linkStatus");
             params.put("linkStatus", linkStatus.trim());
         }
 
-        if (fieldKey != null && !fieldKey.trim().isEmpty()) {
-            sqlBuilder.append(" AND pf.field_key = :fieldKey");
-            params.put("fieldKey", fieldKey.trim());
-        }
-
+        // Product owner filter
         if (assignedPo != null && !assignedPo.trim().isEmpty()) {
             sqlBuilder.append(" AND app.product_owner = :assignedPo");
             params.put("assignedPo", assignedPo.trim());
         }
 
+        // SME assignment filter
         if (assignedSme != null && !assignedSme.trim().isEmpty()) {
-            // For SME assignment, join with risk_story table using proper profile version filtering
             sqlBuilder.append(" AND EXISTS (SELECT 1 FROM risk_story rs WHERE rs.field_key = pf.field_key AND rs.app_id = p.app_id AND rs.assigned_sme = :assignedSme)");
             params.put("assignedSme", assignedSme.trim());
         }
 
-        // Evidence status filter removed - field deprecated
+        // Evidence status filter - deprecated
         if (evidenceStatus != null && !evidenceStatus.trim().isEmpty()) {
             log.warn("Evidence status filter '{}' ignored - status field deprecated", evidenceStatus.trim());
         }
 
+        // Document source type filter
         if (documentSourceType != null && !documentSourceType.trim().isEmpty()) {
             sqlBuilder.append(" AND d.source_type = :documentSourceType");
             params.put("documentSourceType", documentSourceType.trim());
         }
 
-        sqlBuilder.append(" ORDER BY e.created_at DESC LIMIT :limit OFFSET :offset");
-        params.put("limit", limit);
-        params.put("offset", offset);
+        SqlFilterBuilder.addOrderBy(sqlBuilder, "e.created_at DESC");
+        SqlFilterBuilder.addPagination(sqlBuilder, params, limit, offset);
 
         return jdbc.query(sqlBuilder.toString(), params, this::mapEnhancedEvidenceSummary);
     }
@@ -145,59 +134,60 @@ public class EvidenceSearchRepository {
             WHERE 1=1
             """);
 
-        MapSqlParameterSource params = new MapSqlParameterSource();
+        Map<String, Object> params = new HashMap<>();
 
-        // Add profile version filtering (KPI-style logic)
-        if (request.getAppId() != null) {
-            sqlBuilder.append(" AND p.app_id = :appId");
-            sqlBuilder.append(" AND p.version = (SELECT MAX(version) FROM profile WHERE app_id = :appId)");
-            params.addValue("appId", request.getAppId());
-        } else {
-            // For portfolio-wide searches, ensure we only get latest versions for each app
-            sqlBuilder.append(" AND p.version = (SELECT MAX(version) FROM profile p2 WHERE p2.app_id = p.app_id)");
-        }
+        SqlFilterBuilder.addProfileVersionFilter(sqlBuilder, params, request.getAppId(), "p");
+        SqlFilterBuilder.addFieldKeyFilter(sqlBuilder, params, request.getFieldKey(), "pf.field_key");
 
-        // Add dynamic filters
+        // Evidence status filter (deprecated field)
         if (request.getStatus() != null) {
             sqlBuilder.append(" AND e.status = :status");
-            params.addValue("status", request.getStatus());
+            params.put("status", request.getStatus());
         }
+
+        // Approval status (link status)
         if (request.getApprovalStatus() != null) {
             sqlBuilder.append(" AND efl.link_status = :approvalStatus");
-            params.addValue("approvalStatus", request.getApprovalStatus());
+            params.put("approvalStatus", request.getApprovalStatus());
         }
+
+        // Criticality filter (single value, not comma-separated in this method)
         if (request.getCriticality() != null) {
             sqlBuilder.append(" AND app.app_criticality_assessment = :criticality");
-            params.addValue("criticality", request.getCriticality());
+            params.put("criticality", request.getCriticality());
         }
+
+        // Application filters
         if (request.getApplicationType() != null) {
             sqlBuilder.append(" AND app.application_type = :applicationType");
-            params.addValue("applicationType", request.getApplicationType());
+            params.put("applicationType", request.getApplicationType());
         }
         if (request.getArchitectureType() != null) {
             sqlBuilder.append(" AND app.architecture_type = :architectureType");
-            params.addValue("architectureType", request.getArchitectureType());
+            params.put("architectureType", request.getArchitectureType());
         }
         if (request.getInstallType() != null) {
             sqlBuilder.append(" AND app.install_type = :installType");
-            params.addValue("installType", request.getInstallType());
+            params.put("installType", request.getInstallType());
         }
-        if (request.getFieldKey() != null) {
-            sqlBuilder.append(" AND pf.field_key = :fieldKey");
-            params.addValue("fieldKey", request.getFieldKey());
-        }
+
+        // Reviewer and submitter filters
         if (request.getAssignedReviewer() != null) {
             sqlBuilder.append(" AND efl.reviewed_by = :assignedReviewer");
-            params.addValue("assignedReviewer", request.getAssignedReviewer());
+            params.put("assignedReviewer", request.getAssignedReviewer());
         }
         if (request.getSubmittedBy() != null) {
             sqlBuilder.append(" AND e.submitted_by = :submittedBy");
-            params.addValue("submittedBy", request.getSubmittedBy());
+            params.put("submittedBy", request.getSubmittedBy());
         }
+
+        // Domain filter (special pattern matching)
         if (request.getDomain() != null) {
             sqlBuilder.append(" AND pf.derived_from LIKE :domain || '_rating'");
-            params.addValue("domain", request.getDomain());
+            params.put("domain", request.getDomain());
         }
+
+        // Text search across multiple columns
         if (request.getSearch() != null && !request.getSearch().isBlank()) {
             sqlBuilder.append("""
                  AND (
@@ -206,13 +196,11 @@ public class EvidenceSearchRepository {
                     OR app.app_id ILIKE '%' || :search || '%'
                 )
                 """);
-            params.addValue("search", request.getSearch());
+            params.put("search", request.getSearch());
         }
 
-        sqlBuilder.append(" ORDER BY e.created_at DESC");
-        sqlBuilder.append(" LIMIT :limit OFFSET :offset");
-        params.addValue("limit", request.getLimit());
-        params.addValue("offset", request.getOffset());
+        SqlFilterBuilder.addOrderBy(sqlBuilder, "e.created_at DESC");
+        SqlFilterBuilder.addPagination(sqlBuilder, params, request.getLimit(), request.getOffset());
 
         return jdbc.queryForList(sqlBuilder.toString(), params);
     }
