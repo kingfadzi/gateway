@@ -1,0 +1,39 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://helios:5432/lct_data
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+
+  jackson:
+    serialization:
+      indent_output: true
+    default-property-inclusion: NON_NULL
+
+  main:
+    banner-mode: off
+
+  application:
+    name: delivery-unit-backend
+
+server:
+  port: 8080
+
+logging:
+  level:
+    root: INFO
+    org.springframework.web: DEBUG
+    com.example.gateway: DEBUG
+    org.springframework.jdbc.core: DEBUG
+    org.springframework.test: DEBUG
+
+# Test profile - uses real PostgreSQL database
+# Note: Tests use @Transactional with rollback, so data is not persisted
