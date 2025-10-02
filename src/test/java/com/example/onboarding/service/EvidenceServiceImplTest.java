@@ -4,6 +4,9 @@ import com.example.gateway.config.FieldRegistryConfig;
 import com.example.gateway.evidence.dto.EvidenceSearchRequest;
 import com.example.gateway.evidence.dto.WorkbenchEvidenceItem;
 import com.example.gateway.evidence.repository.EvidenceRepository;
+import com.example.gateway.evidence.repository.EvidenceKpiRepository;
+import com.example.gateway.evidence.repository.EvidenceSearchRepository;
+import com.example.gateway.evidence.repository.EvidenceDocumentRepository;
 import com.example.gateway.profile.respository.ProfileRepository;
 import com.example.gateway.document.service.DocumentService;
 import com.example.gateway.evidence.service.EvidenceFieldLinkService;
@@ -26,6 +29,15 @@ class EvidenceServiceImplTest {
 
     @Mock
     private EvidenceRepository evidenceRepository;
+
+    @Mock
+    private EvidenceKpiRepository evidenceKpiRepository;
+
+    @Mock
+    private EvidenceSearchRepository evidenceSearchRepository;
+
+    @Mock
+    private EvidenceDocumentRepository evidenceDocumentRepository;
 
     @Mock
     private DocumentService documentService;
@@ -66,7 +78,7 @@ class EvidenceServiceImplTest {
                 "risk_count", 1
         );
 
-        when(evidenceRepository.searchWorkbenchEvidence(request)).thenReturn(List.of(rawRow));
+        when(evidenceSearchRepository.searchWorkbenchEvidence(request)).thenReturn(List.of(rawRow));
         when(fieldRegistryConfig.getDerivedFromByFieldKey("test-field")).thenReturn("security_rating");
         when(unifiedFreshnessCalculator.calculateFreshness(any(), any())).thenReturn("current");
 

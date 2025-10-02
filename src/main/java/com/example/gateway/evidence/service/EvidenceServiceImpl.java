@@ -8,6 +8,9 @@ import com.example.gateway.document.dto.DocumentResponse;
 import com.example.gateway.document.dto.DocumentVersionInfo;
 import com.example.gateway.document.dto.EnhancedDocumentResponse;
 import com.example.gateway.evidence.repository.EvidenceRepository;
+import com.example.gateway.evidence.repository.EvidenceKpiRepository;
+import com.example.gateway.evidence.repository.EvidenceSearchRepository;
+import com.example.gateway.evidence.repository.EvidenceDocumentRepository;
 import com.example.gateway.profile.respository.ProfileRepository;
 import com.example.gateway.profile.dto.ProfileField;
 import com.example.gateway.document.service.DocumentService;
@@ -28,17 +31,29 @@ public class EvidenceServiceImpl implements EvidenceService {
     private static final Logger log = LoggerFactory.getLogger(EvidenceServiceImpl.class);
     
     private final EvidenceRepository evidenceRepository;
+    private final EvidenceKpiRepository evidenceKpiRepository;
+    private final EvidenceSearchRepository evidenceSearchRepository;
+    private final EvidenceDocumentRepository evidenceDocumentRepository;
     private final DocumentService documentService;
     private final EvidenceFieldLinkService evidenceFieldLinkService;
     private final ProfileRepository profileRepository;
     private final UnifiedFreshnessCalculator unifiedFreshnessCalculator;
     private final FieldRegistryConfig fieldRegistryConfig;
-    
-    
-    public EvidenceServiceImpl(EvidenceRepository evidenceRepository, DocumentService documentService,
-                               EvidenceFieldLinkService evidenceFieldLinkService, ProfileRepository profileRepository,
-                               UnifiedFreshnessCalculator unifiedFreshnessCalculator, FieldRegistryConfig fieldRegistryConfig) {
+
+
+    public EvidenceServiceImpl(EvidenceRepository evidenceRepository,
+                               EvidenceKpiRepository evidenceKpiRepository,
+                               EvidenceSearchRepository evidenceSearchRepository,
+                               EvidenceDocumentRepository evidenceDocumentRepository,
+                               DocumentService documentService,
+                               EvidenceFieldLinkService evidenceFieldLinkService,
+                               ProfileRepository profileRepository,
+                               UnifiedFreshnessCalculator unifiedFreshnessCalculator,
+                               FieldRegistryConfig fieldRegistryConfig) {
         this.evidenceRepository = evidenceRepository;
+        this.evidenceKpiRepository = evidenceKpiRepository;
+        this.evidenceSearchRepository = evidenceSearchRepository;
+        this.evidenceDocumentRepository = evidenceDocumentRepository;
         this.documentService = documentService;
         this.evidenceFieldLinkService = evidenceFieldLinkService;
         this.profileRepository = profileRepository;
@@ -427,7 +442,7 @@ public class EvidenceServiceImpl implements EvidenceService {
     public EnhancedAttachedDocumentsResponse getEnhancedAttachedDocuments(String appId, String profileFieldId) {
         log.debug("Getting enhanced attached documents for profile field {} in app {}", profileFieldId, appId);
         
-        List<Map<String, Object>> results = evidenceRepository.findEnhancedAttachedDocuments(appId, profileFieldId);
+        List<Map<String, Object>> results = evidenceDocumentRepository.findEnhancedAttachedDocuments(appId, profileFieldId);
         
         List<EnhancedDocumentResponse> enhancedDocs = results.stream()
             .map(this::mapToEnhancedDocumentResponse)
@@ -750,14 +765,14 @@ public class EvidenceServiceImpl implements EvidenceService {
         int safeSize = Math.max(size, 1);
         int offset = safePage * safeSize;
         
-        return evidenceRepository.searchEvidence(linkStatus, appId, fieldKey, assignedPo, 
-                                                assignedSme, evidenceStatus, documentSourceType, 
+        return evidenceSearchRepository.searchEvidence(linkStatus, appId, fieldKey, assignedPo,
+                                                assignedSme, evidenceStatus, documentSourceType,
                                                 safeSize, offset);
     }
 
     @Override
     public List<WorkbenchEvidenceItem> searchWorkbenchEvidence(EvidenceSearchRequest request) {
-        List<Map<String, Object>> results = evidenceRepository.searchWorkbenchEvidence(request);
+        List<Map<String, Object>> results = evidenceSearchRepository.searchWorkbenchEvidence(request);
         List<WorkbenchEvidenceItem> items = new ArrayList<>();
 
         for (Map<String, Object> row : results) {
@@ -841,9 +856,9 @@ public class EvidenceServiceImpl implements EvidenceService {
         int safeSize = Math.max(size, 1);
         int offset = (safePage - 1) * safeSize;
 
-        List<KpiEvidenceSummary> items = evidenceRepository.findCompliantEvidence(
+        List<KpiEvidenceSummary> items = evidenceKpiRepository.findCompliantEvidence(
                 appId, criticality, domain, fieldKey, search, safeSize, offset);
-        long total = evidenceRepository.countCompliantEvidence(appId, criticality, domain, fieldKey, search);
+        long total = evidenceKpiRepository.countCompliantEvidence(appId, criticality, domain, fieldKey, search);
 
         return new PageResponse<>(safePage, safeSize, total, items);
     }
@@ -855,9 +870,9 @@ public class EvidenceServiceImpl implements EvidenceService {
         int safeSize = Math.max(size, 1);
         int offset = (safePage - 1) * safeSize;
 
-        List<KpiEvidenceSummary> items = evidenceRepository.findPendingReviewEvidence(
+        List<KpiEvidenceSummary> items = evidenceKpiRepository.findPendingReviewEvidence(
                 appId, criticality, domain, fieldKey, search, safeSize, offset);
-        long total = evidenceRepository.countPendingReviewEvidence(appId, criticality, domain, fieldKey, search);
+        long total = evidenceKpiRepository.countPendingReviewEvidence(appId, criticality, domain, fieldKey, search);
 
         return new PageResponse<>(safePage, safeSize, total, items);
     }
@@ -869,9 +884,9 @@ public class EvidenceServiceImpl implements EvidenceService {
         int safeSize = Math.max(size, 1);
         int offset = (safePage - 1) * safeSize;
 
-        List<Map<String, Object>> items = evidenceRepository.findMissingEvidenceFields(
+        List<Map<String, Object>> items = evidenceKpiRepository.findMissingEvidenceFields(
                 appId, criticality, domain, fieldKey, search, safeSize, offset);
-        long total = evidenceRepository.countMissingEvidenceFields(appId, criticality, domain, fieldKey, search);
+        long total = evidenceKpiRepository.countMissingEvidenceFields(appId, criticality, domain, fieldKey, search);
 
         return new PageResponse<>(safePage, safeSize, total, items);
     }
@@ -883,9 +898,9 @@ public class EvidenceServiceImpl implements EvidenceService {
         int safeSize = Math.max(size, 1);
         int offset = (safePage - 1) * safeSize;
 
-        List<RiskBlockedItem> items = evidenceRepository.findRiskBlockedItems(
+        List<RiskBlockedItem> items = evidenceKpiRepository.findRiskBlockedItems(
                 appId, criticality, domain, fieldKey, search, safeSize, offset);
-        long total = evidenceRepository.countRiskBlockedItems(appId, criticality, domain, fieldKey, search);
+        long total = evidenceKpiRepository.countRiskBlockedItems(appId, criticality, domain, fieldKey, search);
 
         return new PageResponse<>(safePage, safeSize, total, items);
     }
