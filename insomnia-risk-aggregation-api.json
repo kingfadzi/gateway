@@ -150,6 +150,25 @@
       "body": {}
     },
     {
+      "_id": "req_reassign_domain_risk",
+      "_type": "request",
+      "parentId": "folder_domain_risks",
+      "name": "Reassign Domain Risk",
+      "description": "Reassign a domain risk to a different ARB for workload balancing",
+      "url": "{{ _.base_url }}/api/v1/domain-risks/{{ _.domain_risk_id }}/assign",
+      "method": "PATCH",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"assignedArb\": \"integrity_arb\",\n  \"assignedBy\": \"admin_user\",\n  \"assignmentReason\": \"Workload balancing - security team overloaded\"\n}"
+      }
+    },
+    {
       "_id": "req_risk_items_by_app",
       "_type": "request",
       "parentId": "folder_risk_items",
@@ -245,6 +264,68 @@
         {
           "name": "Content-Type",
           "value": "application/json"
+        }
+      ],
+      "body": {}
+    },
+    {
+      "_id": "req_create_manual_risk",
+      "_type": "request",
+      "parentId": "folder_risk_items",
+      "name": "Create Manual Risk Item",
+      "description": "Create a risk item manually (not triggered by evidence)",
+      "url": "{{ _.base_url }}/api/v1/risk-items",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"appId\": \"{{ _.app_id }}\",\n  \"fieldKey\": \"{{ _.field_key }}\",\n  \"profileFieldId\": null,\n  \"title\": \"Manual risk: Encryption configuration review\",\n  \"description\": \"Security team identified potential encryption misconfiguration during audit\",\n  \"priority\": \"HIGH\",\n  \"createdBy\": \"security_arb_user\",\n  \"evidenceId\": null\n}"
+      }
+    },
+    {
+      "_id": "req_add_comment",
+      "_type": "request",
+      "parentId": "folder_risk_items",
+      "name": "Add Comment to Risk Item",
+      "description": "Add a comment to a risk item for discussion",
+      "url": "{{ _.base_url }}/api/v1/risk-items/{{ _.risk_item_id }}/comments",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"commentType\": \"REVIEW\",\n  \"commentText\": \"Reviewed the encryption configuration. Needs to implement AES-256 with proper key management.\",\n  \"commentedBy\": \"security_arb_user\",\n  \"isInternal\": false\n}"
+      }
+    },
+    {
+      "_id": "req_get_comments",
+      "_type": "request",
+      "parentId": "folder_risk_items",
+      "name": "Get Comments for Risk Item",
+      "description": "Get all comments for a risk item",
+      "url": "{{ _.base_url }}/api/v1/risk-items/{{ _.risk_item_id }}/comments",
+      "method": "GET",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "includeInternal",
+          "value": "false",
+          "description": "Include internal ARB notes",
+          "disabled": false
         }
       ],
       "body": {}

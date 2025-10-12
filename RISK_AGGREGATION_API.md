@@ -175,6 +175,42 @@ GET /api/v1/domain-risks/app/app-001
 
 ---
 
+### 6. Reassign Domain Risk
+
+Reassign a domain risk to a different ARB for workload balancing or expertise matching.
+
+**Endpoint**: `PATCH /api/v1/domain-risks/{domainRiskId}/assign`
+
+**Request Body**:
+```json
+{
+  "assignedArb": "integrity_arb",
+  "assignedBy": "admin_user",
+  "assignmentReason": "Workload balancing - security team overloaded"
+}
+```
+
+**Fields**:
+- `assignedArb` (required): New ARB identifier
+- `assignedBy` (required): User performing the reassignment
+- `assignmentReason` (optional): Reason for reassignment
+
+**Example Request**:
+```bash
+PATCH /api/v1/domain-risks/dr-uuid-123/assign
+Content-Type: application/json
+
+{
+  "assignedArb": "integrity_arb",
+  "assignedBy": "admin_user",
+  "assignmentReason": "Reassigning to integrity team for better expertise match"
+}
+```
+
+**Example Response**: Updated DomainRiskResponse object with new `assignedArb` and `assignedAt`
+
+---
+
 ## Risk Item Endpoints (PO View)
 
 ### 1. Get Risk Items for App
@@ -353,6 +389,189 @@ GET /api/v1/risk-items/evidence/evidence-001
 
 ---
 
+### 7. Create Risk Item Manually
+
+Create a risk item manually (not triggered by evidence submission). Used by ARB/SME to create risks outside the automatic flow.
+
+**Endpoint**: `POST /api/v1/risk-items`
+
+**Request Body**:
+```json
+{
+  "appId": "app-001",
+  "fieldKey": "encryption_at_rest",
+  "profileFieldId": "pf-789",
+  "title": "Manual risk: Encryption configuration review",
+  "description": "Security team identified potential encryption misconfiguration during audit",
+  "priority": "HIGH",
+  "createdBy": "security_arb_user",
+  "evidenceId": null
+}
+```
+
+**Fields**:
+- `appId` (required): Application ID
+- `fieldKey` (required): Field key from registry
+- `profileFieldId` (optional): Profile field ID if available
+- `title` (required): Risk title
+- `description` (required): Risk description
+- `priority` (required): One of `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`
+- `createdBy` (required): User creating the risk
+- `evidenceId` (optional): Evidence ID if related to evidence
+
+**Example Request**:
+```bash
+POST /api/v1/risk-items
+Content-Type: application/json
+
+{
+  "appId": "app-001",
+  "fieldKey": "encryption_at_rest",
+  "profileFieldId": "pf-789",
+  "title": "Manual risk: Encryption configuration review",
+  "description": "Security team identified potential encryption misconfiguration during audit",
+  "priority": "HIGH",
+  "createdBy": "security_arb_user",
+  "evidenceId": null
+}
+```
+
+**Example Response**:
+```json
+{
+  "riskItemId": "item-uuid-789",
+  "domainRiskId": "dr-uuid-123",
+  "appId": "app-001",
+  "fieldKey": "encryption_at_rest",
+  "profileFieldId": "pf-789",
+  "triggeringEvidenceId": null,
+  "trackId": null,
+  "title": "Manual risk: Encryption configuration review",
+  "description": "Security team identified potential encryption misconfiguration during audit",
+  "priority": "HIGH",
+  "severity": "high",
+  "priorityScore": 75,
+  "evidenceStatus": "approved",
+  "status": "OPEN",
+  "resolution": null,
+  "resolutionComment": null,
+  "creationType": "MANUAL_CREATION",
+  "raisedBy": "security_arb_user",
+  "openedAt": "2025-10-12T16:00:00Z",
+  "resolvedAt": null,
+  "policyRequirementSnapshot": null,
+  "createdAt": "2025-10-12T16:00:00Z",
+  "updatedAt": "2025-10-12T16:00:00Z"
+}
+```
+
+**Status Code**: `201 Created`
+
+---
+
+### 8. Add Comment to Risk Item
+
+Add a comment to a risk item for discussion and collaboration.
+
+**Endpoint**: `POST /api/v1/risk-items/{riskItemId}/comments`
+
+**Request Body**:
+```json
+{
+  "commentType": "REVIEW",
+  "commentText": "Reviewed the encryption configuration. Needs to implement AES-256 with proper key management.",
+  "commentedBy": "security_arb_user",
+  "isInternal": false
+}
+```
+
+**Fields**:
+- `commentType` (required): One of `GENERAL`, `STATUS_CHANGE`, `REVIEW`, `RESOLUTION`
+- `commentText` (required): Comment content
+- `commentedBy` (required): User adding the comment
+- `isInternal` (optional): `true` for internal ARB notes, `false` for PO-visible (default: `false`)
+
+**Example Request**:
+```bash
+POST /api/v1/risk-items/item-uuid-456/comments
+Content-Type: application/json
+
+{
+  "commentType": "REVIEW",
+  "commentText": "Reviewed the encryption configuration. Needs to implement AES-256 with proper key management.",
+  "commentedBy": "security_arb_user",
+  "isInternal": false
+}
+```
+
+**Example Response**:
+```json
+{
+  "commentId": "comment-uuid-111",
+  "riskItemId": "item-uuid-456",
+  "commentType": "REVIEW",
+  "commentText": "Reviewed the encryption configuration. Needs to implement AES-256 with proper key management.",
+  "commentedBy": "security_arb_user",
+  "commentedAt": "2025-10-12T16:15:00Z",
+  "isInternal": false,
+  "createdAt": "2025-10-12T16:15:00Z",
+  "updatedAt": "2025-10-12T16:15:00Z"
+}
+```
+
+**Status Code**: `201 Created`
+
+---
+
+### 9. Get Comments for Risk Item
+
+Get all comments for a risk item, with optional filtering for internal comments.
+
+**Endpoint**: `GET /api/v1/risk-items/{riskItemId}/comments`
+
+**Parameters**:
+- `includeInternal` (query, optional): Include internal ARB notes (default: `false`)
+
+**Example Request (Public comments only)**:
+```bash
+GET /api/v1/risk-items/item-uuid-456/comments
+```
+
+**Example Request (Include internal comments)**:
+```bash
+GET /api/v1/risk-items/item-uuid-456/comments?includeInternal=true
+```
+
+**Example Response**:
+```json
+[
+  {
+    "commentId": "comment-uuid-111",
+    "riskItemId": "item-uuid-456",
+    "commentType": "REVIEW",
+    "commentText": "Reviewed the encryption configuration. Needs to implement AES-256 with proper key management.",
+    "commentedBy": "security_arb_user",
+    "commentedAt": "2025-10-12T16:15:00Z",
+    "isInternal": false,
+    "createdAt": "2025-10-12T16:15:00Z",
+    "updatedAt": "2025-10-12T16:15:00Z"
+  },
+  {
+    "commentId": "comment-uuid-112",
+    "riskItemId": "item-uuid-456",
+    "commentType": "GENERAL",
+    "commentText": "PO acknowledged. Working on implementation plan.",
+    "commentedBy": "product_owner",
+    "commentedAt": "2025-10-12T17:00:00Z",
+    "isInternal": false,
+    "createdAt": "2025-10-12T17:00:00Z",
+    "updatedAt": "2025-10-12T17:00:00Z"
+  }
+]
+```
+
+---
+
 ## Status Enums
 
 ### DomainRiskStatus
@@ -376,6 +595,18 @@ GET /api/v1/risk-items/evidence/evidence-001
 - `HIGH` - Score 70-89
 - `MEDIUM` - Score 40-69
 - `LOW` - Score 0-39
+
+### RiskCreationType
+- `SYSTEM_AUTO_CREATION` - Automatically created by evidence submission
+- `MANUAL_CREATION` - Manually created by ARB/SME
+- `MANUAL_SME_INITIATED` - Legacy manual creation
+- `AUTO` - Legacy auto creation
+
+### RiskCommentType
+- `GENERAL` - General comment or discussion
+- `STATUS_CHANGE` - Comment related to status change
+- `REVIEW` - ARB/SME review comment
+- `RESOLUTION` - Resolution-related comment
 
 ---
 
@@ -475,8 +706,18 @@ When a risk item status is updated via the PATCH endpoint, the following happens
 
 ### Future Enhancements
 
+- **Risk History/Audit Trail**: Track full history of status changes and modifications
+- **SLA Tracking**: Priority-based deadlines and breach alerts
+- **Bulk Operations**: Batch status updates and assignments
+- **Notifications**: Real-time alerts for risk assignments and updates
+- **Advanced Analytics**: Risk velocity, time-to-resolution metrics
 - Pagination for large result sets
-- Batch status updates
 - WebSocket notifications for real-time updates
 - Export to CSV/Excel
 - Advanced filtering and sorting options
+
+### Recently Added (Phase 7)
+
+- **Manual Risk Creation**: ARB/SME can create risks outside automatic flow
+- **Risk Comments**: Discussion threading with internal/public visibility
+- **Risk Reassignment**: Workload balancing between ARBs
