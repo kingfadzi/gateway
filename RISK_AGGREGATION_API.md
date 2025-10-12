@@ -1,5 +1,14 @@
 # Risk Aggregation API Documentation
 
+## ⚠️ IMPORTANT - Corrected Information (2025-10-12)
+
+Following frontend team feedback, this document has been **corrected** with:
+- ✅ **Base URL**: `http://localhost:8181` (NOT 8080)
+- ✅ **ARB Names**: Short format (`security`, `data`, `operations`, `enterprise_architecture`) - NOT `_arb` suffix
+- ✅ **New Endpoints**: Added comprehensive dashboard, pending-sme-review, and search endpoints
+
+---
+
 ## Overview
 
 The Risk Aggregation API provides endpoints for managing domain-level risk aggregations and evidence-level risk items. It supports two primary personas:
