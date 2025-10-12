@@ -23,7 +23,10 @@
         "domain_risk_id": "domain-risk-123",
         "risk_item_id": "item-456",
         "field_key": "encryption_at_rest",
-        "evidence_id": "evidence-789"
+        "evidence_id": "evidence-789",
+        "profile_field_id": "pf-test-001",
+        "sme_email": "sme@example.com",
+        "developer_email": "developer@example.com"
       },
       "dataPropertyOrder": {
         "&": [
@@ -33,7 +36,10 @@
           "domain_risk_id",
           "risk_item_id",
           "field_key",
-          "evidence_id"
+          "evidence_id",
+          "profile_field_id",
+          "sme_email",
+          "developer_email"
         ]
       }
     },
@@ -50,6 +56,14 @@
       "_type": "request_group",
       "name": "Risk Items (PO View)",
       "description": "Endpoints for evidence-level risk items",
+      "environment": {},
+      "environmentPropertyOrder": null
+    },
+    {
+      "_id": "folder_evidence_lifecycle",
+      "_type": "request_group",
+      "name": "Evidence Lifecycle (Auto-Creation Trigger)",
+      "description": "Complete evidence submission → risk creation → approval → resolution workflow",
       "environment": {},
       "environmentPropertyOrder": null
     },
@@ -385,6 +399,165 @@
       "body": {
         "mimeType": "application/json",
         "text": "{\n  \"status\": \"CLOSED\",\n  \"resolution\": \"VERIFIED\",\n  \"resolutionComment\": \"Fix verified by ARB. Closing risk item.\"\n}"
+      }
+    },
+    {
+      "_id": "req_lifecycle_get_profile",
+      "_type": "request",
+      "parentId": "folder_evidence_lifecycle",
+      "name": "0. Get Profile (Find profileFieldId)",
+      "description": "Get app profile to find the profileFieldId. Look for the field with fieldKey='encryption_at_rest' and copy its 'id' value to the profile_field_id environment variable.",
+      "url": "{{ _.base_url }}/api/apps/{{ _.app_id }}/profile",
+      "method": "GET",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {}
+    },
+    {
+      "_id": "req_lifecycle_create_evidence",
+      "_type": "request",
+      "parentId": "folder_evidence_lifecycle",
+      "name": "1. Create Evidence",
+      "description": "Create new evidence for testing the auto-creation lifecycle.",
+      "url": "{{ _.base_url }}/api/apps/{{ _.app_id }}/evidence",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"profileFieldId\": \"{{ _.profile_field_id }}\",\n  \"type\": \"link\",\n  \"uri\": \"https://confluence.example.com/security/encryption-policy-v3.pdf\",\n  \"sourceSystem\": \"MANUAL\",\n  \"validFrom\": \"2025-10-01T00:00:00Z\",\n  \"submittedBy\": \"{{ _.developer_email }}\"\n}"
+      }
+    },
+    {
+      "_id": "req_lifecycle_attach_evidence",
+      "_type": "request",
+      "parentId": "folder_evidence_lifecycle",
+      "name": "2. Attach Evidence to Field ⚠️ TRIGGERS AUTO-CREATION!",
+      "description": "Attach evidence to profile field - THIS IS WHERE AUTO-RISK CREATION HAPPENS! Creates RiskItem + DomainRisk automatically if field requires review.",
+      "url": "{{ _.base_url }}/api/evidence/{{ _.evidence_id }}/attach-to-field/{{ _.profile_field_id }}?appId={{ _.app_id }}",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"linkedBy\": \"{{ _.developer_email }}\",\n  \"linkComment\": \"Submitting encryption policy documentation for compliance review\"\n}"
+      }
+    },
+    {
+      "_id": "req_lifecycle_verify_risk_created",
+      "_type": "request",
+      "parentId": "folder_evidence_lifecycle",
+      "name": "3. Verify Risk Item Created",
+      "description": "Confirm that risk item was auto-created from evidence submission. Check: status=OPEN, evidenceStatus=submitted, priorityScore=high (1.0x multiplier)",
+      "url": "{{ _.base_url }}/api/v1/risk-items/evidence/{{ _.evidence_id }}",
+      "method": "GET",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {}
+    },
+    {
+      "_id": "req_lifecycle_sme_approve",
+      "_type": "request",
+      "parentId": "folder_evidence_lifecycle",
+      "name": "4. SME Approves Evidence 🎯 PRIORITY DROPS!",
+      "description": "SME approves the evidence. This triggers risk recalculation with 0.5x multiplier - priority score should DROP by ~50%! (e.g., 100 → 50)",
+      "url": "{{ _.base_url }}/api/evidence/{{ _.evidence_id }}/review?profileFieldId={{ _.profile_field_id }}",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"action\": \"approve\",\n  \"reviewerId\": \"{{ _.sme_email }}\",\n  \"reviewComment\": \"Encryption policy meets all security requirements. Key management procedures are properly documented.\"\n}"
+      }
+    },
+    {
+      "_id": "req_lifecycle_sme_reject",
+      "_type": "request",
+      "parentId": "folder_evidence_lifecycle",
+      "name": "4 (Alt). SME Rejects Evidence",
+      "description": "Alternative path: SME rejects the evidence. Risk stays high priority (0.9x multiplier) signaling developer to resubmit.",
+      "url": "{{ _.base_url }}/api/evidence/{{ _.evidence_id }}/review?profileFieldId={{ _.profile_field_id }}",
+      "method": "POST",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"action\": \"reject\",\n  \"reviewerId\": \"{{ _.sme_email }}\",\n  \"reviewComment\": \"Documentation insufficient. Please provide more detail on key rotation procedures and access controls.\"\n}"
+      }
+    },
+    {
+      "_id": "req_lifecycle_verify_risk_updated",
+      "_type": "request",
+      "parentId": "folder_evidence_lifecycle",
+      "name": "5. Verify Risk Recalculated",
+      "description": "Confirm priority score dropped after approval. Check: evidenceStatus changed from 'submitted' → 'approved', priorityScore reduced (e.g., 100 → 50), updatedAt timestamp changed",
+      "url": "{{ _.base_url }}/api/v1/risk-items/{{ _.risk_item_id }}",
+      "method": "GET",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {}
+    },
+    {
+      "_id": "req_lifecycle_verify_domain_updated",
+      "_type": "request",
+      "parentId": "folder_evidence_lifecycle",
+      "name": "6. Verify Domain Risk Updated",
+      "description": "Confirm domain risk aggregation recalculated. Check: priorityScore updated, updatedAt timestamp changed, aggregate counts still correct",
+      "url": "{{ _.base_url }}/api/v1/domain-risks/{{ _.domain_risk_id }}",
+      "method": "GET",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {}
+    },
+    {
+      "_id": "req_lifecycle_resolve_risk",
+      "_type": "request",
+      "parentId": "folder_evidence_lifecycle",
+      "name": "7. Resolve Risk Item",
+      "description": "Mark risk item as resolved. This triggers domain risk recalculation and may auto-transition domain status to RESOLVED if this is the last open item.",
+      "url": "{{ _.base_url }}/api/v1/risk-items/{{ _.risk_item_id }}/status",
+      "method": "PATCH",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"status\": \"RESOLVED\",\n  \"resolution\": \"REMEDIATED\",\n  \"resolutionComment\": \"Evidence approved by SME. Compliance requirement satisfied.\"\n}"
       }
     }
   ]

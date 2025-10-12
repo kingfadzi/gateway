@@ -13,6 +13,10 @@ import com.example.gateway.profile.service.ProfileFieldRegistryService;
 import com.example.gateway.application.repository.ApplicationManagementRepository;
 import com.example.gateway.registry.service.ComplianceContextService;
 import com.example.gateway.profile.dto.ProfileFieldTypeInfo;
+import com.example.gateway.evidence.repository.EvidenceFieldLinkRepository;
+import com.example.gateway.evidence.model.EvidenceFieldLink;
+import com.example.gateway.evidence.model.EvidenceFieldLinkId;
+import com.example.gateway.evidence.service.EvidenceStatusMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.slf4j.Logger;
@@ -38,6 +42,8 @@ public class RiskAutoCreationServiceImpl implements RiskAutoCreationService {
     private final DomainRiskAggregationService aggregationService;
     private final RiskPriorityCalculator priorityCalculator;
     private final ArbRoutingService arbRoutingService;
+    private final EvidenceFieldLinkRepository evidenceFieldLinkRepository;
+    private final EvidenceStatusMapper evidenceStatusMapper;
 
     public RiskAutoCreationServiceImpl(RegistryRiskConfigService registryRiskConfigService,
                                       RiskStoryRepository riskStoryRepository,
@@ -49,7 +55,9 @@ public class RiskAutoCreationServiceImpl implements RiskAutoCreationService {
                                       ComplianceContextService complianceContextService,
                                       DomainRiskAggregationService aggregationService,
                                       RiskPriorityCalculator priorityCalculator,
-                                      ArbRoutingService arbRoutingService) {
+                                      ArbRoutingService arbRoutingService,
+                                      EvidenceFieldLinkRepository evidenceFieldLinkRepository,
+                                      EvidenceStatusMapper evidenceStatusMapper) {
         this.registryRiskConfigService = registryRiskConfigService;
         this.riskStoryRepository = riskStoryRepository;
         this.riskItemRepository = riskItemRepository;
@@ -61,6 +69,8 @@ public class RiskAutoCreationServiceImpl implements RiskAutoCreationService {
         this.aggregationService = aggregationService;
         this.priorityCalculator = priorityCalculator;
         this.arbRoutingService = arbRoutingService;
+        this.evidenceFieldLinkRepository = evidenceFieldLinkRepository;
+        this.evidenceStatusMapper = evidenceStatusMapper;
     }
 
     @Override
@@ -118,9 +128,12 @@ public class RiskAutoCreationServiceImpl implements RiskAutoCreationService {
         }
         RiskPriority priority = matchedRule.priority();
 
-        // Calculate priority score based on evidence status (assuming "missing" for now)
-        // TODO: Get actual evidence status from evidence service
-        String evidenceStatus = "missing";  // This should come from evidence
+        // Query actual evidence status from evidence field link
+        String evidenceStatus = evidenceFieldLinkRepository
+                .findById(new EvidenceFieldLinkId(evidenceId, profileFieldId))
+                .map(link -> evidenceStatusMapper.mapLinkStatusToEvidenceStatus(link.getLinkStatus()))
+                .orElse("missing");  // Truly missing if no link exists
+
         int priorityScore = priorityCalculator.calculatePriorityScore(priority, evidenceStatus);
         String severity = priorityCalculator.getSeverityLabel(priorityScore);
 

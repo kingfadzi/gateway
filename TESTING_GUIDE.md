@@ -41,42 +41,152 @@ Or with your IDE (run `GatewayApplication.java`)
 
 **Objective**: Verify that submitting evidence triggers risk item creation and domain risk aggregation.
 
+**Prerequisites**: Set environment variables:
+```bash
+export BASE="http://localhost:8080"
+export APP_ID="test-app-001"
+export PROFILE_FIELD_ID="pf-test-encryption"
+```
+
 **Steps**:
 
-1. **Create an evidence submission** (use existing evidence submission endpoint)
+1. **Create evidence**
+   ```bash
+   EVIDENCE_ID=$(curl -sS -X POST "$BASE/api/apps/$APP_ID/evidence" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "fieldKey": "encryption_at_rest",
+       "type": "link",
+       "uri": "https://confluence.example.com/security/encryption-policy.pdf",
+       "sourceSystem": "MANUAL",
+       "validFrom": "2025-10-01T00:00:00Z",
+       "submittedBy": "developer@example.com"
+     }' | jq -r '.evidenceId')
+
+   echo "Created evidence: $EVIDENCE_ID"
    ```
-   POST /api/v1/evidence
-   {
-     "appId": "test-app-001",
-     "fieldKey": "encryption_at_rest",
-     "profileFieldId": "pf-123",
-     // ... other fields
-   }
+
+2. **Attach evidence to field - TRIGGERS AUTO-CREATION!**
+   ```bash
+   RESPONSE=$(curl -sS -X POST "$BASE/api/evidence/$EVIDENCE_ID/attach-to-field/$PROFILE_FIELD_ID?appId=$APP_ID" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "linkedBy": "developer@example.com",
+       "linkComment": "Submitting encryption policy for compliance review"
+     }')
+
+   echo "$RESPONSE" | jq .
+
+   # Extract risk IDs from response
+   RISK_ITEM_ID=$(echo "$RESPONSE" | jq -r '.autoCreatedRiskId')
+   DOMAIN_RISK_ID=$(echo "$RESPONSE" | jq -r '.domainRiskId // empty')
+
+   echo "Risk item created: $RISK_ITEM_ID"
    ```
 
-2. **Check if risk item was created**
-   - In Insomnia, run: "Get Risk Items for App"
-   - Set `app_id` environment variable to `test-app-001`
-   - You should see a new risk item with:
-     - `priority`: Based on registry rule (e.g., CRITICAL)
-     - `priorityScore`: Calculated score (e.g., 100)
-     - `evidenceStatus`: "missing"
-     - `status`: OPEN
+3. **Verify risk item was created**
+   ```bash
+   curl -sS "$BASE/api/v1/risk-items/evidence/$EVIDENCE_ID" | jq .
+   ```
 
-3. **Check domain risk aggregation**
-   - Run: "Get Domain Risks for App"
-   - You should see a domain risk with:
-     - `domain`: "security" (for encryption_at_rest)
-     - `totalItems`: 1
-     - `openItems`: 1
-     - `priorityScore`: Calculated
-     - `assignedArb`: "security_arb"
+   **Or in Insomnia**: Run "3. Verify Risk Item Created" from Evidence Lifecycle folder
 
-**Expected Result**: ✅ Risk item created and linked to domain risk
+   You should see a risk item with:
+   - `priority`: Based on registry rule (e.g., CRITICAL)
+   - `priorityScore`: High score (e.g., 100) with 1.0x multiplier
+   - **`evidenceStatus`: "submitted"** (not "missing"!)
+   - `status`: OPEN
+   - `triggeringEvidenceId`: Your evidence ID
+
+4. **Check domain risk aggregation**
+   ```bash
+   curl -sS "$BASE/api/v1/domain-risks/app/$APP_ID" | jq .
+   ```
+
+   **Or in Insomnia**: Run "Get Domain Risks for App"
+
+   You should see a domain risk with:
+   - `domain`: "security" (for encryption_at_rest)
+   - `totalItems`: 1
+   - `openItems`: 1
+   - `priorityScore`: High (calculated from item scores)
+   - `assignedArb`: "security_arb"
+
+**Expected Result**: ✅ Risk item auto-created with `evidenceStatus="submitted"` and linked to domain risk
 
 ---
 
-### Scenario 2: ARB Workbench View
+### Scenario 2: Evidence Approval and Priority Recalculation ⭐ NEW!
+
+**Objective**: Verify that SME approval triggers risk recalculation with evidence status multipliers applied.
+
+**Prerequisites**: Complete Scenario 1 first to have `$EVIDENCE_ID`, `$RISK_ITEM_ID`, and `$PROFILE_FIELD_ID` set.
+
+**Steps**:
+
+1. **Get initial risk item state**
+   ```bash
+   curl -sS "$BASE/api/v1/risk-items/$RISK_ITEM_ID" | jq '{evidenceStatus, priorityScore, updatedAt}'
+   ```
+
+   **Expected**:
+   - `evidenceStatus`: "submitted"
+   - `priorityScore`: 100 (or similar high score with 1.0x multiplier)
+
+2. **SME approves evidence**
+   ```bash
+   curl -sS -X POST "$BASE/api/evidence/$EVIDENCE_ID/review?profileFieldId=$PROFILE_FIELD_ID" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "action": "approve",
+       "reviewerId": "sme@example.com",
+       "reviewComment": "Encryption policy meets all security requirements."
+     }' | jq .
+   ```
+
+   **Or in Insomnia**: Run "4. SME Approves Evidence" from Evidence Lifecycle folder
+
+3. **Verify risk item recalculated**
+   ```bash
+   curl -sS "$BASE/api/v1/risk-items/$RISK_ITEM_ID" | jq '{evidenceStatus, priorityScore, updatedAt}'
+   ```
+
+   **Expected changes**:
+   - `evidenceStatus`: "submitted" → **"approved"** ✅
+   - `priorityScore`: 100 → **50** (0.5x multiplier applied!) ✅
+   - `updatedAt`: New timestamp ✅
+
+4. **Verify domain risk recalculated**
+   ```bash
+   curl -sS "$BASE/api/v1/domain-risks/$DOMAIN_RISK_ID" | jq '{priorityScore, updatedAt}'
+   ```
+
+   **Expected**:
+   - `priorityScore`: Reduced (reflects lower item priority)
+   - `updatedAt`: New timestamp
+
+5. **Test rejection path (optional)**
+   ```bash
+   curl -sS -X POST "$BASE/api/evidence/$EVIDENCE_ID/review?profileFieldId=$PROFILE_FIELD_ID" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "action": "reject",
+       "reviewerId": "sme@example.com",
+       "reviewComment": "Insufficient detail on key rotation procedures."
+     }' | jq .
+   ```
+
+   **Expected**:
+   - `evidenceStatus`: "rejected"
+   - `priorityScore`: Slightly reduced (0.9x multiplier, still high priority)
+
+**Expected Result**: ✅ Evidence approval triggers automatic priority score reduction via 0.5x multiplier
+
+**Why This Matters**: This demonstrates that the system correctly tracks evidence status and adjusts risk priorities automatically. Approved evidence = lower urgency, rejected evidence = still urgent.
+
+---
+
+### Scenario 3: ARB Workbench View
 
 **Objective**: Verify ARB can see all their domain risks prioritized.
 

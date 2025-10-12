@@ -211,6 +211,105 @@ Content-Type: application/json
 
 ---
 
+## Evidence Lifecycle Endpoints
+
+These endpoints manage the evidence submission → risk creation → approval workflow that triggers automatic risk item creation.
+
+### Evidence Approval/Rejection (SME Workflow)
+
+Approve or reject evidence submitted for high-criticality fields requiring SME review.
+
+**Endpoint**: `POST /api/evidence/{evidenceId}/review`
+
+**Query Parameters**:
+- `profileFieldId` (required): Profile field ID the evidence is linked to
+
+**Request Body**:
+```json
+{
+  "action": "approve",
+  "reviewerId": "sme@example.com",
+  "reviewComment": "Optional review notes"
+}
+```
+
+**Fields**:
+- `action` (required): `"approve"` or `"reject"`
+- `reviewerId` (required): SME identifier performing the review
+- `reviewComment` (optional): Review notes or feedback
+
+**Example Request (Approval)**:
+```bash
+POST /api/evidence/evidence-789/review?profileFieldId=pf-test-001
+Content-Type: application/json
+
+{
+  "action": "approve",
+  "reviewerId": "sme@example.com",
+  "reviewComment": "Encryption policy meets all security requirements."
+}
+```
+
+**Example Request (Rejection)**:
+```bash
+POST /api/evidence/evidence-789/review?profileFieldId=pf-test-001
+Content-Type: application/json
+
+{
+  "action": "reject",
+  "reviewerId": "sme@example.com",
+  "reviewComment": "Documentation insufficient. Please provide more detail on key management."
+}
+```
+
+**Example Response**:
+```json
+{
+  "evidenceId": "evidence-789",
+  "profileFieldId": "pf-test-001",
+  "linkStatus": "APPROVED",
+  "linkedBy": "developer@example.com",
+  "linkedAt": "2025-10-12T10:00:00Z",
+  "reviewedBy": "sme@example.com",
+  "reviewedAt": "2025-10-12T14:30:00Z",
+  "reviewComment": "Encryption policy meets all security requirements."
+}
+```
+
+**Status Transitions**:
+- **Approve**: `PENDING_SME_REVIEW` → `APPROVED`
+- **Reject**: `PENDING_SME_REVIEW` → `REJECTED`
+
+**Side Effects** (Critical!):
+1. **Updates evidence field link status** to `APPROVED` or `REJECTED`
+2. **Triggers automatic risk recalculation** if a risk item exists for this evidence
+3. **Priority score multipliers applied**:
+   - `approved`: **0.5x multiplier** (50% score reduction - e.g., 100 → 50)
+   - `rejected`: 0.9x multiplier (10% reduction)
+   - `submitted` (pending): 1.0x multiplier (full priority)
+4. **Domain risk aggregations recalculated** with new priority scores
+5. **Timestamps updated**: `updatedAt` on both risk item and domain risk
+
+**Priority Score Impact Example**:
+```
+Before Approval:
+- Risk item: status=OPEN, evidenceStatus="submitted", priorityScore=100
+- Domain risk: priorityScore=95, openItems=1
+
+After Approval:
+- Risk item: status=OPEN, evidenceStatus="approved", priorityScore=50 ✅
+- Domain risk: priorityScore=55, openItems=1 ✅
+```
+
+**Status Code**: `200 OK`
+
+**Use Cases**:
+- **High-criticality fields** (A1, A2 ratings) require SME approval
+- **Security, integrity, confidentiality** domain evidence
+- Evidence validation before accepting compliance claims
+
+---
+
 ## Risk Item Endpoints (PO View)
 
 ### 1. Get Risk Items for App
@@ -628,10 +727,25 @@ The collection includes environment variables you can customize:
 - `arb_name`: Test ARB name (e.g., `security_arb`)
 - `domain_risk_id`: Domain risk ID for testing
 - `risk_item_id`: Risk item ID for testing
-- `field_key`: Field key for testing
+- `field_key`: Field key for testing (e.g., `encryption_at_rest`)
 - `evidence_id`: Evidence ID for testing
+- `profile_field_id`: Profile field ID for testing
+- `sme_email`: SME email for reviews
+- `developer_email`: Developer email for submissions
 
-### Typical Testing Flow
+### Complete Lifecycle Testing Flow
+
+**NEW: Evidence Lifecycle folder** - Test the full auto-creation workflow:
+
+1. **Create evidence** → Capture `evidence_id`
+2. **Attach to field** ⚠️ **TRIGGERS AUTO-CREATION** → Capture `risk_item_id`, `domain_risk_id`
+3. **Verify risk created** → Check `evidenceStatus="submitted"`, `priorityScore=100`
+4. **SME approves** → Priority score drops to ~50
+5. **Verify recalculation** → Check `evidenceStatus="approved"`, `priorityScore=50`
+6. **Verify domain updated** → Domain risk aggregations recalculated
+7. **Resolve risk** → Mark as resolved
+
+### Typical Testing Flow (Risk Management)
 
 1. **Check ARB workbench**:
    - Run: "Get Domain Risks for ARB"
@@ -721,3 +835,6 @@ When a risk item status is updated via the PATCH endpoint, the following happens
 - **Manual Risk Creation**: ARB/SME can create risks outside automatic flow
 - **Risk Comments**: Discussion threading with internal/public visibility
 - **Risk Reassignment**: Workload balancing between ARBs
+- **SME Evidence Approval**: New `POST /api/evidence/{id}/review` endpoint for evidence approval/rejection workflow
+- **Evidence Status Multipliers**: Priority scores now adjust automatically based on evidence status (approved=0.5x, rejected=0.9x, submitted=1.0x)
+- **Complete Lifecycle Testing**: New Insomnia folder with 7 requests covering evidence → risk → approval → resolution flow

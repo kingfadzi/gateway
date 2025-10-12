@@ -315,14 +315,19 @@ EVID=$(curl -sS -X POST "$BASE/api/apps/$APP_ID/evidence" \
   -H "Content-Type: application/json" \
   -d "{\"profileField\":\"$FIELD_KEY\",\"type\":\"link\",\"uri\":\"$URI1\",\"sourceSystem\":\"MANUAL\",\"validFrom\":\"2025-08-01T00:00:00Z\",\"submittedBy\":\"alice\"}" \
   | jq -r '.evidenceId'); echo "EVID=$EVID"
+
+# Capture profile field ID for review (get from profile API)
+PROFILE_FIELD_ID=$(curl -sS "$BASE/api/apps/$APP_ID/profile" \
+  | jq -r ".fields[] | select(.fieldKey == \"encryption_at_rest\") | .id")
+echo "PROFILE_FIELD_ID=$PROFILE_FIELD_ID"
 ```
 
 ### (C) Approve that evidence
 
 ```bash
-curl -sS -X POST "$BASE/api/evidence/$EVID/review" \
+curl -sS -X POST "$BASE/api/evidence/$EVID/review?profileFieldId=$PROFILE_FIELD_ID" \
   -H "Content-Type: application/json" \
-  -d '{"action":"approve","reviewerId":"sme.bob"}' | jq .
+  -d '{"action":"approve","reviewerId":"sme.bob","reviewComment":"Encryption policy meets requirements"}' | jq .
 ```
 
 ### (D) Validate — list the chain for the field
@@ -343,9 +348,9 @@ EVID2=$(curl -sS -X POST "$BASE/api/apps/$APP_ID/evidence" \
 ### (F) Reject it
 
 ```bash
-curl -sS -X POST "$BASE/api/evidence/$EVID2/review" \
+curl -sS -X POST "$BASE/api/evidence/$EVID2/review?profileFieldId=$PROFILE_FIELD_ID" \
   -H "Content-Type: application/json" \
-  -d '{"action":"reject","reviewerId":"sme.carol"}' | jq .
+  -d '{"action":"reject","reviewerId":"sme.carol","reviewComment":"Insufficient documentation"}' | jq .
 ```
 
 ### (G) Validate again (compact view)

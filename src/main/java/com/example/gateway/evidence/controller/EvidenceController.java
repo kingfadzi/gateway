@@ -368,9 +368,53 @@ public class EvidenceController {
             @RequestParam(required = false) String reviewComment) {
         log.debug("PO attesting evidence {} for field {} by {}", evidenceId, profileFieldId, reviewedBy);
         EvidenceFieldLinkResponse response = evidenceAttestationService.attestEvidenceFieldLink(
-                evidenceId, profileFieldId, reviewedBy, 
+                evidenceId, profileFieldId, reviewedBy,
                 reviewComment != null ? reviewComment : "Attested by Product Owner", "po-approval");
         log.info("Evidence {} approved by PO {} for field {}", evidenceId, reviewedBy, profileFieldId);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Approve or reject evidence (SME review workflow)
+     * POST /api/evidence/{evidenceId}/review
+     *
+     * This endpoint is used by SMEs to approve or reject evidence submitted for
+     * high-criticality fields. Approval/rejection triggers automatic risk recalculation
+     * with evidence status multipliers applied to priority scores.
+     */
+    @PostMapping("/evidence/{evidenceId}/review")
+    public ResponseEntity<EvidenceFieldLinkResponse> reviewEvidence(
+            @PathVariable String evidenceId,
+            @RequestParam String profileFieldId,
+            @RequestBody ReviewEvidenceRequest request) {
+
+        log.info("Reviewing evidence {} for field {} by {}: action={}",
+                evidenceId, profileFieldId, request.reviewerId(), request.action());
+
+        // Validate request
+        if (!request.isValid()) {
+            log.warn("Invalid review request: action={}, reviewerId={}",
+                    request.action(), request.reviewerId());
+            return ResponseEntity.badRequest().build();
+        }
+
+        // Convert action to boolean (approve = true, reject = false)
+        boolean approved = request.isApproval();
+
+        // Review the evidence field link (changes status and triggers risk recalculation)
+        EvidenceFieldLinkResponse response = evidenceService.reviewEvidenceFieldLink(
+                evidenceId,
+                profileFieldId,
+                request.reviewerId(),
+                request.reviewComment() != null ? request.reviewComment() : "",
+                approved);
+
+        log.info("Evidence {} {} by {} for field {}",
+                evidenceId,
+                approved ? "APPROVED" : "REJECTED",
+                request.reviewerId(),
+                profileFieldId);
+
         return ResponseEntity.ok(response);
     }
 
