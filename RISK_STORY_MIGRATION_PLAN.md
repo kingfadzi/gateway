@@ -1,5 +1,68 @@
 # Risk Story Migration Plan
 
+## Context & Background
+
+**Date Created:** 2025-10-12
+**Status:** Ready for Implementation - Phase 1
+**Related Work:** Evidence status bug fix (completed), SME approval endpoint (completed), Risk aggregation architecture (V2 deployed)
+
+### Why This Migration?
+
+**Investigation Finding:** The `risk_story` table is **partially legacy**:
+- ✅ **Still used:** Manual risk creation by SMEs (7 REST endpoints, RiskStoryService active)
+- ✅ **Still integrated:** ProfileServiceImpl queries risk_story for graph views (2 locations)
+- ❌ **Dead code:** RiskAutoCreationServiceImpl injects but never uses RiskStoryRepository
+- ❌ **Duplicates functionality:** New auto-creation uses `risk_item` + `domain_risk` (deployed in V2)
+
+**Business Requirement:** Consolidate to single architecture:
+- **POs** need evidence-level view (risk items)
+- **SMEs/ARBs** need domain-level view (domain risks)
+- **No need for two parallel systems** (risk_story vs risk_item)
+
+**Critical User Requirement (2025-10-12):**
+> "we need to keep: hypothesis/condition/consequence"
+
+Must preserve rich risk narrative structure in risk_item, not lose this data during migration.
+
+### What Has Been Completed
+
+Before starting this migration, the following work is **already done**:
+
+1. **Risk Aggregation Architecture (V2)** ✅
+   - `domain_risk` + `risk_item` tables created
+   - Auto-creation on evidence submission working
+   - Priority scoring with evidence status multipliers
+   - ARB routing by domain
+   - 14 REST endpoints for PO/ARB views
+   - Full testing coverage (TESTING_GUIDE.md, Insomnia collection)
+
+2. **Evidence Status Fix** ✅
+   - RiskAutoCreationServiceImpl now queries actual evidence status (was hardcoded "missing")
+   - Priority scores correctly drop when evidence approved (100 → 50)
+
+3. **SME Approval Endpoint** ✅
+   - `POST /api/evidence/{id}/review` endpoint added
+   - Triggers risk recalculation on approval/rejection
+   - Documented in RISK_AGGREGATION_API.md
+
+4. **Documentation** ✅
+   - RISK_AGGREGATION_API.md - Complete API reference
+   - TESTING_GUIDE.md - 7 end-to-end scenarios
+   - SME_DASHBOARD_SPEC.md - Frontend integration guide
+   - README.md - Quick start with curl examples
+
+### What This Plan Covers
+
+This migration plan will:
+- Add rich content columns to `risk_item` (hypothesis, condition, consequence)
+- Add manual risk creation to RiskItem API (match RiskStory capability)
+- Migrate all risk_story data to risk_item
+- Update ProfileService to use risk_item
+- Deprecate and remove all RiskStory code
+- Drop risk_story tables (with 90-day archive)
+
+---
+
 ## Executive Summary
 
 **Objective:** Migrate all risk management workflows, logic, and data from the legacy `risk_story` architecture to the new `risk_item` + `domain_risk` architecture.
