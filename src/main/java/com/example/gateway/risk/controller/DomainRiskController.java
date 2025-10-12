@@ -1,9 +1,6 @@
 package com.example.gateway.risk.controller;
 
-import com.example.gateway.risk.dto.DomainRiskResponse;
-import com.example.gateway.risk.dto.DomainRiskSummaryResponse;
-import com.example.gateway.risk.dto.RiskDtoMapper;
-import com.example.gateway.risk.dto.RiskItemResponse;
+import com.example.gateway.risk.dto.*;
 import com.example.gateway.risk.model.DomainRisk;
 import com.example.gateway.risk.model.DomainRiskStatus;
 import com.example.gateway.risk.model.RiskItem;
@@ -157,6 +154,43 @@ public class DomainRiskController {
 
         log.info("Found {} domain risks for app: {}", responses.size(), appId);
         return ResponseEntity.ok(responses);
+    }
+
+    /**
+     * Reassign a domain risk to a different ARB.
+     * Used for workload balancing or expertise matching.
+     *
+     * PATCH /api/v1/domain-risks/{domainRiskId}/assign
+     */
+    @PatchMapping("/{domainRiskId}/assign")
+    public ResponseEntity<DomainRiskResponse> reassignDomainRisk(
+            @PathVariable String domainRiskId,
+            @RequestBody AssignRiskRequest request) {
+
+        log.info("PATCH /api/v1/domain-risks/{}/assign - new ARB: {}, by: {}",
+                domainRiskId, request.assignedArb(), request.assignedBy());
+
+        // Validate request
+        if (!request.isValid()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        // Verify domain risk exists
+        if (!domainRiskRepository.existsById(domainRiskId)) {
+            return ResponseEntity.notFound().build();
+        }
+
+        // Reassign
+        DomainRisk updated = aggregationService.reassignDomainRisk(
+                domainRiskId,
+                request.assignedArb(),
+                request.assignedBy()
+        );
+
+        DomainRiskResponse response = RiskDtoMapper.toDomainRiskResponse(updated);
+
+        log.info("Reassigned domain risk {} to ARB: {}", domainRiskId, request.assignedArb());
+        return ResponseEntity.ok(response);
     }
 
     /**

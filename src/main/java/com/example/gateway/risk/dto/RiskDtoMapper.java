@@ -2,6 +2,7 @@ package com.example.gateway.risk.dto;
 
 import com.example.gateway.risk.model.DomainRisk;
 import com.example.gateway.risk.model.RiskItem;
+import com.example.gateway.risk.model.RiskComment;
 
 /**
  * Utility class for mapping risk entities to DTOs.
@@ -73,6 +74,27 @@ public class RiskDtoMapper {
                 riskItem.getPolicyRequirementSnapshot(),
                 riskItem.getCreatedAt(),
                 riskItem.getUpdatedAt()
+        );
+    }
+
+    /**
+     * Convert RiskComment entity to RiskCommentResponse DTO
+     */
+    public static RiskCommentResponse toRiskCommentResponse(RiskComment comment) {
+        if (comment == null) {
+            return null;
+        }
+
+        return new RiskCommentResponse(
+                comment.getCommentId(),
+                comment.getRiskItemId(),
+                comment.getCommentType(),
+                comment.getCommentText(),
+                comment.getCommentedBy(),
+                comment.getCommentedAt(),
+                comment.getIsInternal(),
+                comment.getCreatedAt(),
+                comment.getUpdatedAt()
         );
     }
 }

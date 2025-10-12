@@ -249,6 +249,88 @@ public class DomainRiskAggregationService {
         return riskItemRepository.findByAppIdOrderByPriorityScoreDesc(appId);
     }
 
+    /**
+     * Create a risk item manually (not triggered by evidence submission).
+     * Used by ARB/SME to create risks outside the automatic flow.
+     *
+     * @param appId Application ID
+     * @param fieldKey Field key
+     * @param profileFieldId Profile field ID (optional)
+     * @param title Risk title
+     * @param description Risk description
+     * @param priority Priority level
+     * @param createdBy User creating the risk
+     * @param evidenceId Evidence ID (optional)
+     * @param derivedFrom Derived from field for domain routing
+     * @return Created risk item
+     */
+    @Transactional
+    public RiskItem createManualRisk(String appId, String fieldKey, String profileFieldId,
+                                      String title, String description, RiskPriority priority,
+                                      String createdBy, String evidenceId, String derivedFrom) {
+
+        // Get or create domain risk
+        DomainRisk domainRisk = getOrCreateDomainRisk(appId, derivedFrom);
+
+        // Calculate priority score (no evidence status multiplier for manual creation)
+        int priorityScore = priorityCalculator.calculatePriorityScore(priority, "approved");
+        String severity = priorityCalculator.getSeverityLabel(priorityScore);
+
+        // Create risk item
+        RiskItem riskItem = new RiskItem();
+        riskItem.setRiskItemId("item_" + UUID.randomUUID());
+        riskItem.setAppId(appId);
+        riskItem.setFieldKey(fieldKey);
+        riskItem.setProfileFieldId(profileFieldId);
+        riskItem.setTriggeringEvidenceId(evidenceId);  // May be null
+
+        riskItem.setTitle(title);
+        riskItem.setDescription(description);
+
+        riskItem.setPriority(priority);
+        riskItem.setSeverity(severity);
+        riskItem.setPriorityScore(priorityScore);
+        riskItem.setEvidenceStatus("approved");  // Default for manual creation
+
+        riskItem.setStatus(RiskItemStatus.OPEN);
+        riskItem.setCreationType(RiskCreationType.MANUAL_CREATION);
+        riskItem.setRaisedBy(createdBy);
+        riskItem.setOpenedAt(OffsetDateTime.now());
+
+        // Add to domain risk
+        addRiskItemToDomain(domainRisk, riskItem);
+
+        log.info("Manually created risk item: {} by {} for app: {}",
+                 riskItem.getRiskItemId(), createdBy, appId);
+
+        return riskItem;
+    }
+
+    /**
+     * Reassign a domain risk to a different ARB.
+     *
+     * @param domainRiskId Domain risk ID
+     * @param newArb New ARB identifier
+     * @param assignedBy User performing the reassignment
+     * @return Updated domain risk
+     */
+    @Transactional
+    public DomainRisk reassignDomainRisk(String domainRiskId, String newArb, String assignedBy) {
+        DomainRisk domainRisk = domainRiskRepository.findById(domainRiskId)
+                .orElseThrow(() -> new IllegalArgumentException("Domain risk not found: " + domainRiskId));
+
+        String oldArb = domainRisk.getAssignedArb();
+        domainRisk.setAssignedArb(newArb);
+        domainRisk.setAssignedAt(OffsetDateTime.now());
+
+        DomainRisk saved = domainRiskRepository.save(domainRisk);
+
+        log.info("Reassigned domain risk {} from {} to {} by {}",
+                 domainRiskId, oldArb, newArb, assignedBy);
+
+        return saved;
+    }
+
     // =====================
     // Helper Methods
     // =====================
