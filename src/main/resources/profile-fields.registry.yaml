@@ -4,18 +4,19 @@ updated_at: 2025-08-29
 # ARB (Architecture Review Board) routing configuration
 # Maps derived_from values to their respective ARB
 arb_routing:
-  security_rating: security_arb
-  integrity_rating: integrity_arb
-  availability_rating: availability_arb
-  resilience_rating: resilience_arb
-  confidentiality_rating: confidentiality_arb
-  app_criticality_assessment: governance_arb
+  security_rating: security                    # Security controls (encryption, access, vulnerabilities, network)
+  confidentiality_rating: data                 # Data governance - confidentiality concerns
+  integrity_rating: data                       # Data governance - integrity concerns
+  availability_rating: operations              # Operational resilience - availability
+  resilience_rating: operations                # Operational resilience - DR and recovery
+  app_criticality_assessment: enterprise_architecture  # Strategic governance (visions, roadmaps)
 
 fields:
   # ---- Confidentiality
   - key: confidentiality_level
     label: Confidentiality Level
     derived_from: confidentiality_rating
+    arb: data
     rule:
       A: { value: restricted,   label: "Restricted",   ttl: 90d, requires_review: true, priority: CRITICAL }
       B: { value: confidential, label: "Confidential", ttl: 90d, requires_review: true, priority: HIGH }
@@ -28,6 +29,7 @@ fields:
   - key: data_residency_control
     label: Data Residency Control
     derived_from: confidentiality_rating
+    arb: data
     rule:
       A: { value: required_in_region,      label: "Required in-region",      ttl: 90d, requires_review: true }
       B: { value: preferred_in_region,     label: "Preferred in-region",     ttl: 90d, requires_review: true }
@@ -40,6 +42,7 @@ fields:
   - key: de_identification
     label: De-Identification
     derived_from: confidentiality_rating
+    arb: data
     rule:
       A: { value: mandatory_strong, label: "Mandatory (strong)", ttl: 90d, requires_review: true }
       B: { value: required,         label: "Required",           ttl: 90d, requires_review: true }
@@ -53,6 +56,7 @@ fields:
   - key: encryption_at_rest
     label: Encryption at Rest
     derived_from: security_rating
+    arb: security
     rule:
       A1: { value: required, label: "Required", ttl: 90d, requires_review: true, priority: CRITICAL }
       A2: { value: required, label: "Required", ttl: 90d, requires_review: true, priority: HIGH }
@@ -66,6 +70,7 @@ fields:
   - key: encryption_in_transit
     label: Encryption in Transit
     derived_from: security_rating
+    arb: security
     rule:
       A1: { value: required,    label: "Required",    ttl: 90d, requires_review: true }
       A2: { value: required,    label: "Required",    ttl: 90d, requires_review: true }
@@ -79,6 +84,7 @@ fields:
   - key: security_testing
     label: Security Testing
     derived_from: security_rating
+    arb: security
     rule:
       A1: { value: external_pentest_annual+continuous_scans, label: "External pentest (annual) + continuous scans", ttl: 365d, requires_review: true }
       A2: { value: internal_pentest_annual+continuous_scans, label: "Internal pentest (annual) + continuous scans", ttl: 365d, requires_review: true }
@@ -92,6 +98,7 @@ fields:
   - key: secrets_management
     label: Secrets Management
     derived_from: security_rating
+    arb: security
     rule:
       A1: { value: centralized_required,    label: "Centralized (required)",    ttl: 90d, requires_review: true }
       A2: { value: centralized_required,    label: "Centralized (required)",    ttl: 90d, requires_review: true }
@@ -107,6 +114,7 @@ fields:
   - key: key_rotation_max
     label: Key Rotation Max
     derived_from: security_rating
+    arb: security
     rule:
       A1: { value: 90d,  label: "Rotate ≤ 90 days",  ttl: 90d, requires_review: true }
       A2: { value: 180d, label: "Rotate ≤ 180 days", ttl: 180d, requires_review: true }
@@ -121,6 +129,7 @@ fields:
   - key: data_validation
     label: Data Validation
     derived_from: integrity_rating
+    arb: data
     rule:
       A: { value: dual_control,        label: "Dual control",        ttl: 90d, requires_review: true }
       B: { value: strong_validation,   label: "Strong validation",   ttl: 90d, requires_review: true }
@@ -133,6 +142,7 @@ fields:
   - key: reconciliation_frequency
     label: Reconciliation Frequency
     derived_from: integrity_rating
+    arb: data
     rule:
       A: { value: daily,       label: "Daily",        ttl: 90d, requires_review: true }
       B: { value: weekly,      label: "Weekly",       ttl: 30d, requires_review: true }
@@ -145,6 +155,7 @@ fields:
   - key: audit_logging
     label: Audit Logging
     derived_from: integrity_rating
+    arb: data
     rule:
       A: { value: full_with_daily_review,      label: "Full logging + daily review",      ttl: 90d, requires_review: true }
       B: { value: full_with_periodic_review,   label: "Full logging + periodic review",   ttl: 90d, requires_review: true }
@@ -157,6 +168,7 @@ fields:
   - key: change_control
     label: Change Control
     derived_from: integrity_rating
+    arb: data
     rule:
       A: { value: independent_review+regression_suite, label: "Independent review + regression suite", ttl: 90d, requires_review: true }
       B: { value: peer_review+regression_suite,        label: "Peer review + regression suite",        ttl: 90d, requires_review: true }
@@ -169,6 +181,7 @@ fields:
   - key: immutability_required
     label: Immutability Required
     derived_from: integrity_rating
+    arb: data
     rule:
       A: { value: yes, label: "Yes", ttl: 90d, requires_review: true }
       B: { value: yes, label: "Yes", ttl: 90d, requires_review: true }
@@ -182,6 +195,7 @@ fields:
   - key: rto_hours
     label: RTO (hours)
     derived_from: availability_rating
+    arb: operations
     rule:
       A: { value: 1,          label: "≤ 1 hour",          ttl: 90d, requires_review: true }
       B: { value: 4,          label: "≤ 4 hours",         ttl: 90d, requires_review: true }
@@ -194,6 +208,7 @@ fields:
   - key: rpo_minutes
     label: RPO (minutes)
     derived_from: availability_rating
+    arb: operations
     rule:
       A: { value: 5,          label: "≤ 5 minutes",       ttl: 90d, requires_review: true }
       B: { value: 60,         label: "≤ 60 minutes",      ttl: 90d, requires_review: true }
@@ -206,6 +221,7 @@ fields:
   - key: ha_topology
     label: HA Topology
     derived_from: availability_rating
+    arb: operations
     rule:
       A: { value: active_active,  label: "Active-Active",  ttl: 90d, requires_review: true }
       B: { value: active_passive, label: "Active-Passive", ttl: 90d, requires_review: true }
@@ -218,6 +234,7 @@ fields:
   - key: monitoring_slos
     label: Monitoring SLOs
     derived_from: availability_rating
+    arb: operations
     rule:
       A: { value: "99.9+_with_alerting", label: "≥99.9% with alerting", ttl: 90d, requires_review: true }
       B: { value: "99.5_with_alerting",  label: "≥99.5% with alerting", ttl: 90d, requires_review: true }
@@ -230,6 +247,7 @@ fields:
   - key: oncall_coverage
     label: On-call Coverage
     derived_from: availability_rating
+    arb: operations
     rule:
       A: { value: "24x7",           label: "24×7",           ttl: 90d, requires_review: true }
       B: { value: "16x5",           label: "16×5",           ttl: 90d, requires_review: true }
@@ -243,6 +261,7 @@ fields:
   - key: dr_test_frequency
     label: DR Test Frequency
     derived_from: resilience_rating
+    arb: operations
     rule:
       "0": { value: semi_annual_live, ttl: 180d, label: "Semi-annual live", requires_review: true }
       "1": { value: annual_live,      ttl: 365d, label: "Annual live", requires_review: true }
@@ -256,6 +275,7 @@ fields:
   - key: backup_policy
     label: Backup Policy
     derived_from: resilience_rating
+    arb: operations
     rule:
       "0": { value: encrypted_geo_redundant+tested_restores, label: "Encrypted geo-redundant + tested restores", ttl: 90d, requires_review: true }
       "1": { value: encrypted+tested_restores,                label: "Encrypted + tested restores",              ttl: 90d, requires_review: true }
@@ -269,6 +289,7 @@ fields:
   - key: failover_automation
     label: Failover Automation
     derived_from: resilience_rating
+    arb: operations
     rule:
       "0": { value: automatic,      label: "Automatic",      ttl: 90d, requires_review: true }
       "1": { value: semi_automatic, label: "Semi-automatic", ttl: 90d, requires_review: true }
@@ -282,6 +303,7 @@ fields:
   - key: runbook_maturity
     label: Runbook Maturity
     derived_from: resilience_rating
+    arb: operations
     rule:
       "0": { value: certified, label: "Certified", ttl: 90d, requires_review: true }
       "1": { value: approved,  label: "Approved",  ttl: 90d, requires_review: true }
@@ -295,6 +317,7 @@ fields:
   - key: chaos_testing
     label: Chaos Testing
     derived_from: resilience_rating
+    arb: operations
     rule:
       "0": { value: required,    label: "Required",    ttl: 90d, requires_review: true }
       "1": { value: recommended, label: "Recommended", ttl: 180d, requires_review: true }
@@ -309,6 +332,7 @@ fields:
   - key: product_vision
     label: Product Vision
     derived_from: app_criticality_assessment
+    arb: enterprise_architecture
     rule:
       A: { value: mandatory, label: "Mandatory", ttl: 90d, requires_review: true }
       B: { value: mandatory, label: "Mandatory", ttl: 90d, requires_review: true }
@@ -321,6 +345,7 @@ fields:
   - key: product_roadmap
     label: Product Roadmap
     derived_from: app_criticality_assessment
+    arb: enterprise_architecture
     rule:
       A: { value: mandatory, label: "Mandatory", ttl: 90d, requires_review: true }
       B: { value: mandatory, label: "Mandatory", ttl: 90d, requires_review: true }
@@ -333,6 +358,7 @@ fields:
   - key: architecture_vision
     label: Architecture Vision
     derived_from: app_criticality_assessment
+    arb: enterprise_architecture
     rule:
       A: { value: mandatory, label: "Mandatory", ttl: 90d, requires_review: true }
       B: { value: mandatory, label: "Mandatory", ttl: 90d, requires_review: true }
@@ -345,6 +371,7 @@ fields:
   - key: service_vision
     label: Service Vision
     derived_from: app_criticality_assessment
+    arb: enterprise_architecture
     rule:
       A: { value: mandatory, label: "Mandatory", ttl: 90d, requires_review: true }
       B: { value: mandatory, label: "Mandatory", ttl: 90d, requires_review: true }
@@ -357,6 +384,7 @@ fields:
   - key: security_vision
     label: Security Vision
     derived_from: app_criticality_assessment
+    arb: enterprise_architecture
     rule:
       A: { value: mandatory, label: "Mandatory", ttl: 90d, requires_review: true }
       B: { value: mandatory, label: "Mandatory", ttl: 90d, requires_review: true }
@@ -369,6 +397,7 @@ fields:
   - key: test_vision
     label: Test Vision
     derived_from: app_criticality_assessment
+    arb: enterprise_architecture
     rule:
       A: { value: mandatory, label: "Mandatory", ttl: 90d, requires_review: true }
       B: { value: mandatory, label: "Mandatory", ttl: 90d, requires_review: true }
@@ -384,6 +413,7 @@ fields:
   - key: mfa_enforcement
     label: Multi-Factor Authentication
     derived_from: security_rating
+    arb: security
     rule:
       A1: { value: required,    label: "Required",    ttl: 90d, requires_review: true }
       A2: { value: required,    label: "Required",    ttl: 90d, requires_review: true }
@@ -397,6 +427,7 @@ fields:
   - key: access_review
     label: Access Review Cadence
     derived_from: confidentiality_rating
+    arb: data
     rule:
       A: { value: quarterly,   label: "Quarterly",    ttl: 90d, requires_review: true }
       B: { value: semi_annual, label: "Semi-annual",  ttl: 180d, requires_review: true }
@@ -409,6 +440,7 @@ fields:
   - key: privileged_access_mgmt
     label: Privileged Access Management
     derived_from: security_rating
+    arb: security
     rule:
       A1: { value: centralized_required,    label: "Centralized (required)",    ttl: 90d, requires_review: true }
       A2: { value: centralized_required,    label: "Centralized (required)",    ttl: 90d, requires_review: true }
@@ -425,6 +457,7 @@ fields:
   - key: patching_sla
     label: Patch Remediation SLA
     derived_from: security_rating
+    arb: security
     rule:
       A1: { value: critical_30d, label: "Critical ≤30 days", ttl: 90d, requires_review: true }
       A2: { value: critical_30d, label: "Critical ≤30 days", ttl: 90d, requires_review: true }
@@ -438,6 +471,7 @@ fields:
   - key: dependency_management
     label: Dependency / SBOM Management
     derived_from: security_rating
+    arb: security
     rule:
       A1: { value: sbom_required,     label: "SBOM required",     ttl: 90d, requires_review: true }
       A2: { value: sbom_required,     label: "SBOM required",     ttl: 180d, requires_review: true }
@@ -454,6 +488,7 @@ fields:
   - key: ir_plan
     label: Incident Response Plan
     derived_from: resilience_rating
+    arb: operations
     rule:
       "0": { value: tested_quarterly, label: "Tested quarterly", ttl: 90d, requires_review: true }
       "1": { value: tested_annually,  label: "Tested annually",  ttl: 365d, requires_review: true }
@@ -467,6 +502,7 @@ fields:
   - key: ir_exercise
     label: Incident Response Exercise
     derived_from: resilience_rating
+    arb: operations
     rule:
       "0": { value: annual_live, label: "Annual live", ttl: 365d, requires_review: true }
       "1": { value: tabletop,    label: "Tabletop",    ttl: 365d, requires_review: true }
@@ -483,6 +519,7 @@ fields:
   - key: tpsp_attestation
     label: Third-Party Service Provider Attestation
     derived_from: confidentiality_rating
+    arb: data
     rule:
       A: { value: required,    label: "Required",    ttl: 365d, requires_review: true }
       B: { value: required,    label: "Required",    ttl: 365d, requires_review: true }
@@ -498,6 +535,7 @@ fields:
   - key: data_retention_policy
     label: Data Retention Policy
     derived_from: confidentiality_rating
+    arb: data
     rule:
       A: { value: defined+enforced, label: "Defined & enforced", ttl: 365d, requires_review: true }
       B: { value: defined,          label: "Defined",            ttl: 365d, requires_review: true }
@@ -510,6 +548,7 @@ fields:
   - key: data_deletion_evidence
     label: Secure Data Deletion Evidence
     derived_from: confidentiality_rating
+    arb: data
     rule:
       A: { value: required, label: "Required", ttl: 365d, requires_review: true }
       B: { value: required, label: "Required", ttl: 365d, requires_review: true }
@@ -525,6 +564,7 @@ fields:
   - key: network_segmentation
     label: Network Segmentation Evidence
     derived_from: security_rating
+    arb: security
     rule:
       A1: { value: pci_cde_required,     label: "PCI/CDE segmentation required", ttl: 365d, requires_review: true }
       A2: { value: segmentation_required,label: "Segmentation required",         ttl: 365d, requires_review: true }
@@ -538,6 +578,7 @@ fields:
   - key: waf_protection
     label: Web Application Firewall Evidence
     derived_from: security_rating
+    arb: security
     rule:
       A1: { value: required,    label: "Required",    ttl: 90d, requires_review: true }
       A2: { value: required,    label: "Required",    ttl: 90d, requires_review: true }
@@ -554,6 +595,7 @@ fields:
   - key: log_retention
     label: Log Retention Period
     derived_from: integrity_rating
+    arb: data
     rule:
       A: { value: ">=1y",  label: "≥ 1 year", ttl: 365d, requires_review: true }
       B: { value: ">=6m",  label: "≥ 6 months", ttl: 365d, requires_review: true }
@@ -566,6 +608,7 @@ fields:
   - key: siem_integration
     label: SIEM / Central Log Integration
     derived_from: security_rating
+    arb: security
     rule:
       A1: { value: required,    label: "Required",    ttl: 365d, requires_review: true }
       A2: { value: required,    label: "Required",    ttl: 365d, requires_review: true }
