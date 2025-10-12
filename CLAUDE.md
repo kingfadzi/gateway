@@ -172,9 +172,10 @@ Evidence Submission → RiskItem (evidence-level)
 
 **ArbRoutingService**
 - Routes risks to ARBs based on field's `derived_from` value
-- Maps: `security_rating` → `security_arb`, `integrity_rating` → `integrity_arb`
+- Maps: `security_rating` → `security`, `integrity_rating` → `data`
 - Calculates domain by stripping `_rating` suffix
-- Configuration in: `profile-fields.registry.yaml` → `arb_routing` section
+- Configuration in: `profile-fields.registry.yaml` → `arb` field (per field)
+- **Note:** Registry uses short names (security, data, operations, enterprise_architecture) not suffixed versions
 
 **DomainRiskAggregationService**
 - Creates/retrieves domain risks (one per app+domain, enforced by UNIQUE constraint)
@@ -246,20 +247,12 @@ Domain Score = Max(Item Scores) + Bonuses
 **6. Registry Configuration**
 
 **ARB Routing** (`profile-fields.registry.yaml`):
-```yaml
-arb_routing:
-  security_rating: security_arb
-  integrity_rating: integrity_arb
-  availability_rating: availability_arb
-  resilience_rating: resilience_arb
-  confidentiality_rating: confidentiality_arb
-  app_criticality_assessment: governance_arb
-```
-
-**Field Priority** (per criticality):
+Each field specifies its ARB using short names:
 ```yaml
 - key: encryption_at_rest
+  label: Encryption at Rest
   derived_from: security_rating
+  arb: security                    # ARB assignment (source of truth)
   rule:
     A1: { value: required, label: "Required", ttl: 90d,
           requires_review: true, priority: CRITICAL }
@@ -268,6 +261,12 @@ arb_routing:
     B:  { value: required, label: "Required", ttl: 180d,
           requires_review: true, priority: MEDIUM }
 ```
+
+**Standard ARB Names:**
+- `security` - Security domain risks
+- `data` - Data protection (confidentiality, integrity)
+- `operations` - Operations risks (availability, resilience)
+- `enterprise_architecture` - Governance and architecture risks
 
 **7. Testing**
 
@@ -287,7 +286,33 @@ arb_routing:
 - Validation checklist
 - Common issues & fixes
 
-**8. Key Design Decisions**
+**8. Data Migration**
+
+**Migration Service** (`risk/service/RiskMigrationService.java`)
+- Migrates legacy `risk_story` records to new v2 model
+- Groups by app+domain, creates domain risks, converts to risk items
+- Handles deduplication (checks existing by app+field+evidence)
+- Provides dry-run capability for safe preview
+
+**Migration Endpoints:**
+```bash
+# Preview migration without making changes
+GET /api/admin/risk-migration/dry-run
+
+# Execute full migration
+POST /api/admin/risk-migration/execute
+
+# Get database statistics
+GET /api/admin/risk-migration/stats
+```
+
+**Migration Status:**
+- ✅ Completed: 383 risk_story records migrated to 51 domain_risks + 383 risk_items
+- Success rate: 100% (0 failures)
+- Duration: ~6.6 seconds
+- Legacy table preserved for rollback safety
+
+**9. Key Design Decisions**
 
 **Why domain-level aggregation?**
 - Reduces noise: ARBs see 1 risk per domain instead of N evidence items

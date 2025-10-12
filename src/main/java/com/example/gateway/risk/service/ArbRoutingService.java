@@ -28,19 +28,19 @@ public class ArbRoutingService {
      * Determine which ARB should handle a risk for the given field.
      *
      * @param fieldKey The profile field key (e.g., "confidentiality_level")
-     * @return ARB identifier (e.g., "security_arb"), or "default_arb" if routing not found
+     * @return ARB identifier from registry (e.g., "security"), or "default" if routing not found
      */
     public String getArbForField(String fieldKey) {
         if (fieldKey == null || fieldKey.isEmpty()) {
             log.warn("Cannot determine ARB for null/empty field key");
-            return "default_arb";
+            return "default";
         }
 
         Optional<String> arb = registryService.getArbForField(fieldKey);
 
         if (arb.isEmpty()) {
-            log.warn("No ARB routing found for field: {}, using default_arb", fieldKey);
-            return "default_arb";
+            log.warn("No ARB routing found for field: {}, using default", fieldKey);
+            return "default";
         }
 
         return arb.get();
@@ -50,19 +50,19 @@ public class ArbRoutingService {
      * Get ARB directly from derived_from field.
      *
      * @param derivedFrom The derived_from value (e.g., "security_rating")
-     * @return ARB identifier (e.g., "security_arb"), or "default_arb" if not found
+     * @return ARB identifier from registry (e.g., "security"), or "default" if not found
      */
     public String getArbForDerivedFrom(String derivedFrom) {
         if (derivedFrom == null || derivedFrom.isEmpty()) {
             log.warn("Cannot determine ARB for null/empty derived_from");
-            return "default_arb";
+            return "default";
         }
 
         Optional<String> arb = registryService.getArbForDerivedFrom(derivedFrom);
 
         if (arb.isEmpty()) {
-            log.warn("No ARB routing found for derived_from: {}, using default_arb", derivedFrom);
-            return "default_arb";
+            log.warn("No ARB routing found for derived_from: {}, using default", derivedFrom);
+            return "default";
         }
 
         return arb.get();
@@ -98,7 +98,7 @@ public class ArbRoutingService {
      * Get human-readable ARB name from ARB identifier.
      * Can be used for display purposes.
      *
-     * @param arbId ARB identifier (e.g., "security_arb")
+     * @param arbId ARB identifier from registry (e.g., "security")
      * @return Human-readable name (e.g., "Security ARB")
      */
     public String getArbDisplayName(String arbId) {
@@ -107,14 +107,12 @@ public class ArbRoutingService {
         }
 
         return switch (arbId.toLowerCase()) {
-            case "security_arb" -> "Security ARB";
-            case "integrity_arb" -> "Integrity ARB";
-            case "availability_arb" -> "Availability ARB";
-            case "resilience_arb" -> "Resilience ARB";
-            case "confidentiality_arb" -> "Confidentiality ARB";
-            case "governance_arb" -> "Governance ARB";
-            case "default_arb" -> "Default ARB";
-            default -> capitalizeWords(arbId.replace("_", " "));
+            case "security" -> "Security ARB";
+            case "data" -> "Data ARB";
+            case "operations" -> "Operations ARB";
+            case "enterprise_architecture" -> "Enterprise Architecture ARB";
+            case "default" -> "Default ARB";
+            default -> capitalizeWords(arbId.replace("_", " ")) + " ARB";
         };
     }
 

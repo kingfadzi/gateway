@@ -82,8 +82,10 @@ The SME (Subject Matter Expert) Dashboard provides a centralized interface for s
 
 ### Base URL
 ```
-http://localhost:8080
+http://localhost:8181
 ```
+
+**Note**: The service runs on port 8181 (lct_data_v2 database)
 
 ---
 
@@ -457,14 +459,20 @@ GET /api/v1/risk-items/item-456/comments?includeInternal=true
 **Endpoint**: `GET /api/v1/domain-risks/arb/{arbName}`
 
 **Query Parameters**:
-- `arbName` (path): ARB identifier (e.g., `security_arb`)
+- `arbName` (path): ARB identifier - **Use short names**: `security`, `data`, `operations`, `enterprise_architecture`
 - `status` (query, optional): Comma-separated statuses
   - Default: `PENDING_ARB_REVIEW,UNDER_ARB_REVIEW,AWAITING_REMEDIATION,IN_PROGRESS`
 
 **Example Request**:
 ```bash
-GET /api/v1/domain-risks/arb/security_arb?status=PENDING_ARB_REVIEW,UNDER_ARB_REVIEW
+GET /api/v1/domain-risks/arb/security?status=PENDING_ARB_REVIEW,UNDER_ARB_REVIEW
 ```
+
+**Important**: ARB names are **short format** (from registry):
+- `security` - Security domain
+- `data` - Confidentiality & Integrity domains
+- `operations` - Availability & Resilience domains
+- `enterprise_architecture` - Governance & Architecture
 
 **Response Schema**:
 ```json
@@ -474,7 +482,7 @@ GET /api/v1/domain-risks/arb/security_arb?status=PENDING_ARB_REVIEW,UNDER_ARB_RE
     "appId": "app-001",
     "domain": "security",
     "derivedFrom": "security_rating",
-    "arb": "security_arb",
+    "arb": "security",
     "title": "Security Domain Risks",
     "description": "Aggregated security risks derived from security_rating assessment.",
     "totalItems": 5,
@@ -484,7 +492,7 @@ GET /api/v1/domain-risks/arb/security_arb?status=PENDING_ARB_REVIEW,UNDER_ARB_RE
     "overallSeverity": "high",
     "priorityScore": 85,
     "status": "UNDER_ARB_REVIEW",
-    "assignedArb": "security_arb",
+    "assignedArb": "security",
     "assignedAt": "2025-10-12T10:00:00Z",
     "openedAt": "2025-10-10T09:00:00Z",
     "lastItemAddedAt": "2025-10-11T14:30:00Z",
@@ -514,7 +522,7 @@ GET /api/v1/domain-risks/arb/security_arb?status=PENDING_ARB_REVIEW,UNDER_ARB_RE
 
 **Example Request**:
 ```bash
-GET /api/v1/domain-risks/arb/security_arb/summary
+GET /api/v1/domain-risks/arb/security/summary
 ```
 
 **Response Schema**:
@@ -549,7 +557,105 @@ GET /api/v1/domain-risks/arb/security_arb/summary
 
 ---
 
-### 3.3 Get Risk Items for Domain
+### 3.3 Get Comprehensive ARB Dashboard
+
+**Purpose**: Get ALL metrics needed for a complete ARB dashboard in a single API call. This endpoint aggregates data from multiple sources for optimal frontend performance.
+
+**Endpoint**: `GET /api/v1/domain-risks/arb/{arbName}/dashboard`
+
+**Query Parameters**:
+- `status` (optional): Filter by status (default: active statuses)
+
+**Example Request**:
+```bash
+GET /api/v1/domain-risks/arb/security/dashboard
+```
+
+**Response Schema**:
+```json
+{
+  "arbName": "security",
+  "overview": {
+    "totalDomainRisks": 10,
+    "totalOpenItems": 126,
+    "criticalCount": 2,
+    "highCount": 5,
+    "averagePriorityScore": 55,
+    "needsImmediateAttention": 7
+  },
+  "domains": [
+    {
+      "domain": "security",
+      "riskCount": 10,
+      "openItems": 126,
+      "criticalItems": 15,
+      "avgPriorityScore": 55.0,
+      "topPriorityStatus": "PENDING_ARB_REVIEW"
+    }
+  ],
+  "topApplications": [
+    {
+      "appId": "APM100001",
+      "appName": null,
+      "domainRiskCount": 1,
+      "totalOpenItems": 14,
+      "highestPriorityScore": 55,
+      "criticalDomain": "security"
+    }
+  ],
+  "statusDistribution": {
+    "PENDING_ARB_REVIEW": 10,
+    "IN_PROGRESS": 0,
+    "RESOLVED": 0
+  },
+  "priorityDistribution": {
+    "critical": 0,
+    "high": 0,
+    "medium": 10,
+    "low": 0
+  },
+  "recentActivity": {
+    "newRisksLast7Days": 0,
+    "newRisksLast30Days": 10,
+    "resolvedLast7Days": 0,
+    "resolvedLast30Days": 0
+  }
+}
+```
+
+**Frontend Benefits**:
+- **Single API call** instead of multiple requests
+- Complete data for dashboard visualization
+- Optimized queries (calculated server-side)
+- Ready-to-display metrics
+
+**Recommended UI Layout**:
+```
+┌────────────────────────────────────────────────────┐
+│  Security ARB Dashboard                            │
+├────────────────────────────────────────────────────┤
+│  [Total: 10] [Open: 126] [Critical: 2] [Avg: 55]  │  ← overview
+├────────────────────────────────────────────────────┤
+│  Domain Breakdown:                                 │
+│  ┌──────────────┐ ┌──────────────┐                │
+│  │ Security (10)│ │ Confid... (5)│                │  ← domains
+│  │ Score: 55    │ │ Score: 68    │                │
+│  └──────────────┘ └──────────────┘                │
+├────────────────────────────────────────────────────┤
+│  Top Applications:                                 │
+│  1. APM100001 (14 items, score: 55)               │  ← topApplications
+│  2. APM100002 (13 items, score: 55)               │
+├────────────────────────────────────────────────────┤
+│  Status: [Pending: 10] [In Progress: 0]           │  ← statusDistribution
+│  Priority: [Critical: 0] [High: 0] [Medium: 10]   │  ← priorityDistribution
+├────────────────────────────────────────────────────┤
+│  Activity: +0 new (7d) | 0 resolved (7d)          │  ← recentActivity
+└────────────────────────────────────────────────────┘
+```
+
+---
+
+### 3.4 Get Risk Items for Domain
 
 **Purpose**: Drill down from domain-level to evidence-level risk items.
 
@@ -641,12 +747,24 @@ GET /api/evidence/by-state?states=pending-review,risk-blocked&domain=security
 - **40-69**: MEDIUM (yellow)
 - **0-39**: LOW (blue)
 
-### Evidence Status Multipliers
-- `missing`: 2.5x (highest urgency)
-- `submitted` / `pending`: 1.0x (full priority)
-- `rejected`: 0.9x (still urgent)
-- **`approved`: 0.5x** (reduced urgency)
-- `expired`: 2.0x
+### Evidence Status Multipliers (Actual Implementation)
+- `missing` / `not_provided`: **2.5x** (highest urgency)
+- `non_compliant` / `failed`: **2.3x** (very high urgency)
+- `expired`: **2.0x** (high urgency)
+- `under_review` / `pending`: **1.5x** (medium urgency)
+- `needs_update`: **1.3x** (medium urgency)
+- **`approved` / `compliant`: 1.0x** (base priority - compliant)
+- `waived` / `exempted`: **0.5x** (lower priority - accepted risk)
+
+**Priority Score Formula**:
+```
+Score = Base Priority × Evidence Multiplier
+Base: CRITICAL=40, HIGH=30, MEDIUM=20, LOW=10
+Result: 0-100 (capped at 100)
+
+Example: CRITICAL (40) × missing (2.5) = 100
+Example: HIGH (30) × approved (1.0) = 30
+```
 
 ### Domain Risk Status Flow
 ```
@@ -695,10 +813,22 @@ GET /api/v1/risk-items/app/${appId}/status/OPEN
 **Purpose**: Strategic overview of all domains
 
 ```javascript
-GET /api/v1/domain-risks/arb/security_arb?status=PENDING_ARB_REVIEW,UNDER_ARB_REVIEW
+GET /api/v1/domain-risks/arb/security?status=PENDING_ARB_REVIEW,UNDER_ARB_REVIEW
 ```
 
 **Display**: Domain risk cards with priority scores
+
+---
+
+### Query 3b: Comprehensive ARB Dashboard (Recommended)
+
+**Purpose**: Get ALL dashboard data in single request
+
+```javascript
+GET /api/v1/domain-risks/arb/security/dashboard
+```
+
+**Display**: Complete dashboard with overview, domains, apps, status, priority, activity
 
 ---
 
@@ -864,11 +994,17 @@ File: insomnia-risk-aggregation-api.json
 
 **Environment Variables**:
 ```
-base_url: http://localhost:8080
-app_id: test-app-001
+base_url: http://localhost:8181
+app_id: APM100001
 sme_email: sme@example.com
-arb_name: security_arb
+arb_name: security
 ```
+
+**Available ARB Names**:
+- `security` - Security domain
+- `data` - Confidentiality & Integrity
+- `operations` - Availability & Resilience
+- `enterprise_architecture` - Governance
 
 ---
 

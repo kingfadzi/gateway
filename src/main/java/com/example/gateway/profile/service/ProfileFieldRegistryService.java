@@ -317,4 +317,12 @@ public class ProfileFieldRegistryService {
         return getFieldTypeInfo(fieldKey)
                 .map(ProfileFieldTypeInfo::arb);
     }
+
+    /**
+     * Get derived_from value for a field
+     */
+    public Optional<String> getDerivedFromForField(String fieldKey) {
+        return getFieldTypeInfo(fieldKey)
+                .map(ProfileFieldTypeInfo::derivedFrom);
+    }
 }
