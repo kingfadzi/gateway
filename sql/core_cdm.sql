@@ -8,11 +8,11 @@ DROP FUNCTION IF EXISTS set_updated_at() CASCADE;
 DROP FUNCTION IF EXISTS enforce_ev_claim_same_app() CASCADE;
 DROP FUNCTION IF EXISTS assert_track_app_match() CASCADE;
 
--- Risk management tables
-DROP TABLE IF EXISTS risk_story_evidence CASCADE;
-DROP TABLE IF EXISTS risk_story CASCADE;
+-- Risk aggregation tables
+DROP TABLE IF EXISTS risk_comment CASCADE;
+DROP TABLE IF EXISTS risk_item CASCADE;
+DROP TABLE IF EXISTS domain_risk CASCADE;
 DROP TABLE IF EXISTS evidence_field_link CASCADE;
-DROP TABLE IF EXISTS sme_queue CASCADE;
 
 -- Existing tables
 DROP TABLE IF EXISTS evidence CASCADE;
@@ -27,8 +27,6 @@ DROP TABLE IF EXISTS service_instances CASCADE;
 DROP TABLE IF EXISTS application CASCADE;
 
 -- Drop enums (converted to TEXT for Hibernate compatibility)
-DROP TYPE IF EXISTS risk_status CASCADE;
-DROP TYPE IF EXISTS risk_creation_type CASCADE;
 DROP TYPE IF EXISTS evidence_field_link_status CASCADE;
 
 -- Needed for gen_random_uuid()
@@ -331,94 +329,176 @@ CREATE INDEX IF NOT EXISTS idx_efl_app ON evidence_field_link(app_id);
 CREATE INDEX IF NOT EXISTS idx_efl_status ON evidence_field_link(link_status);
 
 -- =========================
--- RISK_STORY (Enhanced Risk Management)
+-- DOMAIN_RISK (Aggregated risks per domain per application)
 -- =========================
-CREATE TABLE risk_story (
-    risk_id                 TEXT PRIMARY KEY,
-    app_id                  TEXT NOT NULL,
-    field_key               TEXT NOT NULL,
-    profile_id              TEXT,
-    profile_field_id        TEXT,
-    track_id                TEXT,
-    
-    -- New fields for enhanced workflow
-    triggering_evidence_id  TEXT,  -- Evidence that triggered this risk (if AUTO)
-    creation_type          TEXT NOT NULL DEFAULT 'MANUAL_SME_INITIATED',
-    assigned_sme           TEXT,
-    
-    -- Existing fields
-    title                  TEXT,
-    hypothesis             TEXT,
-    condition              TEXT,
-    consequence            TEXT,
-    control_refs           TEXT,
-    attributes             JSONB DEFAULT '{}',
-    severity               TEXT DEFAULT 'medium',
-    status                 TEXT NOT NULL DEFAULT 'PENDING_SME_REVIEW',
-    closure_reason         TEXT,
-    raised_by              TEXT NOT NULL DEFAULT 'system',
-    owner                  TEXT,
-    
-    -- Enhanced timestamps
-    opened_at              TIMESTAMPTZ,
-    closed_at              TIMESTAMPTZ,
-    assigned_at            TIMESTAMPTZ,
-    reviewed_at            TIMESTAMPTZ,
-    review_comment         TEXT,
-    policy_requirement_snapshot JSONB DEFAULT '{}',  -- Compliance frameworks snapshot
-    created_at             TIMESTAMPTZ DEFAULT now(),
-    updated_at             TIMESTAMPTZ DEFAULT now(),
-    
+CREATE TABLE domain_risk (
+    domain_risk_id    TEXT PRIMARY KEY,
+    app_id            TEXT NOT NULL,
+    domain            TEXT NOT NULL,           -- security, integrity, availability, etc.
+    derived_from      TEXT NOT NULL,           -- security_rating, integrity_rating, etc.
+    arb               TEXT NOT NULL,           -- security_arb, integrity_arb, etc.
+
+    -- Aggregated metadata
+    title             TEXT,
+    description       TEXT,
+    total_items       INTEGER DEFAULT 0,
+    open_items        INTEGER DEFAULT 0,
+    high_priority_items INTEGER DEFAULT 0,
+
+    -- Priority & severity (calculated from items)
+    overall_priority  TEXT,                    -- CRITICAL, HIGH, MEDIUM, LOW
+    overall_severity  TEXT,                    -- high, medium, low
+    priority_score    INTEGER,                 -- Calculated: 0-100
+
+    -- Status
+    status            TEXT NOT NULL DEFAULT 'PENDING_ARB_REVIEW',
+
+    -- Assignment
+    assigned_arb      TEXT,
+    assigned_at       TIMESTAMPTZ,
+
+    -- Lifecycle
+    opened_at         TIMESTAMPTZ NOT NULL,
+    closed_at         TIMESTAMPTZ,
+    last_item_added_at TIMESTAMPTZ,
+
+    -- Audit
+    created_at        TIMESTAMPTZ DEFAULT now(),
+    updated_at        TIMESTAMPTZ DEFAULT now(),
+
     -- Foreign Keys
-    CONSTRAINT fk_risk_app FOREIGN KEY (app_id) REFERENCES application(app_id) ON DELETE CASCADE,
-    CONSTRAINT fk_risk_profile FOREIGN KEY (profile_id) REFERENCES profile(profile_id),
-    CONSTRAINT fk_risk_profile_field FOREIGN KEY (profile_field_id) REFERENCES profile_field(id),
-    CONSTRAINT fk_risk_track FOREIGN KEY (track_id) REFERENCES track(track_id),
-    CONSTRAINT fk_risk_evidence FOREIGN KEY (triggering_evidence_id) REFERENCES evidence(evidence_id),
-    
-    -- CHECK constraints for TEXT-based enums (Hibernate compatibility)
-    CONSTRAINT chk_risk_status CHECK (status IN (
-        'PENDING_SME_REVIEW', 'AWAITING_EVIDENCE', 'UNDER_REVIEW', 
-        'APPROVED', 'REJECTED', 'WAIVED', 'CLOSED'
-    )),
-    CONSTRAINT chk_risk_creation_type CHECK (creation_type IN (
-        'MANUAL_SME_INITIATED', 'SYSTEM_AUTO_CREATION'
+    CONSTRAINT fk_domain_risk_app FOREIGN KEY (app_id) REFERENCES application(app_id) ON DELETE CASCADE,
+
+    -- Unique constraint: one domain risk per domain per app
+    CONSTRAINT uk_app_domain UNIQUE (app_id, domain),
+
+    -- CHECK constraints
+    CONSTRAINT chk_domain_risk_status CHECK (status IN (
+        'PENDING_ARB_REVIEW', 'UNDER_ARB_REVIEW', 'AWAITING_REMEDIATION',
+        'IN_PROGRESS', 'RESOLVED', 'CLOSED'
     ))
 );
 
--- Risk Story Indexes
-CREATE INDEX IF NOT EXISTS idx_risk_app ON risk_story(app_id);
-CREATE INDEX IF NOT EXISTS idx_risk_field ON risk_story(field_key);
-CREATE INDEX IF NOT EXISTS idx_risk_profile_field ON risk_story(profile_field_id);
-CREATE INDEX IF NOT EXISTS idx_risk_status ON risk_story(status);
-CREATE INDEX IF NOT EXISTS idx_risk_creation_type ON risk_story(creation_type);
-CREATE INDEX IF NOT EXISTS idx_risk_assigned_sme ON risk_story(assigned_sme);
-CREATE INDEX IF NOT EXISTS idx_risk_triggering_evidence ON risk_story(triggering_evidence_id);
+-- Domain Risk Indexes
+CREATE INDEX IF NOT EXISTS idx_domain_risk_app ON domain_risk(app_id);
+CREATE INDEX IF NOT EXISTS idx_domain_risk_arb ON domain_risk(assigned_arb);
+CREATE INDEX IF NOT EXISTS idx_domain_risk_status ON domain_risk(status);
+CREATE INDEX IF NOT EXISTS idx_domain_risk_priority ON domain_risk(priority_score DESC);
+CREATE INDEX IF NOT EXISTS idx_domain_risk_domain ON domain_risk(domain);
 
 -- =========================
--- RISK_STORY_EVIDENCE (Risk-Evidence Junction)
+-- RISK_ITEM (Individual evidence-level risks)
 -- =========================
-CREATE TABLE risk_story_evidence (
-    risk_id TEXT NOT NULL,
-    evidence_id TEXT NOT NULL,
-    submitted_by TEXT,
-    submitted_at TIMESTAMPTZ DEFAULT now(),
-    review_status TEXT DEFAULT 'pending',
-    reviewed_by TEXT,
-    reviewed_at TIMESTAMPTZ,
-    review_comment TEXT,
-    waiver_reason TEXT,
-    waiver_until TIMESTAMPTZ,
-    created_at TIMESTAMPTZ DEFAULT now(),
-    updated_at TIMESTAMPTZ DEFAULT now(),
-    PRIMARY KEY (risk_id, evidence_id),
-    CONSTRAINT fk_rse_risk FOREIGN KEY (risk_id) REFERENCES risk_story(risk_id) ON DELETE CASCADE,
-    CONSTRAINT fk_rse_evidence FOREIGN KEY (evidence_id) REFERENCES evidence(evidence_id) ON DELETE CASCADE
+CREATE TABLE risk_item (
+    risk_item_id           TEXT PRIMARY KEY,
+    domain_risk_id         TEXT NOT NULL,
+
+    -- References
+    app_id                 TEXT NOT NULL,
+    field_key              TEXT NOT NULL,
+    profile_field_id       TEXT,
+    triggering_evidence_id TEXT,
+    track_id               TEXT,
+
+    -- Content
+    title                  TEXT,
+    description            TEXT,
+
+    -- Priority & severity
+    priority               TEXT,                   -- CRITICAL, HIGH, MEDIUM, LOW (from registry)
+    severity               TEXT,                   -- high, medium, low (from evidence status)
+    priority_score         INTEGER,                -- Calculated score 0-100
+    evidence_status        TEXT,                   -- missing, expiring, expired, rejected
+
+    -- Status
+    status                 TEXT NOT NULL DEFAULT 'OPEN',
+    resolution             TEXT,
+    resolution_comment     TEXT,
+
+    -- Lifecycle
+    creation_type          TEXT,
+    raised_by              TEXT,
+    opened_at              TIMESTAMPTZ NOT NULL,
+    resolved_at            TIMESTAMPTZ,
+
+    -- Snapshot
+    policy_requirement_snapshot JSONB,
+
+    -- Audit
+    created_at             TIMESTAMPTZ DEFAULT now(),
+    updated_at             TIMESTAMPTZ DEFAULT now(),
+
+    -- Foreign Keys
+    CONSTRAINT fk_risk_item_domain FOREIGN KEY (domain_risk_id) REFERENCES domain_risk(domain_risk_id) ON DELETE CASCADE,
+    CONSTRAINT fk_risk_item_app FOREIGN KEY (app_id) REFERENCES application(app_id) ON DELETE CASCADE,
+    CONSTRAINT fk_risk_item_profile_field FOREIGN KEY (profile_field_id) REFERENCES profile_field(id) ON DELETE SET NULL,
+    CONSTRAINT fk_risk_item_evidence FOREIGN KEY (triggering_evidence_id) REFERENCES evidence(evidence_id) ON DELETE SET NULL,
+    CONSTRAINT fk_risk_item_track FOREIGN KEY (track_id) REFERENCES track(track_id) ON DELETE SET NULL,
+
+    -- CHECK constraints
+    CONSTRAINT chk_risk_item_status CHECK (status IN (
+        'OPEN', 'IN_PROGRESS', 'RESOLVED', 'WAIVED', 'CLOSED'
+    )),
+    CONSTRAINT chk_risk_item_creation_type CHECK (creation_type IN (
+        'AUTO', 'MANUAL_CREATION', 'MANUAL_SME_INITIATED', 'SYSTEM_AUTO_CREATION'
+    ))
 );
 
-CREATE INDEX IF NOT EXISTS idx_rse_risk ON risk_story_evidence(risk_id);
-CREATE INDEX IF NOT EXISTS idx_rse_evidence ON risk_story_evidence(evidence_id);
-CREATE INDEX IF NOT EXISTS idx_rse_status ON risk_story_evidence(review_status);
+-- Risk Item Indexes
+CREATE INDEX IF NOT EXISTS idx_risk_item_domain_risk ON risk_item(domain_risk_id);
+CREATE INDEX IF NOT EXISTS idx_risk_item_app ON risk_item(app_id);
+CREATE INDEX IF NOT EXISTS idx_risk_item_field ON risk_item(field_key);
+CREATE INDEX IF NOT EXISTS idx_risk_item_evidence ON risk_item(triggering_evidence_id);
+CREATE INDEX IF NOT EXISTS idx_risk_item_priority ON risk_item(priority_score DESC);
+CREATE INDEX IF NOT EXISTS idx_risk_item_status ON risk_item(status);
+CREATE INDEX IF NOT EXISTS idx_risk_item_profile_field ON risk_item(profile_field_id);
+
+-- =========================
+-- RISK_COMMENT (Comments and discussion thread for risk items)
+-- =========================
+CREATE TABLE risk_comment (
+    comment_id      TEXT PRIMARY KEY,
+    risk_item_id    TEXT NOT NULL,
+    comment_type    TEXT NOT NULL,             -- GENERAL, STATUS_CHANGE, REVIEW, RESOLUTION
+    comment_text    TEXT NOT NULL,
+    commented_by    TEXT NOT NULL,
+    commented_at    TIMESTAMPTZ NOT NULL,
+
+    -- Metadata
+    is_internal     BOOLEAN DEFAULT FALSE,     -- Internal ARB notes vs visible to PO
+    created_at      TIMESTAMPTZ DEFAULT now(),
+    updated_at      TIMESTAMPTZ DEFAULT now(),
+
+    -- Foreign Keys
+    CONSTRAINT fk_risk_comment_risk_item FOREIGN KEY (risk_item_id) REFERENCES risk_item(risk_item_id) ON DELETE CASCADE,
+
+    -- CHECK constraints
+    CONSTRAINT chk_risk_comment_type CHECK (comment_type IN (
+        'GENERAL', 'STATUS_CHANGE', 'REVIEW', 'RESOLUTION'
+    ))
+);
+
+-- Risk Comment Indexes
+CREATE INDEX IF NOT EXISTS idx_risk_comment_risk_item_id ON risk_comment(risk_item_id);
+CREATE INDEX IF NOT EXISTS idx_risk_comment_commented_at ON risk_comment(commented_at DESC);
+CREATE INDEX IF NOT EXISTS idx_risk_comment_commented_by ON risk_comment(commented_by);
+CREATE INDEX IF NOT EXISTS idx_risk_comment_type ON risk_comment(comment_type);
+
+-- Table comments for documentation
+COMMENT ON TABLE domain_risk IS 'Aggregated domain-level risks (ARB/SME view) - one per domain per app';
+COMMENT ON TABLE risk_item IS 'Individual evidence-level risk items (PO workbench view) - linked to profile fields';
+COMMENT ON TABLE risk_comment IS 'Comments and discussion thread for risk items - supports ARB/PO collaboration';
+
+COMMENT ON COLUMN domain_risk.arb IS 'ARB routing based on derived_from field (security_arb, integrity_arb, etc.)';
+COMMENT ON COLUMN domain_risk.assigned_arb IS 'Currently assigned ARB (can differ from arb for workload balancing)';
+COMMENT ON COLUMN domain_risk.priority_score IS 'Aggregate priority score (0-100) calculated from risk items';
+
+COMMENT ON COLUMN risk_item.creation_type IS 'AUTO (from evidence), MANUAL_CREATION (ARB initiated), MANUAL_SME_INITIATED, SYSTEM_AUTO_CREATION';
+COMMENT ON COLUMN risk_item.priority_score IS 'Calculated: priority_base (from registry) * evidence_status_multiplier';
+COMMENT ON COLUMN risk_item.policy_requirement_snapshot IS 'Snapshot of policy requirements at risk creation time';
+
+COMMENT ON COLUMN risk_comment.comment_type IS 'GENERAL, STATUS_CHANGE, REVIEW, RESOLUTION';
+COMMENT ON COLUMN risk_comment.is_internal IS 'TRUE for internal ARB notes, FALSE for PO-visible comments';
 
 -- ===========================
 -- Updated Evidence Field Link Status
@@ -438,25 +518,6 @@ ALTER TABLE evidence_field_link
 ADD CONSTRAINT chk_efl_status 
 CHECK (link_status IN ('ATTACHED', 'PENDING_PO_REVIEW', 'PENDING_SME_REVIEW', 'APPROVED', 'USER_ATTESTED', 'REJECTED'));
 
--- =========================
--- SME_QUEUE (Queue Management)
--- =========================
-CREATE TABLE sme_queue (
-    queue_id        TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-    risk_id         TEXT NOT NULL,
-    sme_id          TEXT NOT NULL,
-    queue_status    TEXT NOT NULL DEFAULT 'PENDING',
-    assigned_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
-    picked_up_at    TIMESTAMPTZ,
-    completed_at    TIMESTAMPTZ,
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-    CONSTRAINT fk_sq_risk FOREIGN KEY (risk_id) REFERENCES risk_story(risk_id) ON DELETE CASCADE
-);
-
-CREATE INDEX IF NOT EXISTS idx_sme_queue_risk ON sme_queue(risk_id);
-CREATE INDEX IF NOT EXISTS idx_sme_queue_sme ON sme_queue(sme_id);
-CREATE INDEX IF NOT EXISTS idx_sme_queue_status ON sme_queue(queue_status);
 
 CREATE INDEX IF NOT EXISTS idx_application_criticality ON application(app_criticality_assessment);
 CREATE INDEX IF NOT EXISTS idx_application_app_type ON application(application_type);
@@ -568,24 +629,24 @@ DO $$
                 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
         END IF;
 
-        -- Risk Management table triggers
+        -- Risk Aggregation table triggers
         IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_evidence_field_link_updated_at') THEN
             CREATE TRIGGER trg_evidence_field_link_updated_at BEFORE UPDATE ON evidence_field_link
                 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
         END IF;
 
-        IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_risk_story_updated_at') THEN
-            CREATE TRIGGER trg_risk_story_updated_at BEFORE UPDATE ON risk_story
+        IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_domain_risk_updated_at') THEN
+            CREATE TRIGGER trg_domain_risk_updated_at BEFORE UPDATE ON domain_risk
                 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
         END IF;
 
-        IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_risk_story_evidence_updated_at') THEN
-            CREATE TRIGGER trg_risk_story_evidence_updated_at BEFORE UPDATE ON risk_story_evidence
+        IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_risk_item_updated_at') THEN
+            CREATE TRIGGER trg_risk_item_updated_at BEFORE UPDATE ON risk_item
                 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
         END IF;
 
-        IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_sme_queue_updated_at') THEN
-            CREATE TRIGGER trg_sme_queue_updated_at BEFORE UPDATE ON sme_queue
+        IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_risk_comment_updated_at') THEN
+            CREATE TRIGGER trg_risk_comment_updated_at BEFORE UPDATE ON risk_comment
                 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
         END IF;
 
