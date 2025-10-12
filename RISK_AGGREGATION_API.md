@@ -36,8 +36,10 @@ Evidence → RiskItem → DomainRisk → ARB
 ## Base URL
 
 ```
-http://localhost:8080
+http://localhost:8181
 ```
+
+**Important**: This service runs on port **8181** (NOT 8080). All endpoints use this base URL.
 
 ## Authentication
 
@@ -54,14 +56,18 @@ Get all domain risks assigned to a specific ARB, with status filtering.
 **Endpoint**: `GET /api/v1/domain-risks/arb/{arbName}`
 
 **Parameters**:
-- `arbName` (path): ARB identifier (e.g., "security_arb", "integrity_arb")
+- `arbName` (path): ARB identifier - **Use short format**: `security`, `data`, `operations`, `enterprise_architecture`
 - `status` (query, optional): Comma-separated list of statuses
   - Default: `PENDING_ARB_REVIEW,UNDER_ARB_REVIEW,AWAITING_REMEDIATION,IN_PROGRESS`
   - Valid values: `PENDING_ARB_REVIEW`, `UNDER_ARB_REVIEW`, `AWAITING_REMEDIATION`, `IN_PROGRESS`, `RESOLVED`, `WAIVED`, `CLOSED`
 
+**Important - ARB Naming**:
+- ✅ **Correct**: `security`, `data`, `operations`, `enterprise_architecture`
+- ❌ **Incorrect**: `security_arb`, `data_arb`, `integrity_arb`
+
 **Example Request**:
 ```bash
-GET /api/v1/domain-risks/arb/security_arb?status=PENDING_ARB_REVIEW,UNDER_ARB_REVIEW
+GET /api/v1/domain-risks/arb/security?status=PENDING_ARB_REVIEW,UNDER_ARB_REVIEW
 ```
 
 **Example Response**:
@@ -72,7 +78,7 @@ GET /api/v1/domain-risks/arb/security_arb?status=PENDING_ARB_REVIEW,UNDER_ARB_RE
     "appId": "app-001",
     "domain": "security",
     "derivedFrom": "security_rating",
-    "arb": "security_arb",
+    "arb": "security",
     "title": "Security Domain Risks",
     "description": "Aggregated security risks derived from security_rating assessment.",
     "totalItems": 5,
@@ -82,7 +88,7 @@ GET /api/v1/domain-risks/arb/security_arb?status=PENDING_ARB_REVIEW,UNDER_ARB_RE
     "overallSeverity": "high",
     "priorityScore": 85,
     "status": "UNDER_ARB_REVIEW",
-    "assignedArb": "security_arb",
+    "assignedArb": "security",
     "assignedAt": "2025-10-12T10:00:00Z",
     "openedAt": "2025-10-10T09:00:00Z",
     "closedAt": null,
@@ -107,7 +113,7 @@ Get aggregate statistics across domains for ARB dashboard.
 
 **Example Request**:
 ```bash
-GET /api/v1/domain-risks/arb/security_arb/summary
+GET /api/v1/domain-risks/arb/security/summary
 ```
 
 **Example Response**:
@@ -130,7 +136,81 @@ GET /api/v1/domain-risks/arb/security_arb/summary
 
 ---
 
-### 3. Get Domain Risk by ID
+### 3. Get ARB Dashboard (Comprehensive)
+
+Get complete dashboard metrics for ARB in a single API call. **Recommended for frontend** - returns all data needed for dashboard visualization.
+
+**Endpoint**: `GET /api/v1/domain-risks/arb/{arbName}/dashboard`
+
+**Parameters**:
+- `arbName` (path): ARB identifier (short format)
+- `status` (query, optional): Comma-separated list of statuses
+
+**Example Request**:
+```bash
+GET /api/v1/domain-risks/arb/security/dashboard
+```
+
+**Example Response**:
+```json
+{
+  "arbName": "security",
+  "overview": {
+    "totalDomainRisks": 10,
+    "totalOpenItems": 126,
+    "criticalCount": 2,
+    "highCount": 5,
+    "averagePriorityScore": 55,
+    "needsImmediateAttention": 7
+  },
+  "domains": [
+    {
+      "domain": "security",
+      "riskCount": 10,
+      "openItems": 126,
+      "criticalItems": 15,
+      "avgPriorityScore": 55.0,
+      "topPriorityStatus": "PENDING_ARB_REVIEW"
+    }
+  ],
+  "topApplications": [
+    {
+      "appId": "APM100001",
+      "appName": null,
+      "domainRiskCount": 1,
+      "totalOpenItems": 14,
+      "highestPriorityScore": 55,
+      "criticalDomain": "security"
+    }
+  ],
+  "statusDistribution": {
+    "PENDING_ARB_REVIEW": 10,
+    "IN_PROGRESS": 0,
+    "RESOLVED": 0
+  },
+  "priorityDistribution": {
+    "critical": 0,
+    "high": 0,
+    "medium": 10,
+    "low": 0
+  },
+  "recentActivity": {
+    "newRisksLast7Days": 0,
+    "newRisksLast30Days": 10,
+    "resolvedLast7Days": 0,
+    "resolvedLast30Days": 0
+  }
+}
+```
+
+**Why Use This Endpoint?**
+- Single API call returns all dashboard data
+- More efficient than `/summary` (which only returns domain breakdown)
+- Includes: overview, domains, top apps, distributions, recent activity
+
+---
+
+### 4. Get Domain Risk by ID
 
 Get details of a specific domain risk.
 
@@ -145,7 +225,7 @@ GET /api/v1/domain-risks/dr-uuid-123
 
 ---
 
-### 4. Get Risk Items for Domain
+### 5. Get Risk Items for Domain
 
 Get all risk items belonging to a domain risk (drill-down from domain to evidence level).
 
@@ -160,7 +240,7 @@ GET /api/v1/domain-risks/dr-uuid-123/items
 
 ---
 
-### 5. Get Domain Risks for App
+### 6. Get Domain Risks for App
 
 Get all domain risks for a specific application.
 
@@ -175,7 +255,7 @@ GET /api/v1/domain-risks/app/app-001
 
 ---
 
-### 6. Reassign Domain Risk
+### 7. Reassign Domain Risk
 
 Reassign a domain risk to a different ARB for workload balancing or expertise matching.
 
@@ -184,14 +264,14 @@ Reassign a domain risk to a different ARB for workload balancing or expertise ma
 **Request Body**:
 ```json
 {
-  "assignedArb": "integrity_arb",
+  "assignedArb": "data",
   "assignedBy": "admin_user",
   "assignmentReason": "Workload balancing - security team overloaded"
 }
 ```
 
 **Fields**:
-- `assignedArb` (required): New ARB identifier
+- `assignedArb` (required): New ARB identifier (use short format: `security`, `data`, `operations`, `enterprise_architecture`)
 - `assignedBy` (required): User performing the reassignment
 - `assignmentReason` (optional): Reason for reassignment
 
@@ -201,9 +281,9 @@ PATCH /api/v1/domain-risks/dr-uuid-123/assign
 Content-Type: application/json
 
 {
-  "assignedArb": "integrity_arb",
+  "assignedArb": "data",
   "assignedBy": "admin_user",
-  "assignmentReason": "Reassigning to integrity team for better expertise match"
+  "assignmentReason": "Reassigning to data team for better expertise match"
 }
 ```
 
@@ -215,7 +295,68 @@ Content-Type: application/json
 
 These endpoints manage the evidence submission → risk creation → approval workflow that triggers automatic risk item creation.
 
-### Evidence Approval/Rejection (SME Workflow)
+### 1. Get Pending SME Review Evidence
+
+Get all evidence items pending SME review for a specific SME.
+
+**Endpoint**: `GET /api/evidence/pending-sme-review`
+
+**Query Parameters**:
+- `assignedSme` (required): SME email or identifier
+
+**Example Request**:
+```bash
+GET /api/evidence/pending-sme-review?assignedSme=sme@example.com
+```
+
+**Example Response**:
+```json
+[
+  {
+    "evidenceId": "evidence-123",
+    "appId": "APM100001",
+    "fieldKey": "encryption_at_rest",
+    "profileFieldId": "pf-789",
+    "linkStatus": "PENDING_SME_REVIEW",
+    "linkedAt": "2025-10-12T10:00:00Z",
+    "linkedBy": "developer@example.com",
+    "documentId": "doc-456",
+    "documentTitle": "Encryption Policy v2",
+    "documentUri": "https://gitlab.com/docs/encryption-policy"
+  }
+]
+```
+
+---
+
+### 2. Search Evidence (Advanced)
+
+Search evidence with multiple filter criteria.
+
+**Endpoint**: `GET /api/evidence/search`
+
+**Query Parameters**:
+- `linkStatus` (optional): Filter by link status (PENDING_SME_REVIEW, APPROVED, REJECTED, etc.)
+- `appId` (optional): Filter by application
+- `fieldKey` (optional): Filter by field key
+- `criticality` (optional): Filter by criticality
+- `domain` (optional): Filter by domain
+- `assignedPo` (optional): Filter by Product Owner
+- `assignedSme` (optional): Filter by SME
+- `enhanced` (optional): Return enhanced response (default: true)
+- `page` (optional): Page number (default: 0)
+- `size` (optional): Page size (default: 100)
+
+**Example Request**:
+```bash
+GET /api/evidence/search?linkStatus=PENDING_SME_REVIEW&appId=APM100001&fieldKey=encryption_at_rest
+```
+
+**Example Response**: Array of EnhancedEvidenceSummary objects (same format as pending-sme-review response)
+
+---
+
+### 3. Evidence Approval/Rejection (SME Workflow)
 
 Approve or reject evidence submitted for high-criticality fields requiring SME review.
 
@@ -722,9 +863,9 @@ GET /api/v1/risk-items/item-uuid-456/comments?includeInternal=true
 
 The collection includes environment variables you can customize:
 
-- `base_url`: API base URL (default: `http://localhost:8080`)
+- `base_url`: API base URL (default: `http://localhost:8181`)
 - `app_id`: Test application ID
-- `arb_name`: Test ARB name (e.g., `security_arb`)
+- `arb_name`: Test ARB name (e.g., `security`, `data`, `operations`)
 - `domain_risk_id`: Domain risk ID for testing
 - `risk_item_id`: Risk item ID for testing
 - `field_key`: Field key for testing (e.g., `encryption_at_rest`)
