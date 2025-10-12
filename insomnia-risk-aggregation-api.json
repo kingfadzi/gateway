@@ -14,6 +14,7 @@
     {
       "_id": "env_base",
       "_type": "environment",
+      "parentId": "wrk_risk_aggregation",
       "name": "Base Environment",
       "data": {
         "base_url": "http://localhost:8080",
