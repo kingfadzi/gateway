@@ -1,0 +1,309 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2025-10-12T00:00:00.000Z",
+  "__export_source": "insomnia.desktop.app:v2023.5.8",
+  "resources": [
+    {
+      "_id": "wrk_risk_aggregation",
+      "_type": "workspace",
+      "name": "Risk Aggregation API",
+      "description": "API endpoints for the new risk aggregation architecture",
+      "scope": "collection"
+    },
+    {
+      "_id": "env_base",
+      "_type": "environment",
+      "name": "Base Environment",
+      "data": {
+        "base_url": "http://localhost:8080",
+        "app_id": "test-app-001",
+        "arb_name": "security_arb",
+        "domain_risk_id": "domain-risk-123",
+        "risk_item_id": "item-456",
+        "field_key": "encryption_at_rest",
+        "evidence_id": "evidence-789"
+      },
+      "dataPropertyOrder": {
+        "&": [
+          "base_url",
+          "app_id",
+          "arb_name",
+          "domain_risk_id",
+          "risk_item_id",
+          "field_key",
+          "evidence_id"
+        ]
+      }
+    },
+    {
+      "_id": "folder_domain_risks",
+      "_type": "request_group",
+      "name": "Domain Risks (ARB/SME View)",
+      "description": "Endpoints for domain-level risk aggregations",
+      "environment": {},
+      "environmentPropertyOrder": null
+    },
+    {
+      "_id": "folder_risk_items",
+      "_type": "request_group",
+      "name": "Risk Items (PO View)",
+      "description": "Endpoints for evidence-level risk items",
+      "environment": {},
+      "environmentPropertyOrder": null
+    },
+    {
+      "_id": "req_domain_risks_by_arb",
+      "_type": "request",
+      "parentId": "folder_domain_risks",
+      "name": "Get Domain Risks for ARB",
+      "description": "Get all domain risks assigned to a specific ARB, filtered by status",
+      "url": "{{ _.base_url }}/api/v1/domain-risks/arb/{{ _.arb_name }}?status=PENDING_ARB_REVIEW,UNDER_ARB_REVIEW,AWAITING_REMEDIATION,IN_PROGRESS",
+      "method": "GET",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "status",
+          "value": "PENDING_ARB_REVIEW,UNDER_ARB_REVIEW",
+          "description": "Comma-separated list of statuses to filter by",
+          "disabled": false
+        }
+      ],
+      "body": {}
+    },
+    {
+      "_id": "req_arb_summary",
+      "_type": "request",
+      "parentId": "folder_domain_risks",
+      "name": "Get ARB Dashboard Summary",
+      "description": "Get aggregate statistics for ARB dashboard view",
+      "url": "{{ _.base_url }}/api/v1/domain-risks/arb/{{ _.arb_name }}/summary",
+      "method": "GET",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "status",
+          "value": "PENDING_ARB_REVIEW,UNDER_ARB_REVIEW,IN_PROGRESS",
+          "description": "Filter statuses",
+          "disabled": false
+        }
+      ],
+      "body": {}
+    },
+    {
+      "_id": "req_domain_risk_by_id",
+      "_type": "request",
+      "parentId": "folder_domain_risks",
+      "name": "Get Domain Risk by ID",
+      "description": "Get a specific domain risk by its ID",
+      "url": "{{ _.base_url }}/api/v1/domain-risks/{{ _.domain_risk_id }}",
+      "method": "GET",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {}
+    },
+    {
+      "_id": "req_domain_risk_items",
+      "_type": "request",
+      "parentId": "folder_domain_risks",
+      "name": "Get Risk Items for Domain",
+      "description": "Get all risk items belonging to a specific domain risk (drill-down view)",
+      "url": "{{ _.base_url }}/api/v1/domain-risks/{{ _.domain_risk_id }}/items",
+      "method": "GET",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {}
+    },
+    {
+      "_id": "req_domain_risks_by_app",
+      "_type": "request",
+      "parentId": "folder_domain_risks",
+      "name": "Get Domain Risks for App",
+      "description": "Get all domain risks for a specific application",
+      "url": "{{ _.base_url }}/api/v1/domain-risks/app/{{ _.app_id }}",
+      "method": "GET",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {}
+    },
+    {
+      "_id": "req_risk_items_by_app",
+      "_type": "request",
+      "parentId": "folder_risk_items",
+      "name": "Get Risk Items for App",
+      "description": "Get all risk items for an app, prioritized by score (PO workbench view)",
+      "url": "{{ _.base_url }}/api/v1/risk-items/app/{{ _.app_id }}",
+      "method": "GET",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {}
+    },
+    {
+      "_id": "req_risk_items_by_status",
+      "_type": "request",
+      "parentId": "folder_risk_items",
+      "name": "Get Risk Items by Status",
+      "description": "Get risk items for an app filtered by status",
+      "url": "{{ _.base_url }}/api/v1/risk-items/app/{{ _.app_id }}/status/OPEN",
+      "method": "GET",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "parameters": [],
+      "body": {}
+    },
+    {
+      "_id": "req_risk_item_by_id",
+      "_type": "request",
+      "parentId": "folder_risk_items",
+      "name": "Get Risk Item by ID",
+      "description": "Get a specific risk item by its ID",
+      "url": "{{ _.base_url }}/api/v1/risk-items/{{ _.risk_item_id }}",
+      "method": "GET",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {}
+    },
+    {
+      "_id": "req_update_risk_item_status",
+      "_type": "request",
+      "parentId": "folder_risk_items",
+      "name": "Update Risk Item Status",
+      "description": "Update the status of a risk item (triggers domain risk recalculation)",
+      "url": "{{ _.base_url }}/api/v1/risk-items/{{ _.risk_item_id }}/status",
+      "method": "PATCH",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"status\": \"RESOLVED\",\n  \"resolution\": \"FIXED\",\n  \"resolutionComment\": \"Issue has been resolved. Evidence updated with proper encryption configuration.\"\n}"
+      }
+    },
+    {
+      "_id": "req_risk_items_by_field",
+      "_type": "request",
+      "parentId": "folder_risk_items",
+      "name": "Get Risk Items by Field",
+      "description": "Get all risk items for a specific field key (field-specific analysis)",
+      "url": "{{ _.base_url }}/api/v1/risk-items/field/{{ _.field_key }}",
+      "method": "GET",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {}
+    },
+    {
+      "_id": "req_risk_items_by_evidence",
+      "_type": "request",
+      "parentId": "folder_risk_items",
+      "name": "Get Risk Items by Evidence",
+      "description": "Get all risk items triggered by a specific evidence submission",
+      "url": "{{ _.base_url }}/api/v1/risk-items/evidence/{{ _.evidence_id }}",
+      "method": "GET",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {}
+    },
+    {
+      "_id": "req_example_resolve_item",
+      "_type": "request",
+      "parentId": "folder_risk_items",
+      "name": "Example: Resolve Risk Item",
+      "description": "Example request to resolve a risk item",
+      "url": "{{ _.base_url }}/api/v1/risk-items/{{ _.risk_item_id }}/status",
+      "method": "PATCH",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"status\": \"RESOLVED\",\n  \"resolution\": \"REMEDIATED\",\n  \"resolutionComment\": \"Applied security patches and updated configuration as recommended.\"\n}"
+      }
+    },
+    {
+      "_id": "req_example_waive_item",
+      "_type": "request",
+      "parentId": "folder_risk_items",
+      "name": "Example: Waive Risk Item",
+      "description": "Example request to waive a risk item",
+      "url": "{{ _.base_url }}/api/v1/risk-items/{{ _.risk_item_id }}/status",
+      "method": "PATCH",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"status\": \"WAIVED\",\n  \"resolution\": \"RISK_ACCEPTED\",\n  \"resolutionComment\": \"Risk accepted by security team. Compensating controls in place.\"\n}"
+      }
+    },
+    {
+      "_id": "req_example_close_item",
+      "_type": "request",
+      "parentId": "folder_risk_items",
+      "name": "Example: Close Risk Item",
+      "description": "Example request to close a risk item",
+      "url": "{{ _.base_url }}/api/v1/risk-items/{{ _.risk_item_id }}/status",
+      "method": "PATCH",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"status\": \"CLOSED\",\n  \"resolution\": \"VERIFIED\",\n  \"resolutionComment\": \"Fix verified by ARB. Closing risk item.\"\n}"
+      }
+    }
+  ]
+}
