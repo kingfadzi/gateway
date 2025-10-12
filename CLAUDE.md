@@ -93,7 +93,12 @@ com.example.gateway/
 ├── requirements/        # OPA-driven requirements assembly + reuse decoration
 ├── policy/              # OPA client, policy evaluation
 ├── document/           # Document metadata (GitLab, Confluence), URL validation
-├── risk/               # Risk story creation and management
+├── risk/               # Risk aggregation (domain risks + risk items)
+│   ├── model/          # DomainRisk, RiskItem entities + enums
+│   ├── repository/     # Domain & item repositories with ARB/PO queries
+│   ├── service/        # Aggregation, priority calc, ARB routing
+│   ├── controller/     # REST API for ARB & PO views
+│   └── dto/            # Request/response DTOs + mapper
 ├── track/              # Release/change tracking
 └── registry/           # Compliance context, risk config
 ```
@@ -119,6 +124,191 @@ com.example.gateway/
 - Auto-creates profiles on app creation
 - Derives field requirements from `profile-fields.registry.yaml` + app ratings
 - Triggered by feature flag: `autoprofile.enabled=true`
+
+### Risk Aggregation Architecture (New)
+
+**Overview:** Domain-level risk aggregation system that groups evidence-level risks by domain and routes to appropriate Architecture Review Boards (ARBs).
+
+**Flow:**
+```
+Evidence Submission → RiskItem (evidence-level)
+                          ↓
+                    DomainRisk (domain-level aggregation)
+                          ↓
+                    ARB Assignment (based on domain)
+                          ↓
+        ┌──────────────────────┬──────────────────────┐
+        │   ARB/SME View       │     PO/Dev View      │
+        │ (domain aggregates)  │  (evidence items)    │
+        └──────────────────────┴──────────────────────┘
+```
+
+**Key Components:**
+
+**1. Data Model (`risk/model/`)**
+- **DomainRisk** - One per app+domain (e.g., app-123/security)
+  - Aggregates: `totalItems`, `openItems`, `highPriorityItems`
+  - Priority score: 0-100 scale (auto-calculated)
+  - Status: `PENDING_ARB_REVIEW` → `UNDER_ARB_REVIEW` → `RESOLVED`
+  - ARB assignment: Based on domain (security → security_arb)
+
+- **RiskItem** - Individual evidence-level risk
+  - Links to: evidence, field, profile field, domain risk
+  - Priority: `CRITICAL` (90-100), `HIGH` (70-89), `MEDIUM` (40-69), `LOW` (0-39)
+  - Status: `OPEN` → `IN_PROGRESS` → `RESOLVED`/`WAIVED`/`CLOSED`
+  - Score calculation: Base priority × evidence status multiplier
+
+- **Enums:**
+  - `RiskPriority` - CRITICAL/HIGH/MEDIUM/LOW with score mappings
+  - `DomainRiskStatus` - 7 states for domain lifecycle
+  - `RiskItemStatus` - 5 states for item lifecycle
+
+**2. Services (`risk/service/`)**
+
+**RiskPriorityCalculator**
+- Calculates priority scores (0-100) from priority enum + evidence status
+- Evidence multipliers: missing=2.5x, non_compliant=2.3x, expired=2.0x, approved=1.0x
+- Domain score = max item score + bonuses (high-priority items, volume)
+
+**ArbRoutingService**
+- Routes risks to ARBs based on field's `derived_from` value
+- Maps: `security_rating` → `security_arb`, `integrity_rating` → `integrity_arb`
+- Calculates domain by stripping `_rating` suffix
+- Configuration in: `profile-fields.registry.yaml` → `arb_routing` section
+
+**DomainRiskAggregationService**
+- Creates/retrieves domain risks (one per app+domain, enforced by UNIQUE constraint)
+- Adds risk items to domains (triggers auto-recalculation)
+- Recalculates on every update:
+  - Count: totalItems, openItems, highPriorityItems
+  - Score: priorityScore with bonuses
+  - Severity: overallPriority, overallSeverity
+- Auto-transitions status:
+  - → `RESOLVED` when all items closed
+  - → `IN_PROGRESS` when new items added to resolved risk
+
+**RiskAutoCreationServiceImpl** (refactored)
+- Triggers on evidence submission
+- Creates RiskItem (not RiskStory)
+- Gets/creates DomainRisk for app+domain
+- Calculates priority score with evidence multipliers
+- Returns ARB assignment in response
+
+**3. REST API (`risk/controller/`)**
+
+**DomainRiskController** - ARB/SME View
+```
+GET    /api/v1/domain-risks/arb/{arbName}           → Get risks for ARB (filterable)
+GET    /api/v1/domain-risks/arb/{arbName}/summary   → Dashboard statistics
+GET    /api/v1/domain-risks/{domainRiskId}          → Get specific domain risk
+GET    /api/v1/domain-risks/{domainRiskId}/items    → Drill down to items
+GET    /api/v1/domain-risks/app/{appId}             → Get all for app
+```
+
+**RiskItemController** - PO/Developer View
+```
+GET    /api/v1/risk-items/app/{appId}                    → All items (prioritized)
+GET    /api/v1/risk-items/app/{appId}/status/{status}    → Filter by status
+GET    /api/v1/risk-items/{riskItemId}                   → Get specific item
+PATCH  /api/v1/risk-items/{riskItemId}/status            → Update status
+GET    /api/v1/risk-items/field/{fieldKey}               → Items by field
+GET    /api/v1/risk-items/evidence/{evidenceId}          → Items by evidence
+```
+
+**4. Database Schema (`V2__create_domain_risk_tables.sql`)**
+
+**domain_risk table:**
+- Primary key: `domain_risk_id` (UUID)
+- Unique constraint: `(app_id, domain)` - ensures one per app+domain
+- 11 indexes for query optimization
+- Auto-update triggers for `updated_at`
+
+**risk_item table:**
+- Primary key: `risk_item_id` (UUID)
+- Foreign key: `domain_risk_id` (CASCADE on delete)
+- 8 indexes including composite for deduplication
+- JSONB column: `policy_requirement_snapshot`
+
+**5. Priority Scoring Formula**
+
+```
+Item Score = Base Priority × Evidence Multiplier
+  - Base: CRITICAL=40, HIGH=30, MEDIUM=20, LOW=10
+  - Multiplier: missing=2.5, non_compliant=2.3, expired=2.0, approved=1.0
+  - Result: 0-100 (capped at 100)
+
+Domain Score = Max(Item Scores) + Bonuses
+  - High priority bonus: min(10, highPriorityCount × 2)
+  - Volume bonus: min(5, (openCount - 3))
+  - Result: 0-100 (capped at 100)
+```
+
+**6. Registry Configuration**
+
+**ARB Routing** (`profile-fields.registry.yaml`):
+```yaml
+arb_routing:
+  security_rating: security_arb
+  integrity_rating: integrity_arb
+  availability_rating: availability_arb
+  resilience_rating: resilience_arb
+  confidentiality_rating: confidentiality_arb
+  app_criticality_assessment: governance_arb
+```
+
+**Field Priority** (per criticality):
+```yaml
+- key: encryption_at_rest
+  derived_from: security_rating
+  rule:
+    A1: { value: required, label: "Required", ttl: 90d,
+          requires_review: true, priority: CRITICAL }
+    A2: { value: required, label: "Required", ttl: 90d,
+          requires_review: true, priority: HIGH }
+    B:  { value: required, label: "Required", ttl: 180d,
+          requires_review: true, priority: MEDIUM }
+```
+
+**7. Testing**
+
+**Insomnia Collection:** `insomnia-risk-aggregation-api.json`
+- 17 pre-configured requests
+- Environment variables for easy customization
+- Example requests for all workflows
+
+**API Documentation:** `RISK_AGGREGATION_API.md`
+- Complete endpoint reference
+- Request/response examples
+- Status enum definitions
+- Error handling
+
+**Testing Guide:** `TESTING_GUIDE.md`
+- 7 end-to-end scenarios
+- Validation checklist
+- Common issues & fixes
+
+**8. Key Design Decisions**
+
+**Why domain-level aggregation?**
+- Reduces noise: ARBs see 1 risk per domain instead of N evidence items
+- Better prioritization: Aggregate scores consider all items in domain
+- Clearer ownership: Each domain routes to specific ARB
+
+**Why separate views?**
+- ARBs need strategic view (domain-level)
+- POs need tactical view (evidence-level)
+- Different APIs prevent data overload
+
+**Why auto-recalculation?**
+- Always consistent: Aggregations never stale
+- Real-time: Status changes immediately reflected
+- Transactional: Updates atomic with item changes
+
+**Performance Considerations:**
+- Indexes on all query paths (ARB, app, domain, field)
+- Batch loading prevents N+1 queries
+- Domain risks cached at service layer
+- Unique constraints prevent duplicate aggregations
 
 ### SQL & Database Patterns
 
