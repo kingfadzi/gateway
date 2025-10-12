@@ -6,6 +6,7 @@ import com.example.gateway.registry.dto.FieldRiskConfig;
 import com.example.gateway.registry.dto.RiskCreationRule;
 import com.example.gateway.registry.service.ComplianceContextService;
 import com.example.gateway.profile.service.ProfileFieldRegistryService;
+import com.example.gateway.risk.model.RiskPriority;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -50,9 +51,10 @@ class ComplianceContextServiceTest {
         // Setup test rule
         testRule = new RiskCreationRule(
             "required",
-            "Required", 
+            "Required",
             "90d",
-            true
+            true,
+            RiskPriority.HIGH
         );
         
         // Setup test risk config (mock the actual FieldRiskConfig)

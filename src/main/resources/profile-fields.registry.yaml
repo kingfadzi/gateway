@@ -1,16 +1,26 @@
 version: 1
 updated_at: 2025-08-29
 
+# ARB (Architecture Review Board) routing configuration
+# Maps derived_from values to their respective ARB
+arb_routing:
+  security_rating: security_arb
+  integrity_rating: integrity_arb
+  availability_rating: availability_arb
+  resilience_rating: resilience_arb
+  confidentiality_rating: confidentiality_arb
+  app_criticality_assessment: governance_arb
+
 fields:
   # ---- Confidentiality
   - key: confidentiality_level
     label: Confidentiality Level
     derived_from: confidentiality_rating
     rule:
-      A: { value: restricted,   label: "Restricted",   ttl: 90d, requires_review: true }
-      B: { value: confidential, label: "Confidential", ttl: 90d, requires_review: true }
-      C: { value: internal,     label: "Internal",     ttl: 180d, requires_review: false }
-      D: { value: public,       label: "Public",       ttl: 365d, requires_review: false }
+      A: { value: restricted,   label: "Restricted",   ttl: 90d, requires_review: true, priority: CRITICAL }
+      B: { value: confidential, label: "Confidential", ttl: 90d, requires_review: true, priority: HIGH }
+      C: { value: internal,     label: "Internal",     ttl: 180d, requires_review: false, priority: MEDIUM }
+      D: { value: public,       label: "Public",       ttl: 365d, requires_review: false, priority: LOW }
     compliance_frameworks:
       - framework: Internal
         controls: ["TBD"]
@@ -44,11 +54,11 @@ fields:
     label: Encryption at Rest
     derived_from: security_rating
     rule:
-      A1: { value: required, label: "Required", ttl: 90d, requires_review: true }
-      A2: { value: required, label: "Required", ttl: 90d, requires_review: true }
-      B:  { value: required, label: "Required", ttl: 180d, requires_review: true }
-      C:  { value: optional, label: "Optional", ttl: 365d, requires_review: false }
-      D:  { value: optional, label: "Optional", ttl: 365d, requires_review: false }
+      A1: { value: required, label: "Required", ttl: 90d, requires_review: true, priority: CRITICAL }
+      A2: { value: required, label: "Required", ttl: 90d, requires_review: true, priority: HIGH }
+      B:  { value: required, label: "Required", ttl: 180d, requires_review: true, priority: MEDIUM }
+      C:  { value: optional, label: "Optional", ttl: 365d, requires_review: false, priority: LOW }
+      D:  { value: optional, label: "Optional", ttl: 365d, requires_review: false, priority: LOW }
     compliance_frameworks:
       - framework: Internal
         controls: ["TBD"]
