@@ -29,11 +29,20 @@ CREATE INDEX idx_risk_comment_commented_at ON risk_comment(commented_at DESC);
 CREATE INDEX idx_risk_comment_commented_by ON risk_comment(commented_by);
 CREATE INDEX idx_risk_comment_type ON risk_comment(comment_type);
 
+-- Create trigger function to update updated_at timestamp for risk_comment
+CREATE OR REPLACE FUNCTION update_risk_comment_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
 -- Auto-update trigger for updated_at
-CREATE TRIGGER update_risk_comment_updated_at
+CREATE TRIGGER tr_risk_comment_updated_at
     BEFORE UPDATE ON risk_comment
     FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
+    EXECUTE FUNCTION update_risk_comment_updated_at();
 
 -- =============================================================================
 -- Comments for Documentation
