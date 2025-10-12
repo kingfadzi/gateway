@@ -42,9 +42,10 @@ class ComplianceContextServiceTest {
         // Setup test field info
         testFieldInfo = new ProfileFieldTypeInfo(
             "encryption_at_rest",
-            "Encryption at Rest", 
+            "Encryption at Rest",
             "security",
             "security_rating",
+            "security",
             List.of(framework)
         );
         

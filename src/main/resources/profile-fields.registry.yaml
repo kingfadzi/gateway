@@ -1,16 +1,6 @@
 version: 1
 updated_at: 2025-08-29
 
-# ARB (Architecture Review Board) routing configuration
-# Maps derived_from values to their respective ARB
-arb_routing:
-  security_rating: security                    # Security controls (encryption, access, vulnerabilities, network)
-  confidentiality_rating: data                 # Data governance - confidentiality concerns
-  integrity_rating: data                       # Data governance - integrity concerns
-  availability_rating: operations              # Operational resilience - availability
-  resilience_rating: operations                # Operational resilience - DR and recovery
-  app_criticality_assessment: enterprise_architecture  # Strategic governance (visions, roadmaps)
-
 fields:
   # ---- Confidentiality
   - key: confidentiality_level

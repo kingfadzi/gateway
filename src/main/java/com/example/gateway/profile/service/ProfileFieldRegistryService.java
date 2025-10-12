@@ -24,7 +24,6 @@ public class ProfileFieldRegistryService {
     
     private List<ProfileFieldTypeInfo> profileFieldTypes = new ArrayList<>();
     private Map<String, FieldRiskConfig> fieldRiskConfigs = new HashMap<>();
-    private Map<String, String> arbRouting = new HashMap<>();  // derivedFrom -> ARB name mapping
     private Map<String, Object> rawRegistry;
     
     @PostConstruct
@@ -45,19 +44,6 @@ public class ProfileFieldRegistryService {
     private void parseRegistry(Map<String, Object> registry) {
         profileFieldTypes = new ArrayList<>();
         fieldRiskConfigs = new HashMap<>();
-        arbRouting = new HashMap<>();
-
-        // Parse ARB routing configuration
-        Object arbRoutingObj = registry.get("arb_routing");
-        if (arbRoutingObj instanceof Map) {
-            Map<String, Object> arbRoutingMap = (Map<String, Object>) arbRoutingObj;
-            for (Map.Entry<String, Object> entry : arbRoutingMap.entrySet()) {
-                if (entry.getValue() != null) {
-                    arbRouting.put(entry.getKey(), entry.getValue().toString());
-                }
-            }
-            log.info("Loaded {} ARB routing configurations", arbRouting.size());
-        }
 
         // Extract the "fields" array from the registry
         Object fieldsObj = registry.get("fields");
@@ -68,20 +54,22 @@ public class ProfileFieldRegistryService {
                 String fieldKey = getString(fieldMap, "key");
                 String label = getString(fieldMap, "label");
                 String derivedFrom = getString(fieldMap, "derived_from");
-                
+                String arb = getString(fieldMap, "arb");
+
                 if (fieldKey != null && label != null) {
                     // Parse compliance frameworks
                     List<ComplianceFramework> complianceFrameworks = parseComplianceFrameworks(fieldMap);
-                    
+
                     // Calculate domain from derived_from field
                     String domain = getDomainFromDerivedFrom(derivedFrom);
-                    
+
                     // Create ProfileFieldTypeInfo (existing functionality)
                     profileFieldTypes.add(new ProfileFieldTypeInfo(
                             fieldKey,
                             label,
                             domain,
                             derivedFrom,
+                            arb,
                             complianceFrameworks
                     ));
                     
@@ -298,25 +286,35 @@ public class ProfileFieldRegistryService {
     // =====================
 
     /**
-     * Get ARB name for a given derived_from field (e.g., "security_rating" -> "security_arb")
+     * Get ARB name for a given derived_from field (e.g., "security_rating" -> "security")
+     * Finds the first field with this derived_from and returns its arb
      */
     public Optional<String> getArbForDerivedFrom(String derivedFrom) {
-        return Optional.ofNullable(arbRouting.get(derivedFrom));
+        return profileFieldTypes.stream()
+                .filter(ft -> derivedFrom.equals(ft.derivedFrom()))
+                .map(ProfileFieldTypeInfo::arb)
+                .findFirst();
     }
 
     /**
-     * Get all ARB routing configurations
+     * Get all ARB routing configurations (derived_from -> arb mapping)
+     * Builds map from unique derived_from values across all fields
      */
     public Map<String, String> getAllArbRouting() {
-        return Map.copyOf(arbRouting);
+        Map<String, String> routing = new HashMap<>();
+        for (ProfileFieldTypeInfo fieldType : profileFieldTypes) {
+            if (fieldType.derivedFrom() != null && fieldType.arb() != null) {
+                routing.putIfAbsent(fieldType.derivedFrom(), fieldType.arb());
+            }
+        }
+        return Map.copyOf(routing);
     }
 
     /**
-     * Get ARB name for a field by looking up its derived_from value
+     * Get ARB name for a field directly from its arb property
      */
     public Optional<String> getArbForField(String fieldKey) {
         return getFieldTypeInfo(fieldKey)
-                .map(ProfileFieldTypeInfo::derivedFrom)
-                .flatMap(this::getArbForDerivedFrom);
+                .map(ProfileFieldTypeInfo::arb);
     }
 }
