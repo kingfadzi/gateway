@@ -353,8 +353,10 @@ CREATE TABLE domain_risk (
     -- Status
     status            TEXT NOT NULL DEFAULT 'PENDING_ARB_REVIEW',
 
-    -- Assignment
+    -- Assignment (V4 migration)
     assigned_arb      TEXT,
+    assigned_to       TEXT,                      -- User-level assignment for my-queue scope (V4)
+    assigned_to_name  TEXT,                      -- Display name of assigned user (V4)
     assigned_at       TIMESTAMPTZ,
 
     -- Lifecycle
@@ -375,13 +377,14 @@ CREATE TABLE domain_risk (
     -- CHECK constraints
     CONSTRAINT chk_domain_risk_status CHECK (status IN (
         'PENDING_ARB_REVIEW', 'UNDER_ARB_REVIEW', 'AWAITING_REMEDIATION',
-        'IN_PROGRESS', 'RESOLVED', 'CLOSED'
+        'IN_PROGRESS', 'RESOLVED', 'WAIVED', 'CLOSED'
     ))
 );
 
 -- Domain Risk Indexes
 CREATE INDEX IF NOT EXISTS idx_domain_risk_app ON domain_risk(app_id);
 CREATE INDEX IF NOT EXISTS idx_domain_risk_arb ON domain_risk(assigned_arb);
+CREATE INDEX IF NOT EXISTS idx_domain_risk_assigned_to ON domain_risk(assigned_to);
 CREATE INDEX IF NOT EXISTS idx_domain_risk_status ON domain_risk(status);
 CREATE INDEX IF NOT EXISTS idx_domain_risk_priority ON domain_risk(priority_score DESC);
 CREATE INDEX IF NOT EXISTS idx_domain_risk_domain ON domain_risk(domain);
@@ -404,6 +407,12 @@ CREATE TABLE risk_item (
     title                  TEXT,
     description            TEXT,
 
+    -- Rich content (V6 migration - for manual SME-initiated risks)
+    hypothesis             TEXT,                   -- Risk hypothesis: "If X happens..."
+    condition              TEXT,                   -- Condition: "When Y exists..."
+    consequence            TEXT,                   -- Impact: "Then Z occurs..."
+    control_refs           TEXT,                   -- References to relevant controls
+
     -- Priority & severity
     priority               TEXT,                   -- CRITICAL, HIGH, MEDIUM, LOW (from registry)
     severity               TEXT,                   -- high, medium, low (from evidence status)
@@ -420,6 +429,11 @@ CREATE TABLE risk_item (
     raised_by              TEXT,
     opened_at              TIMESTAMPTZ NOT NULL,
     resolved_at            TIMESTAMPTZ,
+
+    -- Assignment (V8 migration - individual SME work assignment)
+    assigned_to            TEXT,                   -- Email or user ID of assigned SME
+    assigned_at            TIMESTAMPTZ,
+    assigned_by            TEXT,                   -- Who made the assignment
 
     -- Snapshot
     policy_requirement_snapshot JSONB,
@@ -453,6 +467,35 @@ CREATE INDEX IF NOT EXISTS idx_risk_item_priority ON risk_item(priority_score DE
 CREATE INDEX IF NOT EXISTS idx_risk_item_status ON risk_item(status);
 CREATE INDEX IF NOT EXISTS idx_risk_item_profile_field ON risk_item(profile_field_id);
 
+-- V6 migration: Full-text search index on risk content
+CREATE INDEX IF NOT EXISTS idx_risk_item_content_search
+    ON risk_item USING gin(
+        to_tsvector('english',
+            COALESCE(title, '') || ' ' ||
+            COALESCE(description, '') || ' ' ||
+            COALESCE(hypothesis, '') || ' ' ||
+            COALESCE(condition, '') || ' ' ||
+            COALESCE(consequence, '')
+        )
+    );
+
+-- V8 migration: Assignment indexes
+CREATE INDEX IF NOT EXISTS idx_risk_item_assigned_to
+    ON risk_item(assigned_to)
+    WHERE assigned_to IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_risk_item_assigned_to_status
+    ON risk_item(assigned_to, status)
+    WHERE assigned_to IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_risk_item_unassigned
+    ON risk_item(status)
+    WHERE assigned_to IS NULL AND status IN ('OPEN', 'IN_PROGRESS');
+
+CREATE INDEX IF NOT EXISTS idx_risk_item_assigned_to_app
+    ON risk_item(assigned_to, app_id, priority_score DESC)
+    WHERE assigned_to IS NOT NULL AND status IN ('OPEN', 'IN_PROGRESS');
+
 -- =========================
 -- RISK_COMMENT (Comments and discussion thread for risk items)
 -- =========================
@@ -484,21 +527,82 @@ CREATE INDEX IF NOT EXISTS idx_risk_comment_commented_at ON risk_comment(comment
 CREATE INDEX IF NOT EXISTS idx_risk_comment_commented_by ON risk_comment(commented_by);
 CREATE INDEX IF NOT EXISTS idx_risk_comment_type ON risk_comment(comment_type);
 
+-- =========================
+-- RISK_ITEM_ASSIGNMENT_HISTORY (V8 migration - Audit trail for assignments)
+-- =========================
+CREATE TABLE risk_item_assignment_history (
+    history_id      TEXT PRIMARY KEY,
+    risk_item_id    TEXT NOT NULL,
+
+    -- Assignment details
+    assigned_to     TEXT,                   -- User who received assignment (null for unassignment)
+    assigned_from   TEXT,                   -- Previous assignee (null if first assignment)
+    assigned_by     TEXT NOT NULL,          -- User who performed the assignment action
+    assignment_type TEXT NOT NULL,          -- SELF_ASSIGN, MANUAL_ASSIGN, AUTO_ASSIGN, UNASSIGN
+
+    -- Context
+    reason          TEXT,
+
+    -- Timestamp
+    assigned_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    -- Foreign Keys
+    CONSTRAINT fk_assignment_history_risk_item
+        FOREIGN KEY (risk_item_id)
+        REFERENCES risk_item(risk_item_id)
+        ON DELETE CASCADE,
+
+    -- CHECK constraints
+    CONSTRAINT chk_assignment_type CHECK (
+        assignment_type IN ('SELF_ASSIGN', 'MANUAL_ASSIGN', 'AUTO_ASSIGN', 'UNASSIGN')
+    )
+);
+
+-- Assignment History Indexes
+CREATE INDEX IF NOT EXISTS idx_assignment_history_risk_item
+    ON risk_item_assignment_history(risk_item_id, assigned_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_assignment_history_assigned_to
+    ON risk_item_assignment_history(assigned_to, assigned_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_assignment_history_assigned_at
+    ON risk_item_assignment_history(assigned_at DESC);
+
 -- Table comments for documentation
 COMMENT ON TABLE domain_risk IS 'Aggregated domain-level risks (ARB/SME view) - one per domain per app';
 COMMENT ON TABLE risk_item IS 'Individual evidence-level risk items (PO workbench view) - linked to profile fields';
 COMMENT ON TABLE risk_comment IS 'Comments and discussion thread for risk items - supports ARB/PO collaboration';
+COMMENT ON TABLE risk_item_assignment_history IS 'Audit trail of risk item assignment changes - tracks who assigned what to whom and when';
 
 COMMENT ON COLUMN domain_risk.arb IS 'ARB routing based on derived_from field (security_arb, integrity_arb, etc.)';
 COMMENT ON COLUMN domain_risk.assigned_arb IS 'Currently assigned ARB (can differ from arb for workload balancing)';
+COMMENT ON COLUMN domain_risk.assigned_to IS 'User-level assignment (user ID) for my-queue scope filtering';
+COMMENT ON COLUMN domain_risk.assigned_to_name IS 'Display name of assigned user for UI';
 COMMENT ON COLUMN domain_risk.priority_score IS 'Aggregate priority score (0-100) calculated from risk items';
 
 COMMENT ON COLUMN risk_item.creation_type IS 'AUTO (from evidence), MANUAL_CREATION (ARB initiated), MANUAL_SME_INITIATED, SYSTEM_AUTO_CREATION';
 COMMENT ON COLUMN risk_item.priority_score IS 'Calculated: priority_base (from registry) * evidence_status_multiplier';
 COMMENT ON COLUMN risk_item.policy_requirement_snapshot IS 'Snapshot of policy requirements at risk creation time';
 
+-- V6 migration comments
+COMMENT ON COLUMN risk_item.hypothesis IS 'Narrative hypothesis: "If X happens..." - describes the risk scenario';
+COMMENT ON COLUMN risk_item.condition IS 'Condition under which risk manifests: "When Y exists..." - preconditions';
+COMMENT ON COLUMN risk_item.consequence IS 'Impact/consequence: "Then Z occurs..." - what happens if risk materializes';
+COMMENT ON COLUMN risk_item.control_refs IS 'References to relevant controls or mitigations';
+
+-- V8 migration comments
+COMMENT ON COLUMN risk_item.assigned_to IS 'Email or user ID of assigned SME (individual work assignment)';
+COMMENT ON COLUMN risk_item.assigned_at IS 'Timestamp when risk was assigned to current assignee';
+COMMENT ON COLUMN risk_item.assigned_by IS 'Email or user ID who made the assignment (self or manager)';
+
 COMMENT ON COLUMN risk_comment.comment_type IS 'GENERAL, STATUS_CHANGE, REVIEW, RESOLUTION';
 COMMENT ON COLUMN risk_comment.is_internal IS 'TRUE for internal ARB notes, FALSE for PO-visible comments';
+
+-- V8 migration: Assignment history comments
+COMMENT ON COLUMN risk_item_assignment_history.assigned_to IS 'User who received the assignment (null for unassignment)';
+COMMENT ON COLUMN risk_item_assignment_history.assigned_from IS 'Previous assignee (null if first assignment or was unassigned)';
+COMMENT ON COLUMN risk_item_assignment_history.assigned_by IS 'User who performed the assignment action';
+COMMENT ON COLUMN risk_item_assignment_history.assignment_type IS 'Type: SELF_ASSIGN (user assigned to self), MANUAL_ASSIGN (assigned by another), AUTO_ASSIGN (system), UNASSIGN (returned to pool)';
 
 -- ===========================
 -- Updated Evidence Field Link Status

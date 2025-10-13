@@ -1,7 +1,7 @@
 # File: src/main/resources/application.yml
 spring:
   datasource:
-    url: jdbc:postgresql://helios:5432/lct_data
+    url: jdbc:postgresql://helios:5432/lct_data_v2
     username: postgres
     password: postgres
     driver-class-name: org.postgresql.Driver
@@ -24,7 +24,7 @@ spring:
     name: delivery-unit-backend
 
 server:
-  port: 8080
+  port: 8181
 
 logging:
   level:
