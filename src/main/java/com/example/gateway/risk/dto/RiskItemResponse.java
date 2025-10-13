@@ -26,6 +26,12 @@ public record RiskItemResponse(
         String title,
         String description,
 
+        // Rich content (for manual SME-initiated risks)
+        String hypothesis,
+        String condition,
+        String consequence,
+        String controlRefs,
+
         // Priority & severity
         RiskPriority priority,
         String severity,
@@ -42,6 +48,11 @@ public record RiskItemResponse(
         String raisedBy,
         OffsetDateTime openedAt,
         OffsetDateTime resolvedAt,
+
+        // Assignment (individual SME work assignment)
+        String assignedTo,
+        OffsetDateTime assignedAt,
+        String assignedBy,
 
         // Snapshot
         Map<String, Object> policyRequirementSnapshot,

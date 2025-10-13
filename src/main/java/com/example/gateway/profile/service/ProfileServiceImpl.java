@@ -5,8 +5,8 @@ import com.example.gateway.evidence.dto.Evidence;
 import com.example.gateway.document.dto.DocumentSummary;
 import com.example.gateway.profile.dto.*;
 import com.example.gateway.profile.respository.ProfileRepository;
-import com.example.gateway.risk.repository.RiskStoryRepository;
-import com.example.gateway.risk.model.RiskStory;
+import com.example.gateway.risk.repository.RiskItemRepository;
+import com.example.gateway.risk.model.RiskItem;
 import com.example.gateway.document.service.DocumentService;
 import com.example.gateway.evidence.dto.EnhancedEvidenceSummary;
 import com.example.gateway.evidence.repository.EvidenceRepository;
@@ -36,16 +36,16 @@ public class ProfileServiceImpl implements ProfileService {
     private final FieldRegistryConfig fieldRegistryConfig;
     private final DocumentService documentService;
     private final ProfileFieldRegistryService profileFieldRegistryService;
-    private final RiskStoryRepository riskStoryRepository;
+    private final RiskItemRepository riskItemRepository;
     private final EvidenceStatusCalculator evidenceStatusCalculator;
     private final EvidenceRepository evidenceRepository;
     private final EvidenceFieldLinkRepository evidenceFieldLinkRepository;
 
-    public ProfileServiceImpl(ProfileRepository profileRepository, 
+    public ProfileServiceImpl(ProfileRepository profileRepository,
                              FieldRegistryConfig fieldRegistryConfig,
                              DocumentService documentService,
                              ProfileFieldRegistryService profileFieldRegistryService,
-                             RiskStoryRepository riskStoryRepository,
+                             RiskItemRepository riskItemRepository,
                              EvidenceStatusCalculator evidenceStatusCalculator,
                              EvidenceRepository evidenceRepository,
                              EvidenceFieldLinkRepository evidenceFieldLinkRepository) {
@@ -53,7 +53,7 @@ public class ProfileServiceImpl implements ProfileService {
         this.fieldRegistryConfig = fieldRegistryConfig;
         this.documentService = documentService;
         this.profileFieldRegistryService = profileFieldRegistryService;
-        this.riskStoryRepository = riskStoryRepository;
+        this.riskItemRepository = riskItemRepository;
         this.evidenceStatusCalculator = evidenceStatusCalculator;
         this.evidenceRepository = evidenceRepository;
         this.evidenceFieldLinkRepository = evidenceFieldLinkRepository;
@@ -196,13 +196,13 @@ public class ProfileServiceImpl implements ProfileService {
         // Group evidence by field ID
         Map<String, List<Evidence>> evidenceByField = evidenceList.stream()
                 .collect(Collectors.groupingBy(Evidence::profileFieldId));
-        
-        // Get risk stories for this application
-        List<RiskStory> riskStories = riskStoryRepository.findByAppId(appId);
-        
+
+        // Get risk items for this application
+        List<RiskItem> riskItems = riskItemRepository.findByAppId(appId);
+
         // Group risks by field key
-        Map<String, List<RiskStory>> risksByFieldKey = riskStories.stream()
-                .collect(Collectors.groupingBy(RiskStory::getFieldKey));
+        Map<String, List<RiskItem>> risksByFieldKey = riskItems.stream()
+                .collect(Collectors.groupingBy(RiskItem::getFieldKey));
         
         // Group fields by derived_from (domain)
         Map<String, List<ProfileField>> fieldsByDomain = fields.stream()
@@ -247,12 +247,12 @@ public class ProfileServiceImpl implements ProfileService {
                         .collect(Collectors.toList());
                 
                 // Get risks for this field
-                List<RiskStory> risksForField = risksByFieldKey.getOrDefault(field.fieldKey(), Collections.emptyList());
-                
+                List<RiskItem> risksForField = risksByFieldKey.getOrDefault(field.fieldKey(), Collections.emptyList());
+
                 // Convert risks to graph payload
                 List<RiskGraphPayload> riskGraphPayloads = risksForField.stream()
                         .map(risk -> new RiskGraphPayload(
-                                risk.getRiskId(),
+                                risk.getRiskItemId(),
                                 risk.getTitle(),
                                 risk.getSeverity(),
                                 risk.getStatus().toString()
@@ -340,14 +340,14 @@ public class ProfileServiceImpl implements ProfileService {
         String assurance = deriveAssurance(evidenceList);
         
         // Get risks for this specific field
-        List<RiskStory> risksForField = riskStoryRepository.findByAppId(appId).stream()
+        List<RiskItem> risksForField = riskItemRepository.findByAppId(appId).stream()
                 .filter(risk -> fieldKey.equals(risk.getFieldKey()))
                 .collect(Collectors.toList());
-        
+
         // Convert risks to graph payload
         List<RiskGraphPayload> riskGraphPayloads = risksForField.stream()
                 .map(risk -> new RiskGraphPayload(
-                        risk.getRiskId(),
+                        risk.getRiskItemId(),
                         risk.getTitle(),
                         risk.getSeverity(),
                         risk.getStatus().toString()

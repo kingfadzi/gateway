@@ -4,7 +4,6 @@ import com.example.gateway.risk.dto.AutoRiskCreationResponse;
 import com.example.gateway.registry.dto.RegistryRuleEvaluation;
 import com.example.gateway.registry.dto.RiskCreationRule;
 import com.example.gateway.risk.model.*;
-import com.example.gateway.risk.repository.RiskStoryRepository;
 import com.example.gateway.risk.repository.RiskItemRepository;
 import com.example.gateway.registry.service.RegistryRiskConfigService;
 import com.example.gateway.track.service.TrackService;
@@ -32,7 +31,6 @@ public class RiskAutoCreationServiceImpl implements RiskAutoCreationService {
     private static final Logger log = LoggerFactory.getLogger(RiskAutoCreationServiceImpl.class);
 
     private final RegistryRiskConfigService registryRiskConfigService;
-    private final RiskStoryRepository riskStoryRepository;
     private final RiskItemRepository riskItemRepository;
     private final TrackService trackService;
     private final ProfileService profileService;
@@ -46,7 +44,6 @@ public class RiskAutoCreationServiceImpl implements RiskAutoCreationService {
     private final EvidenceStatusMapper evidenceStatusMapper;
 
     public RiskAutoCreationServiceImpl(RegistryRiskConfigService registryRiskConfigService,
-                                      RiskStoryRepository riskStoryRepository,
                                       RiskItemRepository riskItemRepository,
                                       TrackService trackService,
                                       ProfileService profileService,
@@ -59,7 +56,6 @@ public class RiskAutoCreationServiceImpl implements RiskAutoCreationService {
                                       EvidenceFieldLinkRepository evidenceFieldLinkRepository,
                                       EvidenceStatusMapper evidenceStatusMapper) {
         this.registryRiskConfigService = registryRiskConfigService;
-        this.riskStoryRepository = riskStoryRepository;
         this.riskItemRepository = riskItemRepository;
         this.trackService = trackService;
         this.profileService = profileService;

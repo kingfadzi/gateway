@@ -258,6 +258,10 @@ public class DomainRiskAggregationService {
      * @param profileFieldId Profile field ID (optional)
      * @param title Risk title
      * @param description Risk description
+     * @param hypothesis Rich content: hypothesis (optional)
+     * @param condition Rich content: condition (optional)
+     * @param consequence Rich content: consequence (optional)
+     * @param controlRefs Rich content: control references (optional)
      * @param priority Priority level
      * @param createdBy User creating the risk
      * @param evidenceId Evidence ID (optional)
@@ -266,7 +270,9 @@ public class DomainRiskAggregationService {
      */
     @Transactional
     public RiskItem createManualRisk(String appId, String fieldKey, String profileFieldId,
-                                      String title, String description, RiskPriority priority,
+                                      String title, String description,
+                                      String hypothesis, String condition, String consequence, String controlRefs,
+                                      RiskPriority priority,
                                       String createdBy, String evidenceId, String derivedFrom) {
 
         // Get or create domain risk
@@ -286,6 +292,12 @@ public class DomainRiskAggregationService {
 
         riskItem.setTitle(title);
         riskItem.setDescription(description);
+
+        // Set rich content fields
+        riskItem.setHypothesis(hypothesis);
+        riskItem.setCondition(condition);
+        riskItem.setConsequence(consequence);
+        riskItem.setControlRefs(controlRefs);
 
         riskItem.setPriority(priority);
         riskItem.setSeverity(severity);

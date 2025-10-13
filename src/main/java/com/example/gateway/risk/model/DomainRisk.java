@@ -68,6 +68,12 @@ public class DomainRisk {
     @Column(name = "assigned_arb", length = 100)
     private String assignedArb;
 
+    @Column(name = "assigned_to", length = 255)
+    private String assignedTo;
+
+    @Column(name = "assigned_to_name", length = 255)
+    private String assignedToName;
+
     @Column(name = "assigned_at")
     private OffsetDateTime assignedAt;
 

@@ -32,6 +32,8 @@ public record DomainRiskResponse(
 
         // Assignment
         String assignedArb,
+        String assignedTo,
+        String assignedToName,
         OffsetDateTime assignedAt,
 
         // Lifecycle
