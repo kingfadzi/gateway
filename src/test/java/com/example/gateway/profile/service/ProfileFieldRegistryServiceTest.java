@@ -66,16 +66,16 @@ public class ProfileFieldRegistryServiceTest {
 
     @Test
     void shouldGetArbForDerivedFrom() {
-        // Test security_rating -> security_arb mapping
+        // Test security_rating -> security mapping (short ARB names)
         Optional<String> arb = registryService.getArbForDerivedFrom("security_rating");
 
         assertTrue(arb.isPresent(), "Should find ARB for security_rating");
-        assertEquals("security_arb", arb.get(), "security_rating should route to security_arb");
+        assertEquals("security", arb.get(), "security_rating should route to security");
     }
 
     @Test
     void shouldGetArbForMultipleDomains() {
-        // Test multiple domain mappings
+        // Test multiple domain mappings (now using short ARB names)
         Optional<String> securityArb = registryService.getArbForDerivedFrom("security_rating");
         Optional<String> integrityArb = registryService.getArbForDerivedFrom("integrity_rating");
         Optional<String> availabilityArb = registryService.getArbForDerivedFrom("availability_rating");
@@ -84,9 +84,9 @@ public class ProfileFieldRegistryServiceTest {
         assertTrue(integrityArb.isPresent(), "Should have integrity ARB");
         assertTrue(availabilityArb.isPresent(), "Should have availability ARB");
 
-        assertEquals("security_arb", securityArb.get());
-        assertEquals("integrity_arb", integrityArb.get());
-        assertEquals("availability_arb", availabilityArb.get());
+        assertEquals("security", securityArb.get());
+        assertEquals("data", integrityArb.get());  // integrity routes to data ARB
+        assertEquals("operations", availabilityArb.get());  // availability routes to operations ARB
     }
 
     @Test
@@ -102,8 +102,8 @@ public class ProfileFieldRegistryServiceTest {
         Optional<String> arb = registryService.getArbForField("confidentiality_level");
 
         assertTrue(arb.isPresent(), "Should find ARB for confidentiality_level field");
-        // confidentiality_level is derived from confidentiality_rating, which routes to confidentiality_arb
-        assertEquals("confidentiality_arb", arb.get());
+        // confidentiality_level is derived from confidentiality_rating, which routes to data ARB
+        assertEquals("data", arb.get());
     }
 
     // =====================

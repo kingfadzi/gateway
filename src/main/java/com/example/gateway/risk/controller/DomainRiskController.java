@@ -100,36 +100,6 @@ public class DomainRiskController {
     }
 
     /**
-     * Get comprehensive dashboard metrics for ARB.
-     * Provides all metrics needed for a dashboard visualization including:
-     * - Overview statistics
-     * - Domain breakdown
-     * - Top applications
-     * - Status distribution
-     * - Priority distribution
-     * - Recent activity
-     *
-     * GET /api/v1/domain-risks/arb/{arbName}/dashboard
-     */
-    @GetMapping("/arb/{arbName}/dashboard")
-    public ResponseEntity<ArbDashboardResponse> getArbDashboard(
-            @PathVariable String arbName,
-            @RequestParam(required = false, defaultValue = "PENDING_ARB_REVIEW,UNDER_ARB_REVIEW,AWAITING_REMEDIATION,IN_PROGRESS") String status) {
-
-        log.info("GET /api/v1/domain-risks/arb/{}/dashboard with status={}", arbName, status);
-
-        // Parse status parameter
-        List<DomainRiskStatus> statuses = parseStatuses(status);
-
-        // Build comprehensive dashboard
-        ArbDashboardResponse dashboard = dashboardService.buildDashboard(arbName, statuses);
-
-        log.info("Generated dashboard for ARB: {} with {} domain risks",
-                arbName, dashboard.overview().totalDomainRisks());
-        return ResponseEntity.ok(dashboard);
-    }
-
-    /**
      * Get a specific domain risk by ID.
      *
      * GET /api/v1/domain-risks/{domainRiskId}
