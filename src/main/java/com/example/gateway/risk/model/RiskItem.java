@@ -52,6 +52,19 @@ public class RiskItem {
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
+    // Rich content fields (for manual SME-initiated risks)
+    @Column(name = "hypothesis", columnDefinition = "TEXT")
+    private String hypothesis;
+
+    @Column(name = "condition", columnDefinition = "TEXT")
+    private String condition;
+
+    @Column(name = "consequence", columnDefinition = "TEXT")
+    private String consequence;
+
+    @Column(name = "control_refs", columnDefinition = "TEXT")
+    private String controlRefs;
+
     // Priority & severity
     @Enumerated(EnumType.STRING)
     @Column(name = "priority", length = 50)
@@ -90,6 +103,16 @@ public class RiskItem {
 
     @Column(name = "resolved_at")
     private OffsetDateTime resolvedAt;
+
+    // Assignment (individual SME work assignment)
+    @Column(name = "assigned_to")
+    private String assignedTo;  // Email or user ID of assigned SME
+
+    @Column(name = "assigned_at")
+    private OffsetDateTime assignedAt;
+
+    @Column(name = "assigned_by")
+    private String assignedBy;  // Who made the assignment
 
     // Snapshot
     @JdbcTypeCode(SqlTypes.JSON)
