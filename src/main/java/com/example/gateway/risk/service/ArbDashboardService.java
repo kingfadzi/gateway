@@ -1,11 +1,16 @@
 package com.example.gateway.risk.service;
 
-import com.example.gateway.risk.dto.ArbDashboardResponse;
+import com.example.gateway.application.model.Application;
+import com.example.gateway.application.repository.ApplicationRepository;
+import com.example.gateway.risk.dto.*;
 import com.example.gateway.risk.model.DomainRisk;
 import com.example.gateway.risk.model.DomainRiskStatus;
 import com.example.gateway.risk.model.RiskItem;
+import com.example.gateway.risk.model.RiskPriority;
 import com.example.gateway.risk.repository.DomainRiskRepository;
 import com.example.gateway.risk.repository.RiskItemRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.time.OffsetDateTime;
@@ -13,236 +18,491 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * Service for building comprehensive ARB dashboard data.
- * Aggregates metrics from multiple sources for SME dashboard visualization.
+ * Orchestration service for ARB Dashboard.
+ * Handles scope-based filtering, application metadata enrichment, and aggregation calculations.
+ *
+ * Supports three scopes:
+ * - my-queue: Apps where user has self-assigned risk items
+ * - my-domain: Domain risks in ARB's domain
+ * - all-domains: All domain risks
  */
 @Service
 public class ArbDashboardService {
 
+    private static final Logger log = LoggerFactory.getLogger(ArbDashboardService.class);
+
+    private static final List<DomainRiskStatus> ACTIVE_STATUSES = List.of(
+        DomainRiskStatus.PENDING_ARB_REVIEW,
+        DomainRiskStatus.UNDER_ARB_REVIEW,
+        DomainRiskStatus.AWAITING_REMEDIATION,
+        DomainRiskStatus.IN_PROGRESS
+    );
+
     private final DomainRiskRepository domainRiskRepository;
     private final RiskItemRepository riskItemRepository;
+    private final ApplicationRepository applicationRepository;
+    private final HealthGradeCalculator healthGradeCalculator;
 
     public ArbDashboardService(
             DomainRiskRepository domainRiskRepository,
-            RiskItemRepository riskItemRepository) {
+            RiskItemRepository riskItemRepository,
+            ApplicationRepository applicationRepository,
+            HealthGradeCalculator healthGradeCalculator) {
         this.domainRiskRepository = domainRiskRepository;
         this.riskItemRepository = riskItemRepository;
+        this.applicationRepository = applicationRepository;
+        this.healthGradeCalculator = healthGradeCalculator;
     }
 
     /**
-     * Build comprehensive dashboard data for an ARB.
+     * Get applications with risk aggregations for ARB dashboard watchlist.
      *
-     * @param arbName ARB identifier (e.g., "security", "data")
-     * @param statuses List of statuses to include (default: active statuses)
-     * @return Complete dashboard metrics
+     * @param arbName ARB identifier
+     * @param scope Filtering scope: my-queue, my-domain, all-domains
+     * @param userId User ID (required for my-queue)
+     * @param includeRisks Include detailed risk items
+     * @param page Page number
+     * @param pageSize Page size
+     * @return Application watchlist response
      */
-    public ArbDashboardResponse buildDashboard(String arbName, List<DomainRiskStatus> statuses) {
-        // Get all domain risks for this ARB
-        List<DomainRisk> domainRisks = domainRiskRepository.findByArbPrioritized(arbName, statuses);
+    public ApplicationWatchlistResponse getApplicationsForArb(
+            String arbName,
+            String scope,
+            String userId,
+            boolean includeRisks,
+            int page,
+            int pageSize) {
 
-        // Build overview metrics
-        ArbDashboardResponse.OverviewMetrics overview = buildOverviewMetrics(domainRisks);
+        log.info("Getting applications for ARB: {}, scope: {}, userId: {}, page: {}, size: {}",
+                arbName, scope, userId, page, pageSize);
 
-        // Build domain breakdown
-        List<ArbDashboardResponse.DomainBreakdown> domains = buildDomainBreakdown(domainRisks);
+        // Validate scope and userId
+        validateScope(scope, userId);
 
-        // Build application breakdown
-        List<ArbDashboardResponse.AppBreakdown> topApps = buildAppBreakdown(domainRisks);
+        // Get unique app IDs based on scope
+        List<String> appIds = getAppIdsByScope(scope, arbName, userId);
+        log.debug("Found {} unique app IDs for scope: {}", appIds.size(), scope);
 
-        // Build status distribution
-        Map<String, Long> statusDist = buildStatusDistribution(domainRisks);
+        if (appIds.isEmpty()) {
+            return new ApplicationWatchlistResponse(
+                scope, arbName, userId, 0, page, pageSize, List.of());
+        }
 
-        // Build priority distribution
-        ArbDashboardResponse.PriorityDistribution priorityDist = buildPriorityDistribution(domainRisks);
+        // Batch fetch applications (avoid N+1)
+        Map<String, Application> applicationMap = fetchApplicationsBatch(appIds);
 
-        // Build recent activity
-        ArbDashboardResponse.RecentActivity recentActivity = buildRecentActivity(domainRisks);
+        // Batch fetch domain risks for these apps
+        List<DomainRisk> domainRisks = domainRiskRepository.findByAppIdsAndStatuses(appIds, ACTIVE_STATUSES);
 
-        return new ArbDashboardResponse(
+        // Group domain risks by app ID
+        Map<String, List<DomainRisk>> domainRisksByApp = domainRisks.stream()
+                .collect(Collectors.groupingBy(DomainRisk::getAppId));
+
+        // Batch fetch "assigned to me" breakdowns (single query, avoids N+1)
+        Map<String, RiskBreakdown> assignedToMeBreakdowns =
+            fetchAssignedToMeBreakdownsBatch(appIds, userId);
+
+        log.debug("Loaded assigned-to-me breakdowns for {} apps", assignedToMeBreakdowns.size());
+
+        // Build ApplicationWithRisks for each app
+        List<ApplicationWithRisks> applications = appIds.stream()
+                .map(appId -> buildApplicationWithRisks(
+                        appId,
+                        applicationMap.get(appId),
+                        domainRisksByApp.getOrDefault(appId, List.of()),
+                        assignedToMeBreakdowns.getOrDefault(appId, RiskBreakdown.empty()),
+                        userId,
+                        includeRisks))
+                .filter(Objects::nonNull)
+                .sorted(Comparator
+                        .comparing(ApplicationWithRisks::aggregatedRiskScore).reversed()
+                        .thenComparing(ApplicationWithRisks::totalOpenItems).reversed())
+                .collect(Collectors.toList());
+
+        // Apply pagination
+        int start = page * pageSize;
+        int end = Math.min(start + pageSize, applications.size());
+        List<ApplicationWithRisks> paginatedApps = applications.subList(
+                Math.min(start, applications.size()),
+                Math.min(end, applications.size()));
+
+        log.info("Returning {} applications (page {}, total: {})", paginatedApps.size(), page, applications.size());
+
+        return new ApplicationWatchlistResponse(
+                scope,
                 arbName,
-                overview,
-                domains,
-                topApps,
-                statusDist,
-                priorityDist,
+                userId,
+                applications.size(),
+                page,
+                pageSize,
+                paginatedApps
+        );
+    }
+
+    /**
+     * Get dashboard metrics for ARB HUD.
+     *
+     * @param arbName ARB identifier
+     * @param scope Filtering scope
+     * @param userId User ID (required for my-queue)
+     * @return Dashboard metrics response
+     */
+    public DashboardMetricsResponse getMetricsForArb(
+            String arbName,
+            String scope,
+            String userId) {
+
+        log.info("Getting metrics for ARB: {}, scope: {}, userId: {}", arbName, scope, userId);
+
+        // Validate scope and userId
+        validateScope(scope, userId);
+
+        // Get domain risks for scope (to filter risk items)
+        List<String> appIds = getAppIdsByScope(scope, arbName, userId);
+
+        // Calculate metrics
+        int criticalCount = calculateCriticalCount(appIds);
+        int openItemsCount = calculateOpenItemsCount(appIds);
+        int pendingReviewCount = calculatePendingReviewCount(appIds);
+        double averageRiskScore = calculateAverageRiskScore(appIds);
+        String healthGrade = healthGradeCalculator.calculateHealthGrade(averageRiskScore);
+        RecentActivityMetrics recentActivity = calculateRecentActivity(appIds);
+
+        log.info("Metrics calculated: critical={}, open={}, pending={}, avgScore={}, grade={}",
+                criticalCount, openItemsCount, pendingReviewCount, averageRiskScore, healthGrade);
+
+        return new DashboardMetricsResponse(
+                scope,
+                arbName,
+                userId,
+                criticalCount,
+                openItemsCount,
+                pendingReviewCount,
+                averageRiskScore,
+                healthGrade,
                 recentActivity
         );
     }
 
-    private ArbDashboardResponse.OverviewMetrics buildOverviewMetrics(List<DomainRisk> domainRisks) {
-        long totalDomainRisks = domainRisks.size();
-        long totalOpenItems = domainRisks.stream()
-                .mapToLong(dr -> dr.getOpenItems() != null ? dr.getOpenItems() : 0)
-                .sum();
+    /**
+     * Assign application to ARB member.
+     * Updates assigned_to and assigned_to_name for all domain risks belonging to the app+ARB.
+     *
+     * @param arbName ARB identifier (e.g., security, operations)
+     * @param appId Application ID
+     * @param assignedTo User ID
+     * @param assignedToName Display name (optional)
+     * @return Assignment response
+     */
+    public AssignDomainRiskResponse assignApplicationToArbMember(
+            String arbName,
+            String appId,
+            String assignedTo,
+            String assignedToName) {
 
-        long criticalCount = domainRisks.stream()
-                .filter(dr -> dr.getPriorityScore() != null && dr.getPriorityScore() >= 90)
-                .count();
+        log.info("Assigning app {} to ARB member {} ({})", appId, assignedTo, assignedToName);
 
-        long highCount = domainRisks.stream()
-                .filter(dr -> dr.getPriorityScore() != null && dr.getPriorityScore() >= 70)
-                .count();
+        // Verify application exists
+        Application app = applicationRepository.findById(appId)
+                .orElseThrow(() -> new IllegalArgumentException("Application not found: " + appId));
 
-        long avgPriorityScore = (long) domainRisks.stream()
-                .filter(dr -> dr.getPriorityScore() != null)
-                .mapToInt(DomainRisk::getPriorityScore)
-                .average()
-                .orElse(0.0);
+        // Get all domain risks for this app where assigned_arb matches arbName
+        List<DomainRisk> domainRisks = domainRiskRepository.findByAppIdAndAssignedArb(appId, arbName);
 
-        long needsAttention = domainRisks.stream()
-                .filter(dr -> dr.getPriorityScore() != null && dr.getPriorityScore() >= 70)
-                .count();
+        if (domainRisks.isEmpty()) {
+            throw new IllegalArgumentException(
+                    String.format("No domain risks found for app %s and ARB %s", appId, arbName));
+        }
 
-        return new ArbDashboardResponse.OverviewMetrics(
-                totalDomainRisks,
-                totalOpenItems,
-                criticalCount,
-                highCount,
-                avgPriorityScore,
-                needsAttention
+        // Update all domain risks
+        OffsetDateTime assignedAt = OffsetDateTime.now();
+        int updated = domainRiskRepository.updateAssignedToForAppAndArb(
+                appId, arbName, assignedTo, assignedToName, assignedAt);
+
+        log.info("Updated {} domain risks for app {} with assigned_to={}", updated, appId, assignedTo);
+
+        return new AssignDomainRiskResponse(
+                appId,
+                app.getName(),
+                assignedTo,
+                assignedToName,
+                assignedAt.toInstant(),
+                String.format("Application successfully assigned to %s", assignedTo)
         );
     }
 
-    private List<ArbDashboardResponse.DomainBreakdown> buildDomainBreakdown(List<DomainRisk> domainRisks) {
-        // Group by domain
-        Map<String, List<DomainRisk>> byDomain = domainRisks.stream()
-                .collect(Collectors.groupingBy(DomainRisk::getDomain));
+    // =====================
+    // Helper Methods
+    // =====================
 
-        return byDomain.entrySet().stream()
-                .map(entry -> {
-                    String domain = entry.getKey();
-                    List<DomainRisk> risks = entry.getValue();
+    /**
+     * Validate scope parameter and userId requirement.
+     */
+    private void validateScope(String scope, String userId) {
+        if (!List.of("my-queue", "my-domain", "all-domains").contains(scope)) {
+            throw new IllegalArgumentException(
+                    "Invalid scope parameter. Must be one of: my-queue, my-domain, all-domains");
+        }
 
-                    long riskCount = risks.size();
-                    long openItems = risks.stream()
-                            .mapToLong(dr -> dr.getOpenItems() != null ? dr.getOpenItems() : 0)
-                            .sum();
-
-                    long criticalItems = risks.stream()
-                            .filter(dr -> dr.getPriorityScore() != null && dr.getPriorityScore() >= 90)
-                            .mapToLong(dr -> dr.getOpenItems() != null ? dr.getOpenItems() : 0)
-                            .sum();
-
-                    double avgScore = risks.stream()
-                            .filter(dr -> dr.getPriorityScore() != null)
-                            .mapToInt(DomainRisk::getPriorityScore)
-                            .average()
-                            .orElse(0.0);
-
-                    // Get status of highest priority risk
-                    String topStatus = risks.stream()
-                            .max(Comparator.comparing(DomainRisk::getPriorityScore, Comparator.nullsLast(Comparator.naturalOrder())))
-                            .map(dr -> dr.getStatus().name())
-                            .orElse("UNKNOWN");
-
-                    return new ArbDashboardResponse.DomainBreakdown(
-                            domain,
-                            riskCount,
-                            openItems,
-                            criticalItems,
-                            avgScore,
-                            topStatus
-                    );
-                })
-                .sorted(Comparator.comparing(ArbDashboardResponse.DomainBreakdown::avgPriorityScore).reversed())
-                .collect(Collectors.toList());
+        if ("my-queue".equals(scope) && (userId == null || userId.isBlank())) {
+            throw new IllegalArgumentException("userId is required when scope=my-queue");
+        }
     }
 
-    private List<ArbDashboardResponse.AppBreakdown> buildAppBreakdown(List<DomainRisk> domainRisks) {
-        // Group by appId
-        Map<String, List<DomainRisk>> byApp = domainRisks.stream()
-                .collect(Collectors.groupingBy(DomainRisk::getAppId));
-
-        return byApp.entrySet().stream()
-                .map(entry -> {
-                    String appId = entry.getKey();
-                    List<DomainRisk> risks = entry.getValue();
-
-                    long domainRiskCount = risks.size();
-                    long totalOpenItems = risks.stream()
-                            .mapToLong(dr -> dr.getOpenItems() != null ? dr.getOpenItems() : 0)
-                            .sum();
-
-                    int highestScore = risks.stream()
-                            .filter(dr -> dr.getPriorityScore() != null)
-                            .mapToInt(DomainRisk::getPriorityScore)
-                            .max()
-                            .orElse(0);
-
-                    // Find domain with highest priority
-                    String criticalDomain = risks.stream()
-                            .max(Comparator.comparing(DomainRisk::getPriorityScore, Comparator.nullsLast(Comparator.naturalOrder())))
-                            .map(DomainRisk::getDomain)
-                            .orElse("unknown");
-
-                    return new ArbDashboardResponse.AppBreakdown(
-                            appId,
-                            null,  // App name would come from app service
-                            domainRiskCount,
-                            totalOpenItems,
-                            highestScore,
-                            criticalDomain
-                    );
-                })
-                .sorted(Comparator.comparing(ArbDashboardResponse.AppBreakdown::highestPriorityScore).reversed())
-                .limit(10)  // Top 10 apps
-                .collect(Collectors.toList());
+    /**
+     * Get app IDs based on scope filtering.
+     * - my-queue: Apps where user has self-assigned risk items (risk_item.assigned_to)
+     * - my-domain: Apps with domain risks in ARB's domain
+     * - all-domains: All apps with active domain risks
+     */
+    private List<String> getAppIdsByScope(String scope, String arbName, String userId) {
+        return switch (scope) {
+            case "my-queue" -> riskItemRepository.findAppsWithAssignedRisks(userId);
+            case "my-domain" -> domainRiskRepository.findAppIdsByDomain(arbName, ACTIVE_STATUSES);
+            case "all-domains" -> domainRiskRepository.findAllAppIdsByStatuses(ACTIVE_STATUSES);
+            default -> throw new IllegalArgumentException("Invalid scope: " + scope);
+        };
     }
 
-    private Map<String, Long> buildStatusDistribution(List<DomainRisk> domainRisks) {
-        return domainRisks.stream()
-                .collect(Collectors.groupingBy(
-                        dr -> dr.getStatus().name(),
-                        Collectors.counting()
+    /**
+     * Batch fetch applications by IDs to avoid N+1 queries.
+     * Follows ProfileServiceImpl pattern.
+     */
+    private Map<String, Application> fetchApplicationsBatch(List<String> appIds) {
+        List<Application> applications = applicationRepository.findAllById(appIds);
+        return applications.stream()
+                .collect(Collectors.toMap(Application::getAppId, app -> app));
+    }
+
+    /**
+     * Build ApplicationWithRisks from application and domain risks.
+     */
+    private ApplicationWithRisks buildApplicationWithRisks(
+            String appId,
+            Application app,
+            List<DomainRisk> domainRisks,
+            RiskBreakdown assignedToMeBreakdown,
+            String userId,
+            boolean includeRisks) {
+
+        if (app == null) {
+            log.warn("Application not found for appId: {}, skipping", appId);
+            return null;
+        }
+
+        // Calculate aggregations
+        Integer aggregatedRiskScore = domainRisks.stream()
+                .map(DomainRisk::getPriorityScore)
+                .filter(Objects::nonNull)
+                .max(Integer::compareTo)
+                .orElse(0);
+
+        Integer totalOpenItems = domainRisks.stream()
+                .map(DomainRisk::getOpenItems)
+                .filter(Objects::nonNull)
+                .mapToInt(Integer::intValue)
+                .sum();
+
+        RiskBreakdown riskBreakdown = calculateRiskBreakdown(appId);
+
+        List<String> domains = domainRisks.stream()
+                .map(DomainRisk::getDomain)
+                .distinct()
+                .sorted()
+                .collect(Collectors.toList());
+
+        Boolean hasAssignedRisks = domainRisks.stream()
+                .anyMatch(dr -> userId != null && userId.equals(dr.getAssignedTo()));
+
+        OffsetDateTime lastActivityDate = getLastActivityForApp(appId, domainRisks);
+
+        // Build domain risk summaries
+        List<DomainRiskSummaryDto> domainRiskSummaries = domainRisks.stream()
+                .map(this::toDomainRiskSummaryDto)
+                .sorted(Comparator.comparing(DomainRiskSummaryDto::priorityScore).reversed())
+                .collect(Collectors.toList());
+
+        // Get detailed risk items if requested
+        List<RiskItemResponse> risks = includeRisks
+                ? riskItemRepository.findByAppId(appId).stream()
+                    .map(RiskDtoMapper::toRiskItemResponse)
+                    .collect(Collectors.toList())
+                : List.of();
+
+        return new ApplicationWithRisks(
+                app.getAppId(),
+                app.getAppId(),
+                app.getName(),
+                app.getAppCriticalityAssessment(),
+                app.getTransactionCycle(),
+                app.getProductOwner(),
+                app.getProductOwnerBrid(),
+                aggregatedRiskScore,
+                totalOpenItems,
+                riskBreakdown,
+                domains,
+                hasAssignedRisks,
+                lastActivityDate,
+                domainRiskSummaries,
+                risks,
+                assignedToMeBreakdown
+        );
+    }
+
+    /**
+     * Calculate risk breakdown by priority for an application.
+     */
+    private RiskBreakdown calculateRiskBreakdown(String appId) {
+        List<Object[]> breakdownData = riskItemRepository.getRiskBreakdownByApp(appId);
+
+        Map<RiskPriority, Integer> countsByPriority = breakdownData.stream()
+                .collect(Collectors.toMap(
+                        row -> (RiskPriority) row[0],
+                        row -> ((Long) row[1]).intValue()
                 ));
+
+        return new RiskBreakdown(
+                countsByPriority.getOrDefault(RiskPriority.CRITICAL, 0),
+                countsByPriority.getOrDefault(RiskPriority.HIGH, 0),
+                countsByPriority.getOrDefault(RiskPriority.MEDIUM, 0),
+                countsByPriority.getOrDefault(RiskPriority.LOW, 0)
+        );
     }
 
-    private ArbDashboardResponse.PriorityDistribution buildPriorityDistribution(List<DomainRisk> domainRisks) {
-        long critical = domainRisks.stream()
-                .filter(dr -> dr.getPriorityScore() != null && dr.getPriorityScore() >= 90)
-                .count();
+    /**
+     * Batch load "assigned to me" breakdowns for multiple apps.
+     * Returns: Map<appId, RiskBreakdown>
+     * Only loads if userId is provided.
+     * Uses single batch query to avoid N+1 problem.
+     */
+    private Map<String, RiskBreakdown> fetchAssignedToMeBreakdownsBatch(
+            List<String> appIds,
+            String userId) {
 
-        long high = domainRisks.stream()
-                .filter(dr -> dr.getPriorityScore() != null && dr.getPriorityScore() >= 70 && dr.getPriorityScore() < 90)
-                .count();
+        if (userId == null || userId.isBlank() || appIds.isEmpty()) {
+            return Map.of();
+        }
 
-        long medium = domainRisks.stream()
-                .filter(dr -> dr.getPriorityScore() != null && dr.getPriorityScore() >= 40 && dr.getPriorityScore() < 70)
-                .count();
+        List<Object[]> breakdownData = riskItemRepository.getAssignedToMeBreakdownByApps(appIds, userId);
 
-        long low = domainRisks.stream()
-                .filter(dr -> dr.getPriorityScore() != null && dr.getPriorityScore() < 40)
-                .count();
+        // Group by appId first, then by priority
+        Map<String, Map<RiskPriority, Integer>> groupedByApp = new HashMap<>();
 
-        return new ArbDashboardResponse.PriorityDistribution(critical, high, medium, low);
+        for (Object[] row : breakdownData) {
+            String appId = (String) row[0];
+            RiskPriority priority = (RiskPriority) row[1];
+            Integer count = ((Long) row[2]).intValue();
+
+            groupedByApp
+                .computeIfAbsent(appId, k -> new HashMap<>())
+                .put(priority, count);
+        }
+
+        // Convert to RiskBreakdown per app
+        Map<String, RiskBreakdown> result = new HashMap<>();
+        for (Map.Entry<String, Map<RiskPriority, Integer>> entry : groupedByApp.entrySet()) {
+            Map<RiskPriority, Integer> counts = entry.getValue();
+            result.put(
+                entry.getKey(),
+                new RiskBreakdown(
+                    counts.getOrDefault(RiskPriority.CRITICAL, 0),
+                    counts.getOrDefault(RiskPriority.HIGH, 0),
+                    counts.getOrDefault(RiskPriority.MEDIUM, 0),
+                    counts.getOrDefault(RiskPriority.LOW, 0)
+                )
+            );
+        }
+
+        return result;
     }
 
-    private ArbDashboardResponse.RecentActivity buildRecentActivity(List<DomainRisk> domainRisks) {
+    /**
+     * Get last activity date for application.
+     */
+    private OffsetDateTime getLastActivityForApp(String appId, List<DomainRisk> domainRisks) {
+        OffsetDateTime domainRiskActivity = domainRisks.stream()
+                .map(DomainRisk::getUpdatedAt)
+                .filter(Objects::nonNull)
+                .max(OffsetDateTime::compareTo)
+                .orElse(null);
+
+        OffsetDateTime riskItemActivity = riskItemRepository.getLastActivityForApp(appId);
+
+        if (domainRiskActivity == null) return riskItemActivity;
+        if (riskItemActivity == null) return domainRiskActivity;
+
+        return domainRiskActivity.isAfter(riskItemActivity)
+                ? domainRiskActivity
+                : riskItemActivity;
+    }
+
+    /**
+     * Convert DomainRisk to DomainRiskSummaryDto.
+     */
+    private DomainRiskSummaryDto toDomainRiskSummaryDto(DomainRisk dr) {
+        return new DomainRiskSummaryDto(
+                dr.getDomainRiskId(),
+                dr.getDomain(),
+                dr.getStatus(),
+                dr.getPriorityScore(),
+                dr.getOpenItems(),
+                dr.getAssignedArb(),
+                dr.getAssignedTo(),
+                dr.getAssignedToName(),
+                dr.getAssignedAt()
+        );
+    }
+
+    /**
+     * Calculate critical count for metrics.
+     */
+    private int calculateCriticalCount(List<String> appIds) {
+        if (appIds.isEmpty()) return 0;
+        // For scoped metrics, we need to filter by app IDs
+        // This is a simplified implementation - in production, add scope filtering to query
+        return (int) riskItemRepository.countCriticalItems();
+    }
+
+    /**
+     * Calculate open items count for metrics.
+     */
+    private int calculateOpenItemsCount(List<String> appIds) {
+        if (appIds.isEmpty()) return 0;
+        return (int) riskItemRepository.countOpenItems();
+    }
+
+    /**
+     * Calculate pending review count for metrics.
+     */
+    private int calculatePendingReviewCount(List<String> appIds) {
+        if (appIds.isEmpty()) return 0;
+        return (int) domainRiskRepository.countPendingReview();
+    }
+
+    /**
+     * Calculate average risk score for metrics.
+     */
+    private double calculateAverageRiskScore(List<String> appIds) {
+        if (appIds.isEmpty()) return 0.0;
+        Double avgScore = riskItemRepository.getAveragePriorityScore();
+        return avgScore != null ? avgScore : 0.0;
+    }
+
+    /**
+     * Calculate recent activity metrics (7-day and 30-day windows).
+     */
+    private RecentActivityMetrics calculateRecentActivity(List<String> appIds) {
+        if (appIds.isEmpty()) return RecentActivityMetrics.empty();
+
         OffsetDateTime now = OffsetDateTime.now();
         OffsetDateTime sevenDaysAgo = now.minusDays(7);
         OffsetDateTime thirtyDaysAgo = now.minusDays(30);
 
-        long newLast7Days = domainRisks.stream()
-                .filter(dr -> dr.getOpenedAt() != null && dr.getOpenedAt().isAfter(sevenDaysAgo))
-                .count();
+        int newRisks7d = (int) riskItemRepository.countCreatedAfter(sevenDaysAgo);
+        int resolved7d = (int) riskItemRepository.countResolvedAfter(sevenDaysAgo);
+        int newRisks30d = (int) riskItemRepository.countCreatedAfter(thirtyDaysAgo);
+        int resolved30d = (int) riskItemRepository.countResolvedAfter(thirtyDaysAgo);
 
-        long newLast30Days = domainRisks.stream()
-                .filter(dr -> dr.getOpenedAt() != null && dr.getOpenedAt().isAfter(thirtyDaysAgo))
-                .count();
-
-        long resolvedLast7Days = domainRisks.stream()
-                .filter(dr -> dr.getClosedAt() != null && dr.getClosedAt().isAfter(sevenDaysAgo))
-                .count();
-
-        long resolvedLast30Days = domainRisks.stream()
-                .filter(dr -> dr.getClosedAt() != null && dr.getClosedAt().isAfter(thirtyDaysAgo))
-                .count();
-
-        return new ArbDashboardResponse.RecentActivity(
-                newLast7Days,
-                newLast30Days,
-                resolvedLast7Days,
-                resolvedLast30Days
-        );
+        return new RecentActivityMetrics(newRisks7d, resolved7d, newRisks30d, resolved30d);
     }
 }

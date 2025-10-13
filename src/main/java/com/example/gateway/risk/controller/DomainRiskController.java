@@ -13,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -225,6 +226,177 @@ public class DomainRiskController {
 
         log.info("Reassigned domain risk {} to ARB: {}", domainRiskId, request.assignedArb());
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Get applications with risk aggregations for ARB dashboard watchlist.
+     * Supports three scopes: my-queue, my-domain, all-domains.
+     *
+     * GET /api/v1/domain-risks/arb/{arbName}/applications
+     */
+    @GetMapping("/arb/{arbName}/applications")
+    public ResponseEntity<?> getApplicationsForArb(
+            @PathVariable String arbName,
+            @RequestParam String scope,
+            @RequestParam(required = false) String userId,
+            @RequestParam(defaultValue = "false") boolean includeRisks,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "100") int pageSize) {
+
+        log.info("GET /api/v1/domain-risks/arb/{}/applications - scope: {}, userId: {}, page: {}, size: {}",
+                arbName, scope, userId, page, pageSize);
+
+        try {
+            // Validate page size
+            if (pageSize < 1 || pageSize > 500) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of(
+                                "timestamp", java.time.OffsetDateTime.now().toString(),
+                                "status", 400,
+                                "error", "Bad Request",
+                                "message", "pageSize must be between 1 and 500",
+                                "path", "/api/v1/domain-risks/arb/" + arbName + "/applications"
+                        ));
+            }
+
+            if (page < 0) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of(
+                                "timestamp", java.time.OffsetDateTime.now().toString(),
+                                "status", 400,
+                                "error", "Bad Request",
+                                "message", "page must be >= 0",
+                                "path", "/api/v1/domain-risks/arb/" + arbName + "/applications"
+                        ));
+            }
+
+            ApplicationWatchlistResponse response = dashboardService.getApplicationsForArb(
+                    arbName, scope, userId, includeRisks, page, pageSize);
+
+            return ResponseEntity.ok(response);
+
+        } catch (IllegalArgumentException e) {
+            log.error("Validation error: {}", e.getMessage());
+            return ResponseEntity.badRequest()
+                    .body(Map.of(
+                            "timestamp", java.time.OffsetDateTime.now().toString(),
+                            "status", 400,
+                            "error", "Bad Request",
+                            "message", e.getMessage(),
+                            "path", "/api/v1/domain-risks/arb/" + arbName + "/applications"
+                    ));
+        } catch (Exception e) {
+            log.error("Error getting applications for ARB: {}", arbName, e);
+            return ResponseEntity.internalServerError()
+                    .body(Map.of(
+                            "timestamp", java.time.OffsetDateTime.now().toString(),
+                            "status", 500,
+                            "error", "Internal Server Error",
+                            "message", "An error occurred while processing your request",
+                            "path", "/api/v1/domain-risks/arb/" + arbName + "/applications"
+                    ));
+        }
+    }
+
+    /**
+     * Get dashboard metrics for ARB HUD.
+     * Supports three scopes: my-queue, my-domain, all-domains.
+     *
+     * GET /api/v1/domain-risks/arb/{arbName}/metrics
+     */
+    @GetMapping("/arb/{arbName}/metrics")
+    public ResponseEntity<?> getMetricsForArb(
+            @PathVariable String arbName,
+            @RequestParam String scope,
+            @RequestParam(required = false) String userId) {
+
+        log.info("GET /api/v1/domain-risks/arb/{}/metrics - scope: {}, userId: {}",
+                arbName, scope, userId);
+
+        try {
+            DashboardMetricsResponse response = dashboardService.getMetricsForArb(
+                    arbName, scope, userId);
+
+            return ResponseEntity.ok(response);
+
+        } catch (IllegalArgumentException e) {
+            log.error("Validation error: {}", e.getMessage());
+            return ResponseEntity.badRequest()
+                    .body(Map.of(
+                            "timestamp", java.time.OffsetDateTime.now().toString(),
+                            "status", 400,
+                            "error", "Bad Request",
+                            "message", e.getMessage(),
+                            "path", "/api/v1/domain-risks/arb/" + arbName + "/metrics"
+                    ));
+        } catch (Exception e) {
+            log.error("Error getting metrics for ARB: {}", arbName, e);
+            return ResponseEntity.internalServerError()
+                    .body(Map.of(
+                            "timestamp", java.time.OffsetDateTime.now().toString(),
+                            "status", 500,
+                            "error", "Internal Server Error",
+                            "message", "An error occurred while processing your request",
+                            "path", "/api/v1/domain-risks/arb/" + arbName + "/metrics"
+                    ));
+        }
+    }
+
+    /**
+     * Assign application to ARB member.
+     * Updates assigned_to and assigned_to_name for all domain risks belonging to the app+ARB.
+     *
+     * PATCH /api/v1/domain-risks/arb/{arbName}/applications/{appId}/assign
+     */
+    @PatchMapping("/arb/{arbName}/applications/{appId}/assign")
+    public ResponseEntity<?> assignApplicationToMember(
+            @PathVariable String arbName,
+            @PathVariable String appId,
+            @RequestBody AssignDomainRiskRequest request) {
+
+        log.info("PATCH /api/v1/domain-risks/arb/{}/applications/{}/assign - assignedTo: {}, assignedToName: {}",
+                arbName, appId, request.assignedTo(), request.assignedToName());
+
+        try {
+            // Validate request
+            if (request.assignedTo() == null || request.assignedTo().isBlank()) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of(
+                                "timestamp", java.time.OffsetDateTime.now().toString(),
+                                "status", 400,
+                                "error", "Bad Request",
+                                "message", "assignedTo is required",
+                                "path", "/api/v1/domain-risks/arb/" + arbName + "/applications/" + appId + "/assign"
+                        ));
+            }
+
+            // Assign application
+            AssignDomainRiskResponse response = dashboardService.assignApplicationToArbMember(
+                    arbName, appId, request.assignedTo(), request.assignedToName());
+
+            return ResponseEntity.ok(response);
+
+        } catch (IllegalArgumentException e) {
+            log.error("Validation error: {}", e.getMessage());
+            return ResponseEntity.badRequest()
+                    .body(Map.of(
+                            "timestamp", java.time.OffsetDateTime.now().toString(),
+                            "status", 400,
+                            "error", "Bad Request",
+                            "message", e.getMessage(),
+                            "path", "/api/v1/domain-risks/arb/" + arbName + "/applications/" + appId + "/assign"
+                    ));
+        } catch (Exception e) {
+            log.error("Error assigning application {} to member: {}", appId, request.assignedTo(), e);
+            return ResponseEntity.internalServerError()
+                    .body(Map.of(
+                            "timestamp", java.time.OffsetDateTime.now().toString(),
+                            "status", 500,
+                            "error", "Internal Server Error",
+                            "message", "An error occurred while processing your request",
+                            "path", "/api/v1/domain-risks/arb/" + arbName + "/applications/" + appId + "/assign"
+                    ));
+        }
     }
 
     /**
