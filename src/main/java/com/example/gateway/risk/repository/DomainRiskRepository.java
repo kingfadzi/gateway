@@ -169,11 +169,11 @@ public interface DomainRiskRepository extends JpaRepository<DomainRisk, String> 
 
     @Query("""
         SELECT DISTINCT dr.appId FROM DomainRisk dr
-        WHERE dr.domain = :domain
+        WHERE dr.assignedArb = :arbName
         AND dr.status IN :statuses
         """)
     List<String> findAppIdsByDomain(
-        @Param("domain") String domain,
+        @Param("arbName") String arbName,
         @Param("statuses") List<DomainRiskStatus> statuses);
 
     @Query("""
