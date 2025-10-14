@@ -157,6 +157,7 @@ CREATE TABLE profile_field (
                                profile_id    text NOT NULL REFERENCES profile(profile_id) ON DELETE CASCADE,
                                field_key     text NOT NULL,
                                derived_from  text,          -- present in ERD
+                               arb           text,          -- V10: Architecture Review Board assignment
                                value         jsonb,
                                confidence    text,
                                source_system text,
@@ -169,6 +170,7 @@ CREATE TABLE profile_field (
 
 CREATE INDEX IF NOT EXISTS idx_profile_field_profile ON profile_field(profile_id);
 CREATE INDEX IF NOT EXISTS idx_profile_field_key     ON profile_field(field_key);
+CREATE INDEX IF NOT EXISTS idx_profile_field_arb     ON profile_field(arb);
 
 -- =========================
 -- DOCUMENT (+ versions + tags)
@@ -332,11 +334,11 @@ CREATE INDEX IF NOT EXISTS idx_efl_status ON evidence_field_link(link_status);
 -- DOMAIN_RISK (Aggregated risks per domain per application)
 -- =========================
 CREATE TABLE domain_risk (
-    domain_risk_id    TEXT PRIMARY KEY,
-    app_id            TEXT NOT NULL,
-    domain            TEXT NOT NULL,           -- security, integrity, availability, etc.
-    derived_from      TEXT NOT NULL,           -- security_rating, integrity_rating, etc.
-    arb               TEXT NOT NULL,           -- security_arb, integrity_arb, etc.
+    domain_risk_id         TEXT PRIMARY KEY,
+    app_id                 TEXT NOT NULL,
+    risk_rating_dimension  TEXT NOT NULL,           -- V12: security_rating, integrity_rating, availability_rating, etc.
+    derived_from           TEXT NOT NULL,           -- security_rating, integrity_rating, etc.
+    arb                    TEXT NOT NULL,           -- security, data, operations, enterprise_architecture
 
     -- Aggregated metadata
     title             TEXT,
@@ -371,8 +373,8 @@ CREATE TABLE domain_risk (
     -- Foreign Keys
     CONSTRAINT fk_domain_risk_app FOREIGN KEY (app_id) REFERENCES application(app_id) ON DELETE CASCADE,
 
-    -- Unique constraint: one domain risk per domain per app
-    CONSTRAINT uk_app_domain UNIQUE (app_id, domain),
+    -- V12: Unique constraint using risk_rating_dimension
+    CONSTRAINT uq_domain_risk_app_rating_dimension UNIQUE (app_id, risk_rating_dimension),
 
     -- CHECK constraints
     CONSTRAINT chk_domain_risk_status CHECK (status IN (
@@ -387,7 +389,8 @@ CREATE INDEX IF NOT EXISTS idx_domain_risk_arb ON domain_risk(assigned_arb);
 CREATE INDEX IF NOT EXISTS idx_domain_risk_assigned_to ON domain_risk(assigned_to);
 CREATE INDEX IF NOT EXISTS idx_domain_risk_status ON domain_risk(status);
 CREATE INDEX IF NOT EXISTS idx_domain_risk_priority ON domain_risk(priority_score DESC);
-CREATE INDEX IF NOT EXISTS idx_domain_risk_domain ON domain_risk(domain);
+CREATE INDEX IF NOT EXISTS idx_domain_risk_rating_dimension ON domain_risk(risk_rating_dimension);
+CREATE INDEX IF NOT EXISTS idx_domain_risk_rating_dimension_status ON domain_risk(risk_rating_dimension, status);
 
 -- =========================
 -- RISK_ITEM (Individual evidence-level risks)
@@ -402,6 +405,10 @@ CREATE TABLE risk_item (
     profile_field_id       TEXT,
     triggering_evidence_id TEXT,
     track_id               TEXT,
+
+    -- V11/V12: Denormalized risk dimension and ARB assignment
+    risk_rating_dimension  TEXT,                   -- V12: security_rating, availability_rating, etc. (denormalized from profile_field.derived_from)
+    arb                    TEXT,                   -- V11: security, data, operations, enterprise_architecture (denormalized from profile_field.arb)
 
     -- Content
     title                  TEXT,
@@ -466,6 +473,11 @@ CREATE INDEX IF NOT EXISTS idx_risk_item_evidence ON risk_item(triggering_eviden
 CREATE INDEX IF NOT EXISTS idx_risk_item_priority ON risk_item(priority_score DESC);
 CREATE INDEX IF NOT EXISTS idx_risk_item_status ON risk_item(status);
 CREATE INDEX IF NOT EXISTS idx_risk_item_profile_field ON risk_item(profile_field_id);
+-- V11/V12: Indexes for denormalized columns
+CREATE INDEX IF NOT EXISTS idx_risk_item_risk_rating_dimension ON risk_item(risk_rating_dimension);
+CREATE INDEX IF NOT EXISTS idx_risk_item_arb ON risk_item(arb);
+CREATE INDEX IF NOT EXISTS idx_risk_item_arb_status ON risk_item(arb, status);
+CREATE INDEX IF NOT EXISTS idx_risk_item_rating_dimension_status ON risk_item(risk_rating_dimension, status);
 
 -- V6 migration: Full-text search index on risk content
 CREATE INDEX IF NOT EXISTS idx_risk_item_content_search
@@ -574,12 +586,17 @@ COMMENT ON TABLE risk_item IS 'Individual evidence-level risk items (PO workbenc
 COMMENT ON TABLE risk_comment IS 'Comments and discussion thread for risk items - supports ARB/PO collaboration';
 COMMENT ON TABLE risk_item_assignment_history IS 'Audit trail of risk item assignment changes - tracks who assigned what to whom and when';
 
-COMMENT ON COLUMN domain_risk.arb IS 'ARB routing based on derived_from field (security_arb, integrity_arb, etc.)';
+COMMENT ON COLUMN profile_field.arb IS 'V10: Architecture Review Board assignment from registry (security, data, operations, enterprise_architecture)';
+
+COMMENT ON COLUMN domain_risk.risk_rating_dimension IS 'V12: Full risk rating dimension from derived_from (e.g., security_rating, availability_rating, app_criticality_assessment)';
+COMMENT ON COLUMN domain_risk.arb IS 'ARB routing based on derived_from field (security, data, operations, enterprise_architecture)';
 COMMENT ON COLUMN domain_risk.assigned_arb IS 'Currently assigned ARB (can differ from arb for workload balancing)';
 COMMENT ON COLUMN domain_risk.assigned_to IS 'User-level assignment (user ID) for my-queue scope filtering';
 COMMENT ON COLUMN domain_risk.assigned_to_name IS 'Display name of assigned user for UI';
 COMMENT ON COLUMN domain_risk.priority_score IS 'Aggregate priority score (0-100) calculated from risk items';
 
+COMMENT ON COLUMN risk_item.risk_rating_dimension IS 'V12: Full risk rating dimension from derived_from (e.g., security_rating, availability_rating) - denormalized from profile_field';
+COMMENT ON COLUMN risk_item.arb IS 'V11: Architecture Review Board assignment (security, data, operations, enterprise_architecture) - denormalized from profile_field.arb';
 COMMENT ON COLUMN risk_item.creation_type IS 'AUTO (from evidence), MANUAL_CREATION (ARB initiated), MANUAL_SME_INITIATED, SYSTEM_AUTO_CREATION';
 COMMENT ON COLUMN risk_item.priority_score IS 'Calculated: priority_base (from registry) * evidence_status_multiplier';
 COMMENT ON COLUMN risk_item.policy_requirement_snapshot IS 'Snapshot of policy requirements at risk creation time';
