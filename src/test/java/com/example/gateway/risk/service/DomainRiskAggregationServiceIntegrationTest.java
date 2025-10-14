@@ -64,7 +64,7 @@ class DomainRiskAggregationServiceIntegrationTest {
         assertThat(domainRisk).isNotNull();
         assertThat(domainRisk.getDomainRiskId()).isNotNull();
         assertThat(domainRisk.getAppId()).isEqualTo(TEST_APP_ID);
-        assertThat(domainRisk.getDomain()).isEqualTo("security");
+        assertThat(domainRisk.getRiskDimension()).isEqualTo("security");
         assertThat(domainRisk.getDerivedFrom()).isEqualTo(TEST_DERIVED_FROM);
         assertThat(domainRisk.getArb()).isIn("security", "data", "operations", "enterprise_architecture");
         assertThat(domainRisk.getStatus()).isEqualTo(DomainRiskStatus.PENDING_ARB_REVIEW);
