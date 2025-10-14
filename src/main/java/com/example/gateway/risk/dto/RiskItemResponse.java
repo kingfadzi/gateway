@@ -14,6 +14,8 @@ import java.util.Map;
 public record RiskItemResponse(
         String riskItemId,
         String domainRiskId,
+        String riskRatingDimension,
+        String arb,
 
         // References
         String appId,

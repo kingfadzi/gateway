@@ -11,7 +11,7 @@ import java.time.OffsetDateTime;
 public record DomainRiskResponse(
         String domainRiskId,
         String appId,
-        String riskDimension,
+        String riskRatingDimension,
         String derivedFrom,
         String arb,
 

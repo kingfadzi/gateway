@@ -26,10 +26,11 @@ public class ProfileFieldRepository {
         if (fields == null || fields.isEmpty()) return;
 
         String sql = """
-          INSERT INTO profile_field (id, profile_id, field_key, derived_from, value, source_system, source_ref, created_at, updated_at)
-          VALUES (:id, :pid, :key, :derived_from, CAST(:val AS jsonb), :srcsys, :srcref, :ts, :ts)
+          INSERT INTO profile_field (id, profile_id, field_key, derived_from, arb, value, source_system, source_ref, created_at, updated_at)
+          VALUES (:id, :pid, :key, :derived_from, :arb, CAST(:val AS jsonb), :srcsys, :srcref, :ts, :ts)
           ON CONFLICT (id) DO UPDATE SET
             derived_from = EXCLUDED.derived_from,
+            arb = EXCLUDED.arb,
             value = EXCLUDED.value,
             source_system = EXCLUDED.source_system,
             source_ref = EXCLUDED.source_ref,
@@ -39,17 +40,22 @@ public class ProfileFieldRepository {
         var now = OffsetDateTime.now(ZoneOffset.UTC);
         for (var e : fields.entrySet()) {
             String pfId = HashIds.profileFieldId(profileId, e.getKey());
-            
-            // Get derived_from from YAML registry
+
+            // Get derived_from and arb from YAML registry
             String derivedFrom = profileFieldRegistryService.getFieldTypeInfo(e.getKey())
                     .map(fieldInfo -> fieldInfo.derivedFrom())
                     .orElse(null);
-            
+
+            String arb = profileFieldRegistryService.getFieldTypeInfo(e.getKey())
+                    .map(fieldInfo -> fieldInfo.arb())
+                    .orElse(null);
+
             batch.add(new MapSqlParameterSource()
                     .addValue("id", pfId)
                     .addValue("pid", profileId)
                     .addValue("key", e.getKey())
                     .addValue("derived_from", derivedFrom)
+                    .addValue("arb", arb)
                     .addValue("val", Jsons.toJson(e.getValue()))
                     .addValue("srcsys", sourceSystem)
                     .addValue("srcref", sourceRef)

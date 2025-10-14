@@ -29,6 +29,13 @@ public class RiskItem {
     @JoinColumn(name = "domain_risk_id", insertable = false, updatable = false)
     private DomainRisk domainRisk;
 
+    // Denormalized from domain_risk for query performance
+    @Column(name = "risk_rating_dimension", length = 100)
+    private String riskRatingDimension;
+
+    @Column(name = "arb", length = 100)
+    private String arb;
+
     // References
     @Column(name = "app_id", nullable = false)
     private String appId;

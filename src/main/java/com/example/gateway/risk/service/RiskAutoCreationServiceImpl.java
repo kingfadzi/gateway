@@ -115,7 +115,7 @@ public class RiskAutoCreationServiceImpl implements RiskAutoCreationService {
 
         // Get or create domain risk
         DomainRisk domainRisk = aggregationService.getOrCreateDomainRisk(appId, derivedFrom);
-        log.info("Using domain risk: {} for domain: {}", domainRisk.getDomainRiskId(), domainRisk.getRiskDimension());
+        log.info("Using domain risk: {} for domain: {}", domainRisk.getDomainRiskId(), domainRisk.getRiskRatingDimension());
 
         // Get priority from matched rule
         RiskCreationRule matchedRule = evaluation.matchedRule();
@@ -137,7 +137,7 @@ public class RiskAutoCreationServiceImpl implements RiskAutoCreationService {
                 priority, evidenceStatus, priorityScore, severity);
 
         // Create risk item
-        log.info("Creating risk item for app={}, field={}, evidence={}, domain={}", appId, fieldKey, evidenceId, domainRisk.getRiskDimension());
+        log.info("Creating risk item for app={}, field={}, evidence={}, domain={}", appId, fieldKey, evidenceId, domainRisk.getRiskRatingDimension());
         RiskItem riskItem = new RiskItem();
         riskItem.setRiskItemId("item_" + UUID.randomUUID());
         riskItem.setAppId(appId);
@@ -171,14 +171,14 @@ public class RiskAutoCreationServiceImpl implements RiskAutoCreationService {
         aggregationService.addRiskItemToDomain(domainRisk, riskItem);
 
         log.info("Risk item CREATED successfully: ID={}, Field={}, App={}, Evidence={}, Domain={}, Priority={}, Score={}",
-            riskItem.getRiskItemId(), fieldKey, appId, evidenceId, domainRisk.getRiskDimension(), priority, priorityScore);
+            riskItem.getRiskItemId(), fieldKey, appId, evidenceId, domainRisk.getRiskRatingDimension(), priority, priorityScore);
         log.info("Domain risk {} updated with new item, total items: {}, open items: {}",
             domainRisk.getDomainRiskId(), domainRisk.getTotalItems(), domainRisk.getOpenItems());
         log.info("=== AUTO-RISK EVALUATION END ===");
 
         return AutoRiskCreationResponse.created(riskItem.getRiskItemId(), fieldKey, appId,
                                                appRating, domainRisk.getAssignedArb(), evidenceId,
-                                               "Auto-created risk item and added to domain risk " + domainRisk.getRiskDimension());
+                                               "Auto-created risk item and added to domain risk " + domainRisk.getRiskRatingDimension());
     }
 
     @Override

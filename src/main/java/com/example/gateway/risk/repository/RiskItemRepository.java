@@ -185,6 +185,153 @@ public interface RiskItemRepository extends JpaRepository<RiskItem, String> {
         """)
     Double getAveragePriorityScore();
 
+    // ============================================
+    // Scoped Metrics Queries (filtered by app IDs)
+    // ============================================
+
+    /**
+     * Count CRITICAL priority risk items for specific apps.
+     * Scoped version for dashboard metrics (my-queue, my-domain, all-domains).
+     */
+    @Query("""
+        SELECT COUNT(ri) FROM RiskItem ri
+        WHERE ri.appId IN :appIds
+        AND ri.priority = 'CRITICAL'
+        AND ri.status IN ('OPEN', 'IN_PROGRESS')
+        """)
+    long countCriticalItemsByAppIds(@Param("appIds") List<String> appIds);
+
+    /**
+     * Count OPEN and IN_PROGRESS risk items across specific apps (total count, not grouped).
+     * Scoped version for dashboard metrics (my-queue, my-domain, all-domains).
+     * Renamed from countTotalOpenItemsByAppIds to reflect both statuses.
+     */
+    @Query("""
+        SELECT COUNT(ri) FROM RiskItem ri
+        WHERE ri.appId IN :appIds
+        AND ri.status IN ('OPEN', 'IN_PROGRESS')
+        """)
+    long countTotalOpenItemsByAppIds(@Param("appIds") List<String> appIds);
+
+    /**
+     * Count OPEN risk items (awaiting triage) across specific apps.
+     * OPEN = needs attention but not yet assigned/being worked on.
+     * Used for "Awaiting Triage" metric on dashboard.
+     */
+    @Query("""
+        SELECT COUNT(ri) FROM RiskItem ri
+        WHERE ri.appId IN :appIds
+        AND ri.status = 'OPEN'
+        """)
+    long countAwaitingTriageByAppIds(@Param("appIds") List<String> appIds);
+
+    /**
+     * Calculate average priority score for OPEN and IN_PROGRESS items in specific apps.
+     * Scoped version for dashboard metrics (my-queue, my-domain, all-domains).
+     */
+    @Query("""
+        SELECT AVG(ri.priorityScore) FROM RiskItem ri
+        WHERE ri.appId IN :appIds
+        AND ri.status IN ('OPEN', 'IN_PROGRESS')
+        """)
+    Double getAveragePriorityScoreByAppIds(@Param("appIds") List<String> appIds);
+
+    /**
+     * Count risk items created after timestamp for specific apps.
+     * Scoped version for recent activity metrics (7-day and 30-day windows).
+     */
+    @Query("""
+        SELECT COUNT(ri) FROM RiskItem ri
+        WHERE ri.appId IN :appIds
+        AND ri.openedAt >= :since
+        """)
+    long countCreatedAfterByAppIds(@Param("appIds") List<String> appIds, @Param("since") java.time.OffsetDateTime since);
+
+    /**
+     * Count risk items resolved after timestamp for specific apps.
+     * Scoped version for recent activity metrics (7-day and 30-day windows).
+     */
+    @Query("""
+        SELECT COUNT(ri) FROM RiskItem ri
+        WHERE ri.appId IN :appIds
+        AND ri.resolvedAt >= :since
+        AND ri.status IN ('RESOLVED', 'CLOSED')
+        """)
+    long countResolvedAfterByAppIds(@Param("appIds") List<String> appIds, @Param("since") java.time.OffsetDateTime since);
+
+    // ============================================
+    // User-Specific Metrics (for my-queue scope)
+    // ============================================
+
+    /**
+     * Count CRITICAL priority risk items assigned to a specific user.
+     * User-specific version for "my-queue" scope.
+     */
+    @Query("""
+        SELECT COUNT(ri) FROM RiskItem ri
+        WHERE ri.assignedTo = :userId
+        AND ri.priority = 'CRITICAL'
+        AND ri.status IN ('OPEN', 'IN_PROGRESS')
+        """)
+    long countCriticalItemsByUser(@Param("userId") String userId);
+
+    /**
+     * Count OPEN and IN_PROGRESS risk items assigned to a specific user.
+     * User-specific version for "my-queue" scope.
+     */
+    @Query("""
+        SELECT COUNT(ri) FROM RiskItem ri
+        WHERE ri.assignedTo = :userId
+        AND ri.status IN ('OPEN', 'IN_PROGRESS')
+        """)
+    long countOpenItemsByUser(@Param("userId") String userId);
+
+    /**
+     * Calculate average priority score for OPEN and IN_PROGRESS items assigned to a specific user.
+     * User-specific version for "my-queue" scope.
+     */
+    @Query("""
+        SELECT AVG(ri.priorityScore) FROM RiskItem ri
+        WHERE ri.assignedTo = :userId
+        AND ri.status IN ('OPEN', 'IN_PROGRESS')
+        """)
+    Double getAveragePriorityScoreByUser(@Param("userId") String userId);
+
+    /**
+     * Count risk items assigned to user and created after timestamp.
+     * User-specific version for "my-queue" recent activity.
+     */
+    @Query("""
+        SELECT COUNT(ri) FROM RiskItem ri
+        WHERE ri.assignedTo = :userId
+        AND ri.openedAt >= :since
+        """)
+    long countCreatedAfterByUser(@Param("userId") String userId, @Param("since") java.time.OffsetDateTime since);
+
+    /**
+     * Count risk items assigned to user and resolved after timestamp.
+     * User-specific version for "my-queue" recent activity.
+     */
+    @Query("""
+        SELECT COUNT(ri) FROM RiskItem ri
+        WHERE ri.assignedTo = :userId
+        AND ri.resolvedAt >= :since
+        AND ri.status IN ('RESOLVED', 'CLOSED')
+        """)
+    long countResolvedAfterByUser(@Param("userId") String userId, @Param("since") java.time.OffsetDateTime since);
+
+    /**
+     * Count OPEN risk items (awaiting triage) assigned to a specific user.
+     * OPEN = needs attention but not yet being actively worked on.
+     * User-specific version for "my-queue" awaiting triage metric.
+     */
+    @Query("""
+        SELECT COUNT(ri) FROM RiskItem ri
+        WHERE ri.assignedTo = :userId
+        AND ri.status = 'OPEN'
+        """)
+    long countAwaitingTriageByUser(@Param("userId") String userId);
+
     /**
      * Get most recent activity timestamp for an application.
      * Checks both created_at and updated_at.
@@ -303,18 +450,34 @@ public interface RiskItemRepository extends JpaRepository<RiskItem, String> {
     /**
      * Comprehensive search for risk items with multiple filters.
      * Supports filtering by: appId, assignedTo, status, priority, fieldKey,
-     * severity, creationType, triggeringEvidenceId.
+     * severity, creationType, triggeringEvidenceId, riskRatingDimension, arb, and text search.
      * Returns paginated results with sorting support.
+     *
+     * Special logic: When both arb AND assignedTo are provided, uses OR logic:
+     *   - Show risks from my ARB OR assigned to me
+     *   - Use case: Guild member wants to see all risks from their guild + any risks assigned to them from other guilds
      *
      * Used to replace old /api/risks/search endpoint functionality.
      */
     @Query("""
         SELECT ri FROM RiskItem ri
         WHERE (:appId IS NULL OR ri.appId = :appId)
-        AND (:assignedTo IS NULL OR ri.assignedTo = :assignedTo)
         AND (:fieldKey IS NULL OR ri.fieldKey = :fieldKey)
         AND (:severity IS NULL OR ri.severity = :severity)
         AND (:triggeringEvidenceId IS NULL OR ri.triggeringEvidenceId = :triggeringEvidenceId)
+        AND (:riskRatingDimension IS NULL OR ri.riskRatingDimension = :riskRatingDimension)
+        AND (
+            (:arb IS NOT NULL AND :assignedTo IS NOT NULL AND (ri.arb = :arb OR ri.assignedTo = :assignedTo))
+            OR (:arb IS NOT NULL AND :assignedTo IS NULL AND ri.arb = :arb)
+            OR (:arb IS NULL AND :assignedTo IS NOT NULL AND ri.assignedTo = :assignedTo)
+            OR (:arb IS NULL AND :assignedTo IS NULL)
+        )
+        AND (:search IS NULL OR
+             LOWER(COALESCE(ri.title, '')) LIKE :searchPattern OR
+             LOWER(COALESCE(ri.description, '')) LIKE :searchPattern OR
+             LOWER(COALESCE(ri.hypothesis, '')) LIKE :searchPattern OR
+             LOWER(COALESCE(ri.condition, '')) LIKE :searchPattern OR
+             LOWER(COALESCE(ri.consequence, '')) LIKE :searchPattern)
         AND (:status IS NULL OR ri.status IN :status)
         AND (:priority IS NULL OR ri.priority IN :priority)
         AND (:creationType IS NULL OR ri.creationType IN :creationType)
@@ -328,6 +491,110 @@ public interface RiskItemRepository extends JpaRepository<RiskItem, String> {
         @Param("severity") String severity,
         @Param("creationType") List<RiskCreationType> creationType,
         @Param("triggeringEvidenceId") String triggeringEvidenceId,
+        @Param("riskRatingDimension") String riskRatingDimension,
+        @Param("arb") String arb,
+        @Param("search") String search,
+        @Param("searchPattern") String searchPattern,
         Pageable pageable
     );
+
+    // ============================================
+    // APP-CENTRIC METRICS (Volume & Velocity)
+    // ============================================
+
+    /**
+     * Count unique applications with CRITICAL priority items.
+     * Used for "Critical Applications" app-centric metric.
+     */
+    @Query("""
+        SELECT COUNT(DISTINCT ri.appId) FROM RiskItem ri
+        WHERE ri.appId IN :appIds
+        AND ri.priority = 'CRITICAL'
+        AND ri.status IN ('OPEN', 'IN_PROGRESS')
+        """)
+    long countApplicationsWithCriticalItems(@Param("appIds") List<String> appIds);
+
+    /**
+     * Count unique applications with CRITICAL priority items (user-scoped for my-queue).
+     */
+    @Query("""
+        SELECT COUNT(DISTINCT ri.appId) FROM RiskItem ri
+        WHERE ri.assignedTo = :userId
+        AND ri.priority = 'CRITICAL'
+        AND ri.status IN ('OPEN', 'IN_PROGRESS')
+        """)
+    long countApplicationsWithCriticalItemsByUser(@Param("userId") String userId);
+
+    /**
+     * Count unique applications with OPEN status items (awaiting triage).
+     * Used for "Applications Awaiting Triage" app-centric metric.
+     */
+    @Query("""
+        SELECT COUNT(DISTINCT ri.appId) FROM RiskItem ri
+        WHERE ri.appId IN :appIds
+        AND ri.status = 'OPEN'
+        """)
+    long countApplicationsAwaitingTriage(@Param("appIds") List<String> appIds);
+
+    /**
+     * Count unique applications with OPEN status items (user-scoped for my-queue).
+     */
+    @Query("""
+        SELECT COUNT(DISTINCT ri.appId) FROM RiskItem ri
+        WHERE ri.assignedTo = :userId
+        AND ri.status = 'OPEN'
+        """)
+    long countApplicationsAwaitingTriageByUser(@Param("userId") String userId);
+
+    /**
+     * Count unique applications with new risks created in a time window.
+     * Used for recent activity velocity metric (7-day and 30-day).
+     */
+    @Query("""
+        SELECT COUNT(DISTINCT ri.appId) FROM RiskItem ri
+        WHERE ri.appId IN :appIds
+        AND ri.openedAt >= :since
+        """)
+    long countApplicationsWithNewRisks(
+        @Param("appIds") List<String> appIds,
+        @Param("since") java.time.OffsetDateTime since);
+
+    /**
+     * Count unique applications with new risks (user-scoped for my-queue).
+     */
+    @Query("""
+        SELECT COUNT(DISTINCT ri.appId) FROM RiskItem ri
+        WHERE ri.assignedTo = :userId
+        AND ri.openedAt >= :since
+        """)
+    long countApplicationsWithNewRisksByUser(
+        @Param("userId") String userId,
+        @Param("since") java.time.OffsetDateTime since);
+
+    /**
+     * Count unique applications with resolutions in a time window.
+     * Used for recent activity velocity metric (7-day and 30-day).
+     */
+    @Query("""
+        SELECT COUNT(DISTINCT ri.appId) FROM RiskItem ri
+        WHERE ri.appId IN :appIds
+        AND ri.resolvedAt >= :since
+        AND ri.status IN ('RESOLVED', 'CLOSED')
+        """)
+    long countApplicationsWithResolutions(
+        @Param("appIds") List<String> appIds,
+        @Param("since") java.time.OffsetDateTime since);
+
+    /**
+     * Count unique applications with resolutions (user-scoped for my-queue).
+     */
+    @Query("""
+        SELECT COUNT(DISTINCT ri.appId) FROM RiskItem ri
+        WHERE ri.assignedTo = :userId
+        AND ri.resolvedAt >= :since
+        AND ri.status IN ('RESOLVED', 'CLOSED')
+        """)
+    long countApplicationsWithResolutionsByUser(
+        @Param("userId") String userId,
+        @Param("since") java.time.OffsetDateTime since);
 }

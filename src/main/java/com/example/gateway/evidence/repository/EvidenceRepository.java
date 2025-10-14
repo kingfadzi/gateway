@@ -145,12 +145,14 @@ public class EvidenceRepository {
                    efl.link_status, efl.linked_by, efl.linked_at,
                    efl.reviewed_by, efl.reviewed_at, efl.review_comment,
                    d.title as document_title, d.source_type as document_source_type,
-                   d.owners as document_owners, d.link_health as document_link_health
+                   d.owners as document_owners, d.link_health as document_link_health,
+                   dv.url_at_version
             FROM evidence e
             JOIN evidence_field_link efl ON e.evidence_id = efl.evidence_id
             JOIN profile_field pf ON e.profile_field_id = pf.id
             JOIN profile p ON pf.profile_id = p.profile_id
             LEFT JOIN document d ON e.document_id = d.document_id
+            LEFT JOIN document_version dv ON e.doc_version_id = dv.doc_version_id
             WHERE 1=1
             """);
 
@@ -192,12 +194,14 @@ public class EvidenceRepository {
                    efl.link_status, efl.linked_by, efl.linked_at,
                    efl.reviewed_by, efl.reviewed_at, efl.review_comment,
                    d.title as document_title, d.source_type as document_source_type,
-                   d.owners as document_owners, d.link_health as document_link_health
+                   d.owners as document_owners, d.link_health as document_link_health,
+                   dv.url_at_version
             FROM evidence e
             JOIN evidence_field_link efl ON e.evidence_id = efl.evidence_id
             JOIN profile_field pf ON e.profile_field_id = pf.id
             JOIN profile p ON pf.profile_id = p.profile_id
             LEFT JOIN document d ON e.document_id = d.document_id
+            LEFT JOIN document_version dv ON e.doc_version_id = dv.doc_version_id
             WHERE e.profile_field_id = :profileFieldId
             """);
 
@@ -233,12 +237,14 @@ public class EvidenceRepository {
                    efl.link_status, efl.linked_by, efl.linked_at,
                    efl.reviewed_by, efl.reviewed_at, efl.review_comment,
                    d.title as document_title, d.source_type as document_source_type,
-                   d.owners as document_owners, d.link_health as document_link_health
+                   d.owners as document_owners, d.link_health as document_link_health,
+                   dv.url_at_version
             FROM evidence e
             JOIN evidence_field_link efl ON e.evidence_id = efl.evidence_id
             JOIN profile_field pf ON e.profile_field_id = pf.id
             JOIN profile p ON pf.profile_id = p.profile_id
             LEFT JOIN document d ON e.document_id = d.document_id
+            LEFT JOIN document_version dv ON e.doc_version_id = dv.doc_version_id
             WHERE e.profile_field_id IN (:profileFieldIds)
             AND p.version = (SELECT MAX(version) FROM profile p2 WHERE p2.app_id = p.app_id)
             ORDER BY e.profile_field_id, e.created_at DESC
@@ -260,12 +266,14 @@ public class EvidenceRepository {
                    efl.link_status, efl.linked_by, efl.linked_at,
                    efl.reviewed_by, efl.reviewed_at, efl.review_comment,
                    d.title as document_title, d.source_type as document_source_type,
-                   d.owners as document_owners, d.link_health as document_link_health
+                   d.owners as document_owners, d.link_health as document_link_health,
+                   dv.url_at_version
             FROM evidence e
             JOIN evidence_field_link efl ON e.evidence_id = efl.evidence_id
             JOIN profile_field pf ON e.profile_field_id = pf.id
             JOIN profile p ON pf.profile_id = p.profile_id
             LEFT JOIN document d ON e.document_id = d.document_id
+            LEFT JOIN document_version dv ON e.doc_version_id = dv.doc_version_id
             WHERE e.claim_id = :claimId
             """);
 
@@ -294,12 +302,14 @@ public class EvidenceRepository {
                    efl.link_status, efl.linked_by, efl.linked_at,
                    efl.reviewed_by, efl.reviewed_at, efl.review_comment,
                    d.title as document_title, d.source_type as document_source_type,
-                   d.owners as document_owners, d.link_health as document_link_health
+                   d.owners as document_owners, d.link_health as document_link_health,
+                   dv.url_at_version
             FROM evidence e
             JOIN evidence_field_link efl ON e.evidence_id = efl.evidence_id
             JOIN profile_field pf ON e.profile_field_id = pf.id
             JOIN profile p ON pf.profile_id = p.profile_id
             LEFT JOIN document d ON e.document_id = d.document_id
+            LEFT JOIN document_version dv ON e.doc_version_id = dv.doc_version_id
             WHERE e.track_id = :trackId
             """);
 
@@ -332,12 +342,14 @@ public class EvidenceRepository {
                    efl.reviewed_by, efl.reviewed_at, efl.review_comment,
                    d.title as document_title, d.source_type as document_source_type,
                    d.owners as document_owners, d.link_health as document_link_health,
+                   dv.url_at_version,
                    pf.field_key, app.product_owner
             FROM evidence e
             JOIN evidence_field_link efl ON e.evidence_id = efl.evidence_id
             JOIN profile_field pf ON e.profile_field_id = pf.id
             JOIN profile p ON pf.profile_id = p.profile_id
             LEFT JOIN document d ON e.document_id = d.document_id
+            LEFT JOIN document_version dv ON e.doc_version_id = dv.doc_version_id
             LEFT JOIN application app ON e.app_id = app.app_id
             WHERE 1=1
             """);
@@ -895,7 +907,9 @@ public class EvidenceRepository {
             rs.getString("document_title"),
             rs.getString("document_source_type"),
             rs.getString("document_owners"),
-            (Integer) rs.getObject("document_link_health")
+            (Integer) rs.getObject("document_link_health"),
+            // Document version information
+            rs.getString("url_at_version")
         );
     }
 

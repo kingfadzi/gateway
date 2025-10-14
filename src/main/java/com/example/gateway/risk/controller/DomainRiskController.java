@@ -313,6 +313,51 @@ public class DomainRiskController {
     }
 
     /**
+     * Get app-centric dashboard metrics for ARB HUD.
+     * Focuses on counting applications at risk rather than individual risk items.
+     * Supports three scopes: my-queue, my-domain, all-domains.
+     *
+     * GET /api/v1/domain-risks/arb/{arbName}/app-metrics
+     */
+    @GetMapping("/arb/{arbName}/app-metrics")
+    public ResponseEntity<?> getAppCentricMetricsForArb(
+            @PathVariable String arbName,
+            @RequestParam String scope,
+            @RequestParam(required = false) String userId) {
+
+        log.info("GET /api/v1/domain-risks/arb/{}/app-metrics - scope: {}, userId: {}",
+                arbName, scope, userId);
+
+        try {
+            ApplicationCentricMetricsResponse response = dashboardService.getAppCentricMetricsForArb(
+                    arbName, scope, userId);
+
+            return ResponseEntity.ok(response);
+
+        } catch (IllegalArgumentException e) {
+            log.error("Validation error: {}", e.getMessage());
+            return ResponseEntity.badRequest()
+                    .body(Map.of(
+                            "timestamp", java.time.OffsetDateTime.now().toString(),
+                            "status", 400,
+                            "error", "Bad Request",
+                            "message", e.getMessage(),
+                            "path", "/api/v1/domain-risks/arb/" + arbName + "/app-metrics"
+                    ));
+        } catch (Exception e) {
+            log.error("Error getting app-centric metrics for ARB: {}", arbName, e);
+            return ResponseEntity.internalServerError()
+                    .body(Map.of(
+                            "timestamp", java.time.OffsetDateTime.now().toString(),
+                            "status", 500,
+                            "error", "Internal Server Error",
+                            "message", "An error occurred while processing your request",
+                            "path", "/api/v1/domain-risks/arb/" + arbName + "/app-metrics"
+                    ));
+        }
+    }
+
+    /**
      * Assign application to ARB member.
      * Updates assigned_to and assigned_to_name for all domain risks belonging to the app+ARB.
      *

@@ -52,21 +52,22 @@ public class DomainRiskAggregationService {
      */
     @Transactional
     public DomainRisk getOrCreateDomainRisk(String appId, String derivedFrom) {
-        String domain = arbRoutingService.calculateDomain(derivedFrom);
+        // Use full derived_from as risk_rating_dimension (no transformation)
+        String riskRatingDimension = derivedFrom;
         String arb = arbRoutingService.getArbForDerivedFrom(derivedFrom);
 
-        return domainRiskRepository.findByAppIdAndRiskDimension(appId, domain)
-                .orElseGet(() -> createNewDomainRisk(appId, domain, derivedFrom, arb));
+        return domainRiskRepository.findByAppIdAndRiskRatingDimension(appId, riskRatingDimension)
+                .orElseGet(() -> createNewDomainRisk(appId, riskRatingDimension, derivedFrom, arb));
     }
 
     /**
      * Create a new domain risk.
      */
-    private DomainRisk createNewDomainRisk(String appId, String domain, String derivedFrom, String arb) {
+    private DomainRisk createNewDomainRisk(String appId, String riskRatingDimension, String derivedFrom, String arb) {
         DomainRisk domainRisk = new DomainRisk();
         domainRisk.setDomainRiskId(UUID.randomUUID().toString());
         domainRisk.setAppId(appId);
-        domainRisk.setRiskDimension(domain);
+        domainRisk.setRiskRatingDimension(riskRatingDimension);
         domainRisk.setDerivedFrom(derivedFrom);
         domainRisk.setArb(arb);
         domainRisk.setAssignedArb(arb);  // Auto-assign to ARB
@@ -81,11 +82,11 @@ public class DomainRiskAggregationService {
         domainRisk.setPriorityScore(0);
 
         // Generate title and description
-        domainRisk.setTitle(generateDomainRiskTitle(domain));
-        domainRisk.setDescription(generateDomainRiskDescription(domain, derivedFrom));
+        domainRisk.setTitle(generateDomainRiskTitle(riskRatingDimension));
+        domainRisk.setDescription(generateDomainRiskDescription(riskRatingDimension, derivedFrom));
 
         DomainRisk saved = domainRiskRepository.save(domainRisk);
-        log.info("Created new domain risk: {} for app: {}, domain: {}", saved.getDomainRiskId(), appId, domain);
+        log.info("Created new domain risk: {} for app: {}, risk_rating_dimension: {}", saved.getDomainRiskId(), appId, riskRatingDimension);
 
         return saved;
     }
@@ -100,6 +101,10 @@ public class DomainRiskAggregationService {
     public void addRiskItemToDomain(DomainRisk domainRisk, RiskItem riskItem) {
         // Link risk item to domain risk
         riskItem.setDomainRiskId(domainRisk.getDomainRiskId());
+
+        // Denormalize risk_rating_dimension and arb from domain risk
+        riskItem.setRiskRatingDimension(domainRisk.getRiskRatingDimension());
+        riskItem.setArb(domainRisk.getArb());
 
         // Save risk item
         riskItemRepository.save(riskItem);

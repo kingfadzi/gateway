@@ -203,10 +203,21 @@ public class RiskItemController {
      * - severity: Severity string (Critical, High, Medium, Low)
      * - creationType: Comma-separated RiskCreationType values (MANUAL_SME_INITIATED, SYSTEM_AUTO_CREATION)
      * - triggeringEvidenceId: Evidence that triggered this risk
+     * - riskRatingDimension: Risk rating dimension (security_rating, confidentiality_rating, availability_rating, etc.)
+     * - arb: ARB assignment (security, data, operations, enterprise_architecture)
+     * - search: Text search across title, description, hypothesis, condition, consequence
+     *
+     * Special filtering logic:
+     * - When BOTH arb AND assignedTo are provided, uses OR logic:
+     *   → Show risks from my ARB OR risks assigned to me
+     *   → Example: /search?appId=APM100005&arb=security&assignedTo=security_sme_001
+     *   → Returns: All security ARB risks OR any risks assigned to security_sme_001 (even from other ARBs)
+     *   → Use case: Guild member wants to see all guild risks + personal assignments from other guilds
      *
      * Supports sorting:
      * - sortBy: Field to sort by (default: priorityScore)
      * - sortOrder: ASC or DESC (default: DESC)
+     * - prioritizeUserId: When provided, risks assigned to this user appear first, then sorted by sortBy
      *
      * Supports pagination:
      * - page: Page number (0-indexed, default: 0)
@@ -222,63 +233,179 @@ public class RiskItemController {
             @RequestParam(required = false) String severity,
             @RequestParam(required = false) String creationType,
             @RequestParam(required = false) String triggeringEvidenceId,
+            @RequestParam(required = false) String riskRatingDimension,
+            @RequestParam(required = false) String arb,
+            @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "priorityScore") String sortBy,
             @RequestParam(defaultValue = "DESC") String sortOrder,
+            @RequestParam(required = false) String prioritizeUserId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
         log.info("GET /api/v1/risk-items/search - appId: {}, assignedTo: {}, status: {}, priority: {}, " +
                         "fieldKey: {}, severity: {}, creationType: {}, triggeringEvidenceId: {}, " +
-                        "sortBy: {}, sortOrder: {}, page: {}, size: {}",
+                        "riskRatingDimension: {}, arb: {}, search: {}, " +
+                        "sortBy: {}, sortOrder: {}, prioritizeUserId: {}, page: {}, size: {}",
                 appId, assignedTo, status, priority, fieldKey, severity, creationType,
-                triggeringEvidenceId, sortBy, sortOrder, page, size);
+                triggeringEvidenceId, riskRatingDimension, arb, search, sortBy, sortOrder, prioritizeUserId, page, size);
 
         // Parse enum filters
         List<RiskItemStatus> statusList = parseStatusList(status);
         List<RiskPriority> priorityList = parsePriorityList(priority);
         List<RiskCreationType> creationTypeList = parseCreationTypeList(creationType);
 
-        // Build sort
-        Sort sort = Sort.by(
-                sortOrder.equalsIgnoreCase("ASC") ? Sort.Direction.ASC : Sort.Direction.DESC,
-                sortBy
-        );
+        // Format search pattern with wildcards (handle in Java to avoid JPQL CONCAT issues)
+        String searchPattern = null;
+        if (search != null && !search.isBlank()) {
+            searchPattern = "%" + search.toLowerCase() + "%";
+        }
+
+        // Build sort with prioritization support
+        Sort sort;
+        if (prioritizeUserId != null && !prioritizeUserId.isBlank()) {
+            // Custom sort: assigned to prioritizeUserId first, then by sortBy field
+            // JPQL doesn't support CASE in ORDER BY, so we use a workaround with multiple sort orders
+            // This will put assigned risks at top, then sort each group by the requested field
+            Sort.Direction direction = sortOrder.equalsIgnoreCase("ASC") ? Sort.Direction.ASC : Sort.Direction.DESC;
+
+            // Create a comparator-based sort in memory (will be applied after query)
+            sort = Sort.by(direction, sortBy);
+        } else {
+            sort = Sort.by(
+                    sortOrder.equalsIgnoreCase("ASC") ? Sort.Direction.ASC : Sort.Direction.DESC,
+                    sortBy
+            );
+        }
 
         // Build pageable
         Pageable pageable = PageRequest.of(page, size, sort);
 
-        // Execute search
-        Page<RiskItem> resultPage = riskItemRepository.searchRiskItems(
-                appId,
-                assignedTo,
-                statusList,
-                priorityList,
-                fieldKey,
-                severity,
-                creationTypeList,
-                triggeringEvidenceId,
-                pageable
-        );
+        Page<RiskItem> resultPage;
+        List<RiskItemResponse> items;
+        long totalElements;
+        int totalPages;
 
-        // Convert to response
-        List<RiskItemResponse> items = resultPage.getContent().stream()
-                .map(RiskDtoMapper::toRiskItemResponse)
-                .collect(Collectors.toList());
+        if (prioritizeUserId != null && !prioritizeUserId.isBlank()) {
+            // Custom sorting: fetch all results, sort in memory, then paginate
+            // This ensures assigned risks appear first across page boundaries
+            Pageable unpaged = PageRequest.of(0, Integer.MAX_VALUE, sort);
+            Page<RiskItem> allResults = riskItemRepository.searchRiskItems(
+                    appId,
+                    assignedTo,
+                    statusList,
+                    priorityList,
+                    fieldKey,
+                    severity,
+                    creationTypeList,
+                    triggeringEvidenceId,
+                    riskRatingDimension,
+                    arb,
+                    search,
+                    searchPattern,
+                    unpaged
+            );
+
+            // Sort in memory: assigned to prioritizeUserId first, then by sortBy field
+            List<RiskItem> sortedList = allResults.getContent().stream()
+                    .sorted((r1, r2) -> {
+                        // Primary sort: assigned to prioritizeUserId comes first
+                        boolean r1Assigned = prioritizeUserId.equals(r1.getAssignedTo());
+                        boolean r2Assigned = prioritizeUserId.equals(r2.getAssignedTo());
+
+                        if (r1Assigned && !r2Assigned) return -1;  // r1 first
+                        if (!r1Assigned && r2Assigned) return 1;   // r2 first
+
+                        // Secondary sort: by requested field and direction
+                        return compareBySortField(r1, r2, sortBy, sortOrder);
+                    })
+                    .collect(Collectors.toList());
+
+            // Manual pagination
+            totalElements = sortedList.size();
+            totalPages = (int) Math.ceil((double) totalElements / size);
+
+            int start = page * size;
+            int end = Math.min(start + size, sortedList.size());
+            List<RiskItem> pageContent = sortedList.subList(
+                    Math.min(start, sortedList.size()),
+                    Math.min(end, sortedList.size())
+            );
+
+            items = pageContent.stream()
+                    .map(RiskDtoMapper::toRiskItemResponse)
+                    .collect(Collectors.toList());
+
+        } else {
+            // Standard database sorting
+            resultPage = riskItemRepository.searchRiskItems(
+                    appId,
+                    assignedTo,
+                    statusList,
+                    priorityList,
+                    fieldKey,
+                    severity,
+                    creationTypeList,
+                    triggeringEvidenceId,
+                    riskRatingDimension,
+                    arb,
+                    search,
+                    searchPattern,
+                    pageable
+            );
+
+            items = resultPage.getContent().stream()
+                    .map(RiskDtoMapper::toRiskItemResponse)
+                    .collect(Collectors.toList());
+
+            totalElements = resultPage.getTotalElements();
+            totalPages = resultPage.getTotalPages();
+        }
 
         RiskItemSearchResponse response = new RiskItemSearchResponse(
                 items,
-                resultPage.getNumber(),
-                resultPage.getSize(),
-                resultPage.getTotalElements(),
-                resultPage.getTotalPages(),
-                resultPage.isFirst(),
-                resultPage.isLast()
+                page,
+                size,
+                totalElements,
+                totalPages,
+                page == 0,
+                page >= totalPages - 1
         );
 
         log.info("Search returned {} risk items (page {}/{})",
-                items.size(), page, resultPage.getTotalPages());
+                items.size(), page, totalPages);
 
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Compare two risk items by a specific field for sorting.
+     */
+    private int compareBySortField(RiskItem r1, RiskItem r2, String sortBy, String sortOrder) {
+        int comparison;
+
+        switch (sortBy) {
+            case "priorityScore":
+                comparison = Integer.compare(
+                        r1.getPriorityScore() != null ? r1.getPriorityScore() : 0,
+                        r2.getPriorityScore() != null ? r2.getPriorityScore() : 0
+                );
+                break;
+            case "openedAt":
+                comparison = r1.getOpenedAt() != null && r2.getOpenedAt() != null
+                        ? r1.getOpenedAt().compareTo(r2.getOpenedAt())
+                        : 0;
+                break;
+            case "status":
+                comparison = r1.getStatus().compareTo(r2.getStatus());
+                break;
+            case "priority":
+                comparison = r1.getPriority().compareTo(r2.getPriority());
+                break;
+            default:
+                comparison = 0;
+        }
+
+        return sortOrder.equalsIgnoreCase("ASC") ? comparison : -comparison;
     }
 
     /**

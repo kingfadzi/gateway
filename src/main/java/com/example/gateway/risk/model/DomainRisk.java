@@ -24,8 +24,8 @@ public class DomainRisk {
     @Column(name = "app_id", nullable = false)
     private String appId;
 
-    @Column(name = "risk_dimension", nullable = false, length = 100)
-    private String riskDimension;
+    @Column(name = "risk_rating_dimension", nullable = false, length = 100)
+    private String riskRatingDimension;
 
     @Column(name = "derived_from", nullable = false, length = 100)
     private String derivedFrom;

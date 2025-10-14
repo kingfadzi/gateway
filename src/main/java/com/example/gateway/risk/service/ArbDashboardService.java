@@ -157,16 +157,34 @@ public class ArbDashboardService {
         // Validate scope and userId
         validateScope(scope, userId);
 
-        // Get domain risks for scope (to filter risk items)
+        // Get app IDs for scope
         List<String> appIds = getAppIdsByScope(scope, arbName, userId);
 
-        // Calculate metrics
-        int criticalCount = calculateCriticalCount(appIds);
-        int openItemsCount = calculateOpenItemsCount(appIds);
-        int pendingReviewCount = calculatePendingReviewCount(appIds);
-        double averageRiskScore = calculateAverageRiskScore(appIds);
+        // Calculate metrics - use user-specific queries for "my-queue", app-based for others
+        int criticalCount;
+        int openItemsCount;
+        double averageRiskScore;
+        RecentActivityMetrics recentActivity;
+
+        if ("my-queue".equals(scope)) {
+            // User-specific metrics: count only risks assigned to this user
+            criticalCount = calculateCriticalCountByUser(userId);
+            openItemsCount = calculateOpenItemsCountByUser(userId);
+            averageRiskScore = calculateAverageRiskScoreByUser(userId);
+            recentActivity = calculateRecentActivityByUser(userId);
+        } else {
+            // App-based metrics: count all risks in the scoped apps
+            criticalCount = calculateCriticalCount(appIds);
+            openItemsCount = calculateOpenItemsCount(appIds);
+            averageRiskScore = calculateAverageRiskScore(appIds);
+            recentActivity = calculateRecentActivity(appIds);
+        }
+
+        // Awaiting triage: count OPEN risk items (not domain risks)
+        int pendingReviewCount = "my-queue".equals(scope)
+            ? calculateAwaitingTriageCountByUser(userId)
+            : calculateAwaitingTriageCount(appIds);
         String healthGrade = healthGradeCalculator.calculateHealthGrade(averageRiskScore);
-        RecentActivityMetrics recentActivity = calculateRecentActivity(appIds);
 
         log.info("Metrics calculated: critical={}, open={}, pending={}, avgScore={}, grade={}",
                 criticalCount, openItemsCount, pendingReviewCount, averageRiskScore, healthGrade);
@@ -181,6 +199,87 @@ public class ArbDashboardService {
                 averageRiskScore,
                 healthGrade,
                 recentActivity
+        );
+    }
+
+    /**
+     * Get app-centric dashboard metrics for ARB HUD.
+     * Focuses on counting applications at risk rather than individual risk items.
+     *
+     * @param arbName ARB identifier
+     * @param scope Filtering scope: my-queue, my-domain, all-domains
+     * @param userId User ID (required for my-queue)
+     * @return App-centric metrics response
+     */
+    public ApplicationCentricMetricsResponse getAppCentricMetricsForArb(
+            String arbName,
+            String scope,
+            String userId) {
+
+        log.info("Getting app-centric metrics for ARB: {}, scope: {}, userId: {}", arbName, scope, userId);
+
+        // Validate scope and userId
+        validateScope(scope, userId);
+
+        // Get app IDs for scope
+        List<String> appIds = getAppIdsByScope(scope, arbName, userId);
+
+        // Calculate app-centric metrics - use different queries based on scope
+        int applicationsAtRisk;
+        int criticalApplications;
+        int highRiskApplications;
+        int applicationsAwaitingTriage;
+        int totalOpenItems;
+        ApplicationActivityMetrics recentActivity;
+
+        if ("my-queue".equals(scope)) {
+            // User-specific app counts: apps where user has assigned risks
+            applicationsAtRisk = appIds.size();  // Already filtered by user's assigned risks
+            criticalApplications = calculateCriticalApplicationsByUser(userId);
+            highRiskApplications = calculateHighRiskApplicationsByUser(appIds);
+            applicationsAwaitingTriage = calculateApplicationsAwaitingTriageByUser(userId);
+            totalOpenItems = calculateOpenItemsCountByUser(userId);
+            recentActivity = calculateAppActivityByUser(userId);
+        } else {
+            // ARB-wide or domain-specific app counts
+            applicationsAtRisk = calculateApplicationsAtRisk(arbName, appIds, scope);
+            criticalApplications = calculateCriticalApplications(appIds);
+            highRiskApplications = calculateHighRiskApplications(appIds);
+            applicationsAwaitingTriage = calculateApplicationsAwaitingTriage(appIds);
+            totalOpenItems = calculateOpenItemsCount(appIds);
+            recentActivity = calculateAppActivity(appIds);
+        }
+
+        // Calculate average items per app (concentration indicator)
+        double averageItemsPerApp = applicationsAtRisk > 0
+                ? (double) totalOpenItems / applicationsAtRisk
+                : 0.0;
+
+        // Get risk level distribution (uses domain_risk table for fast aggregation)
+        Map<String, Integer> applicationsByRiskLevel = "my-queue".equals(scope)
+                ? getApplicationRiskLevelDistributionByAppIds(appIds)
+                : getApplicationRiskLevelDistribution(arbName, appIds, scope);
+
+        // Calculate health grade based on % critical applications
+        String healthGrade = ApplicationCentricMetricsResponse.calculateHealthGrade(
+                criticalApplications, applicationsAtRisk);
+
+        log.info("App-centric metrics calculated: appsAtRisk={}, critical={}, highRisk={}, avgItemsPerApp={}, grade={}",
+                applicationsAtRisk, criticalApplications, highRiskApplications, averageItemsPerApp, healthGrade);
+
+        return new ApplicationCentricMetricsResponse(
+                scope,
+                arbName,
+                userId,
+                applicationsAtRisk,
+                criticalApplications,
+                highRiskApplications,
+                applicationsAwaitingTriage,
+                totalOpenItems,
+                averageItemsPerApp,
+                applicationsByRiskLevel,
+                recentActivity,
+                healthGrade
         );
     }
 
@@ -306,7 +405,7 @@ public class ArbDashboardService {
         RiskBreakdown riskBreakdown = calculateRiskBreakdown(appId);
 
         List<String> domains = domainRisks.stream()
-                .map(DomainRisk::getRiskDimension)
+                .map(DomainRisk::getRiskRatingDimension)
                 .distinct()
                 .sorted()
                 .collect(Collectors.toList());
@@ -442,7 +541,7 @@ public class ArbDashboardService {
     private DomainRiskSummaryDto toDomainRiskSummaryDto(DomainRisk dr) {
         return new DomainRiskSummaryDto(
                 dr.getDomainRiskId(),
-                dr.getRiskDimension(),
+                dr.getRiskRatingDimension(),
                 dr.getStatus(),
                 dr.getPriorityScore(),
                 dr.getOpenItems(),
@@ -455,41 +554,45 @@ public class ArbDashboardService {
 
     /**
      * Calculate critical count for metrics.
+     * Uses scoped queries to filter by app IDs based on view (my-queue, my-domain, all-domains).
      */
     private int calculateCriticalCount(List<String> appIds) {
         if (appIds.isEmpty()) return 0;
-        // For scoped metrics, we need to filter by app IDs
-        // This is a simplified implementation - in production, add scope filtering to query
-        return (int) riskItemRepository.countCriticalItems();
+        return (int) riskItemRepository.countCriticalItemsByAppIds(appIds);
     }
 
     /**
      * Calculate open items count for metrics.
+     * Uses scoped queries to filter by app IDs based on view (my-queue, my-domain, all-domains).
      */
     private int calculateOpenItemsCount(List<String> appIds) {
         if (appIds.isEmpty()) return 0;
-        return (int) riskItemRepository.countOpenItems();
+        return (int) riskItemRepository.countTotalOpenItemsByAppIds(appIds);
     }
 
     /**
-     * Calculate pending review count for metrics.
+     * Calculate awaiting triage count for metrics.
+     * Counts OPEN risk items (needs attention, not yet being worked on).
+     * Uses scoped queries to filter by app IDs based on view (my-domain, all-domains).
      */
-    private int calculatePendingReviewCount(List<String> appIds) {
+    private int calculateAwaitingTriageCount(List<String> appIds) {
         if (appIds.isEmpty()) return 0;
-        return (int) domainRiskRepository.countPendingReview();
+        return (int) riskItemRepository.countAwaitingTriageByAppIds(appIds);
     }
 
     /**
      * Calculate average risk score for metrics.
+     * Uses scoped queries to filter by app IDs based on view (my-queue, my-domain, all-domains).
      */
     private double calculateAverageRiskScore(List<String> appIds) {
         if (appIds.isEmpty()) return 0.0;
-        Double avgScore = riskItemRepository.getAveragePriorityScore();
+        Double avgScore = riskItemRepository.getAveragePriorityScoreByAppIds(appIds);
         return avgScore != null ? avgScore : 0.0;
     }
 
     /**
      * Calculate recent activity metrics (7-day and 30-day windows).
+     * Uses scoped queries to filter by app IDs based on view (my-queue, my-domain, all-domains).
      */
     private RecentActivityMetrics calculateRecentActivity(List<String> appIds) {
         if (appIds.isEmpty()) return RecentActivityMetrics.empty();
@@ -498,11 +601,226 @@ public class ArbDashboardService {
         OffsetDateTime sevenDaysAgo = now.minusDays(7);
         OffsetDateTime thirtyDaysAgo = now.minusDays(30);
 
-        int newRisks7d = (int) riskItemRepository.countCreatedAfter(sevenDaysAgo);
-        int resolved7d = (int) riskItemRepository.countResolvedAfter(sevenDaysAgo);
-        int newRisks30d = (int) riskItemRepository.countCreatedAfter(thirtyDaysAgo);
-        int resolved30d = (int) riskItemRepository.countResolvedAfter(thirtyDaysAgo);
+        int newRisks7d = (int) riskItemRepository.countCreatedAfterByAppIds(appIds, sevenDaysAgo);
+        int resolved7d = (int) riskItemRepository.countResolvedAfterByAppIds(appIds, sevenDaysAgo);
+        int newRisks30d = (int) riskItemRepository.countCreatedAfterByAppIds(appIds, thirtyDaysAgo);
+        int resolved30d = (int) riskItemRepository.countResolvedAfterByAppIds(appIds, thirtyDaysAgo);
 
         return new RecentActivityMetrics(newRisks7d, resolved7d, newRisks30d, resolved30d);
+    }
+
+    // ============================================
+    // User-Specific Metrics (for my-queue scope)
+    // ============================================
+
+    /**
+     * Calculate critical count for a specific user.
+     * Counts only risks assigned to this user (my-queue scope).
+     */
+    private int calculateCriticalCountByUser(String userId) {
+        return (int) riskItemRepository.countCriticalItemsByUser(userId);
+    }
+
+    /**
+     * Calculate open items count for a specific user.
+     * Counts only risks assigned to this user (my-queue scope).
+     */
+    private int calculateOpenItemsCountByUser(String userId) {
+        return (int) riskItemRepository.countOpenItemsByUser(userId);
+    }
+
+    /**
+     * Calculate average risk score for a specific user.
+     * Calculates average only for risks assigned to this user (my-queue scope).
+     */
+    private double calculateAverageRiskScoreByUser(String userId) {
+        Double avgScore = riskItemRepository.getAveragePriorityScoreByUser(userId);
+        return avgScore != null ? avgScore : 0.0;
+    }
+
+    /**
+     * Calculate recent activity metrics for a specific user (7-day and 30-day windows).
+     * Counts only risks assigned to this user (my-queue scope).
+     */
+    private RecentActivityMetrics calculateRecentActivityByUser(String userId) {
+        OffsetDateTime now = OffsetDateTime.now();
+        OffsetDateTime sevenDaysAgo = now.minusDays(7);
+        OffsetDateTime thirtyDaysAgo = now.minusDays(30);
+
+        int newRisks7d = (int) riskItemRepository.countCreatedAfterByUser(userId, sevenDaysAgo);
+        int resolved7d = (int) riskItemRepository.countResolvedAfterByUser(userId, sevenDaysAgo);
+        int newRisks30d = (int) riskItemRepository.countCreatedAfterByUser(userId, thirtyDaysAgo);
+        int resolved30d = (int) riskItemRepository.countResolvedAfterByUser(userId, thirtyDaysAgo);
+
+        return new RecentActivityMetrics(newRisks7d, resolved7d, newRisks30d, resolved30d);
+    }
+
+    /**
+     * Calculate awaiting triage count for a specific user.
+     * Counts OPEN risk items assigned to this user (needs attention, not yet being worked on).
+     * User-specific version for "my-queue" scope.
+     */
+    private int calculateAwaitingTriageCountByUser(String userId) {
+        return (int) riskItemRepository.countAwaitingTriageByUser(userId);
+    }
+
+    // ============================================
+    // APP-CENTRIC METRICS HELPERS
+    // ============================================
+
+    /**
+     * Count total applications at risk.
+     * Uses domain_risk table for fast aggregation.
+     */
+    private int calculateApplicationsAtRisk(String arbName, List<String> appIds, String scope) {
+        if (appIds.isEmpty()) return 0;
+
+        // For my-domain: use ARB-filtered query (faster)
+        // For all-domains: use app IDs list (already filtered by active statuses)
+        if ("my-domain".equals(scope)) {
+            return (int) domainRiskRepository.countApplicationsAtRisk(arbName, ACTIVE_STATUSES);
+        } else {
+            return (int) domainRiskRepository.countApplicationsAtRiskByAppIds(appIds, ACTIVE_STATUSES);
+        }
+    }
+
+    /**
+     * Count applications with ≥1 CRITICAL priority risk item.
+     * Uses risk_item table for granular filtering.
+     */
+    private int calculateCriticalApplications(List<String> appIds) {
+        if (appIds.isEmpty()) return 0;
+        return (int) riskItemRepository.countApplicationsWithCriticalItems(appIds);
+    }
+
+    /**
+     * Count applications with ≥1 CRITICAL priority risk item (user-scoped).
+     */
+    private int calculateCriticalApplicationsByUser(String userId) {
+        return (int) riskItemRepository.countApplicationsWithCriticalItemsByUser(userId);
+    }
+
+    /**
+     * Count applications with high risk scores (≥70).
+     * Uses domain_risk table for pre-calculated priority scores.
+     */
+    private int calculateHighRiskApplications(List<String> appIds) {
+        if (appIds.isEmpty()) return 0;
+        return (int) domainRiskRepository.countHighRiskApplicationsByAppIds(appIds, ACTIVE_STATUSES, 70.0);
+    }
+
+    /**
+     * Count applications with high risk scores (≥70) for user's assigned apps.
+     */
+    private int calculateHighRiskApplicationsByUser(List<String> appIds) {
+        if (appIds.isEmpty()) return 0;
+        return (int) domainRiskRepository.countHighRiskApplicationsByAppIds(appIds, ACTIVE_STATUSES, 70.0);
+    }
+
+    /**
+     * Count applications with ≥1 OPEN status risk item (awaiting triage).
+     * Uses risk_item table for status-level filtering.
+     */
+    private int calculateApplicationsAwaitingTriage(List<String> appIds) {
+        if (appIds.isEmpty()) return 0;
+        return (int) riskItemRepository.countApplicationsAwaitingTriage(appIds);
+    }
+
+    /**
+     * Count applications with ≥1 OPEN status risk item (user-scoped).
+     */
+    private int calculateApplicationsAwaitingTriageByUser(String userId) {
+        return (int) riskItemRepository.countApplicationsAwaitingTriageByUser(userId);
+    }
+
+    /**
+     * Calculate application-level activity metrics (7-day and 30-day windows).
+     * Counts unique apps with new risks or resolutions.
+     */
+    private ApplicationActivityMetrics calculateAppActivity(List<String> appIds) {
+        if (appIds.isEmpty()) return new ApplicationActivityMetrics(0, 0, 0, 0);
+
+        OffsetDateTime now = OffsetDateTime.now();
+        OffsetDateTime sevenDaysAgo = now.minusDays(7);
+        OffsetDateTime thirtyDaysAgo = now.minusDays(30);
+
+        int appsWithNewRisks7d = (int) riskItemRepository.countApplicationsWithNewRisks(appIds, sevenDaysAgo);
+        int appsWithResolutions7d = (int) riskItemRepository.countApplicationsWithResolutions(appIds, sevenDaysAgo);
+        int appsWithNewRisks30d = (int) riskItemRepository.countApplicationsWithNewRisks(appIds, thirtyDaysAgo);
+        int appsWithResolutions30d = (int) riskItemRepository.countApplicationsWithResolutions(appIds, thirtyDaysAgo);
+
+        return new ApplicationActivityMetrics(
+                appsWithNewRisks7d,
+                appsWithResolutions7d,
+                appsWithNewRisks30d,
+                appsWithResolutions30d
+        );
+    }
+
+    /**
+     * Calculate application-level activity metrics (user-scoped).
+     */
+    private ApplicationActivityMetrics calculateAppActivityByUser(String userId) {
+        OffsetDateTime now = OffsetDateTime.now();
+        OffsetDateTime sevenDaysAgo = now.minusDays(7);
+        OffsetDateTime thirtyDaysAgo = now.minusDays(30);
+
+        int appsWithNewRisks7d = (int) riskItemRepository.countApplicationsWithNewRisksByUser(userId, sevenDaysAgo);
+        int appsWithResolutions7d = (int) riskItemRepository.countApplicationsWithResolutionsByUser(userId, sevenDaysAgo);
+        int appsWithNewRisks30d = (int) riskItemRepository.countApplicationsWithNewRisksByUser(userId, thirtyDaysAgo);
+        int appsWithResolutions30d = (int) riskItemRepository.countApplicationsWithResolutionsByUser(userId, thirtyDaysAgo);
+
+        return new ApplicationActivityMetrics(
+                appsWithNewRisks7d,
+                appsWithResolutions7d,
+                appsWithNewRisks30d,
+                appsWithResolutions30d
+        );
+    }
+
+    /**
+     * Get application risk level distribution (CRITICAL/HIGH/MEDIUM/LOW).
+     * Uses domain_risk table for pre-calculated priority scores.
+     */
+    private Map<String, Integer> getApplicationRiskLevelDistribution(String arbName, List<String> appIds, String scope) {
+        // Convert enum statuses to strings for native query
+        List<String> statusStrings = ACTIVE_STATUSES.stream()
+                .map(Enum::name)
+                .collect(Collectors.toList());
+
+        List<Object[]> distribution;
+
+        if ("my-domain".equals(scope)) {
+            distribution = domainRiskRepository.getApplicationRiskLevelDistribution(arbName, statusStrings);
+        } else {
+            distribution = domainRiskRepository.getApplicationRiskLevelDistributionByAppIds(appIds, statusStrings);
+        }
+
+        return distribution.stream()
+                .collect(Collectors.toMap(
+                        row -> (String) row[0],
+                        row -> ((Long) row[1]).intValue()
+                ));
+    }
+
+    /**
+     * Get application risk level distribution for user's assigned apps.
+     */
+    private Map<String, Integer> getApplicationRiskLevelDistributionByAppIds(List<String> appIds) {
+        if (appIds.isEmpty()) return Map.of();
+
+        // Convert enum statuses to strings for native query
+        List<String> statusStrings = ACTIVE_STATUSES.stream()
+                .map(Enum::name)
+                .collect(Collectors.toList());
+
+        List<Object[]> distribution = domainRiskRepository.getApplicationRiskLevelDistributionByAppIds(
+                appIds, statusStrings);
+
+        return distribution.stream()
+                .collect(Collectors.toMap(
+                        row -> (String) row[0],
+                        row -> ((Long) row[1]).intValue()
+                ));
     }
 }

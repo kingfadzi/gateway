@@ -20,7 +20,7 @@ public class RiskDtoMapper {
         return new DomainRiskResponse(
                 domainRisk.getDomainRiskId(),
                 domainRisk.getAppId(),
-                domainRisk.getRiskDimension(),
+                domainRisk.getRiskRatingDimension(),
                 domainRisk.getDerivedFrom(),
                 domainRisk.getArb(),
                 domainRisk.getTitle(),
@@ -55,6 +55,8 @@ public class RiskDtoMapper {
         return new RiskItemResponse(
                 riskItem.getRiskItemId(),
                 riskItem.getDomainRiskId(),
+                riskItem.getRiskRatingDimension(),
+                riskItem.getArb(),
                 riskItem.getAppId(),
                 riskItem.getFieldKey(),
                 riskItem.getProfileFieldId(),

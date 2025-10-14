@@ -19,10 +19,10 @@ import java.util.Optional;
 public interface DomainRiskRepository extends JpaRepository<DomainRisk, String> {
 
     /**
-     * Find domain risk by application and risk dimension.
-     * Used to get or create domain risk for a specific app+risk_dimension combination.
+     * Find domain risk by application and risk rating dimension.
+     * Used to get or create domain risk for a specific app+risk_rating_dimension combination.
      */
-    Optional<DomainRisk> findByAppIdAndRiskDimension(String appId, String riskDimension);
+    Optional<DomainRisk> findByAppIdAndRiskRatingDimension(String appId, String riskRatingDimension);
 
     /**
      * Find all domain risks assigned to a specific ARB
@@ -49,16 +49,16 @@ public interface DomainRiskRepository extends JpaRepository<DomainRisk, String> 
         @Param("statuses") List<DomainRiskStatus> statuses);
 
     /**
-     * Get risk dimension summary for an ARB.
-     * Returns: [risk_dimension, count, total_open_items, avg_priority_score]
+     * Get risk rating dimension summary for an ARB.
+     * Returns: [risk_rating_dimension, count, total_open_items, avg_priority_score]
      * Used for ARB dashboard/overview.
      */
     @Query("""
-        SELECT dr.riskDimension, COUNT(dr), SUM(dr.openItems), AVG(dr.priorityScore)
+        SELECT dr.riskRatingDimension, COUNT(dr), SUM(dr.openItems), AVG(dr.priorityScore)
         FROM DomainRisk dr
         WHERE dr.assignedArb = :arb
         AND dr.status IN :statuses
-        GROUP BY dr.riskDimension
+        GROUP BY dr.riskRatingDimension
         ORDER BY AVG(dr.priorityScore) DESC
         """)
     List<Object[]> getDomainSummaryForArb(
@@ -107,17 +107,17 @@ public interface DomainRiskRepository extends JpaRepository<DomainRisk, String> 
         @Param("statuses") List<DomainRiskStatus> statuses);
 
     /**
-     * Find domain risks by risk dimension (my-dimension scope).
-     * Returns all domain risks in a specific risk dimension with active statuses.
+     * Find domain risks by risk rating dimension (my-dimension scope).
+     * Returns all domain risks in a specific risk rating dimension with active statuses.
      */
     @Query("""
         SELECT dr FROM DomainRisk dr
-        WHERE dr.riskDimension = :riskDimension
+        WHERE dr.riskRatingDimension = :riskRatingDimension
         AND dr.status IN :statuses
         ORDER BY dr.priorityScore DESC, dr.openItems DESC
         """)
-    List<DomainRisk> findByRiskDimensionAndStatuses(
-        @Param("riskDimension") String riskDimension,
+    List<DomainRisk> findByRiskRatingDimensionAndStatuses(
+        @Param("riskRatingDimension") String riskRatingDimension,
         @Param("statuses") List<DomainRiskStatus> statuses);
 
     /**
@@ -153,6 +153,17 @@ public interface DomainRiskRepository extends JpaRepository<DomainRisk, String> 
         WHERE dr.status = 'PENDING_ARB_REVIEW'
         """)
     long countPendingReview();
+
+    /**
+     * Count domain risks with PENDING_ARB_REVIEW status for specific apps.
+     * Scoped version for dashboard metrics (my-queue, my-domain, all-domains).
+     */
+    @Query("""
+        SELECT COUNT(dr) FROM DomainRisk dr
+        WHERE dr.appId IN :appIds
+        AND dr.status = 'PENDING_ARB_REVIEW'
+        """)
+    long countPendingReviewByAppIds(@Param("appIds") List<String> appIds);
 
     /**
      * Get unique app IDs from domain risks matching scope criteria.
@@ -209,4 +220,128 @@ public interface DomainRiskRepository extends JpaRepository<DomainRisk, String> 
         @Param("assignedTo") String assignedTo,
         @Param("assignedToName") String assignedToName,
         @Param("assignedAt") OffsetDateTime assignedAt);
+
+    // ========== APP-CENTRIC METRICS QUERIES ==========
+    // Used for ARB dashboard overview metrics (counting applications, not risk items)
+
+    /**
+     * Count unique applications at risk for an ARB.
+     * Returns count of distinct apps with domain risks in active statuses.
+     */
+    @Query("""
+        SELECT COUNT(DISTINCT dr.appId) FROM DomainRisk dr
+        WHERE dr.assignedArb = :arbName
+        AND dr.status IN :statuses
+        """)
+    long countApplicationsAtRisk(
+        @Param("arbName") String arbName,
+        @Param("statuses") List<DomainRiskStatus> statuses);
+
+    /**
+     * Count unique applications at risk (scoped by app IDs).
+     * Used for my-queue and filtered views.
+     */
+    @Query("""
+        SELECT COUNT(DISTINCT dr.appId) FROM DomainRisk dr
+        WHERE dr.appId IN :appIds
+        AND dr.status IN :statuses
+        """)
+    long countApplicationsAtRiskByAppIds(
+        @Param("appIds") List<String> appIds,
+        @Param("statuses") List<DomainRiskStatus> statuses);
+
+    /**
+     * Count applications with high priority scores (≥70).
+     * Used for "High Risk Applications" metric.
+     */
+    @Query("""
+        SELECT COUNT(DISTINCT dr.appId) FROM DomainRisk dr
+        WHERE dr.assignedArb = :arbName
+        AND dr.status IN :statuses
+        AND dr.priorityScore >= :scoreThreshold
+        """)
+    long countHighRiskApplications(
+        @Param("arbName") String arbName,
+        @Param("statuses") List<DomainRiskStatus> statuses,
+        @Param("scoreThreshold") double scoreThreshold);
+
+    /**
+     * Count applications with high priority scores (scoped by app IDs).
+     */
+    @Query("""
+        SELECT COUNT(DISTINCT dr.appId) FROM DomainRisk dr
+        WHERE dr.appId IN :appIds
+        AND dr.status IN :statuses
+        AND dr.priorityScore >= :scoreThreshold
+        """)
+    long countHighRiskApplicationsByAppIds(
+        @Param("appIds") List<String> appIds,
+        @Param("statuses") List<DomainRiskStatus> statuses,
+        @Param("scoreThreshold") double scoreThreshold);
+
+    /**
+     * Get application risk level distribution.
+     * Returns: [risk_level, app_count]
+     * Risk levels: CRITICAL (90-100), HIGH (70-89), MEDIUM (40-69), LOW (0-39)
+     */
+    @Query(value = """
+        SELECT risk_level, COUNT(DISTINCT app_id)
+        FROM (
+            SELECT
+                dr.app_id,
+                CASE
+                    WHEN MAX(dr.priority_score) >= 90 THEN 'CRITICAL'
+                    WHEN MAX(dr.priority_score) >= 70 THEN 'HIGH'
+                    WHEN MAX(dr.priority_score) >= 40 THEN 'MEDIUM'
+                    ELSE 'LOW'
+                END as risk_level
+            FROM domain_risk dr
+            WHERE dr.assigned_arb = :arbName
+            AND dr.status IN (:statuses)
+            GROUP BY dr.app_id
+        ) subquery
+        GROUP BY risk_level
+        ORDER BY
+            CASE risk_level
+                WHEN 'CRITICAL' THEN 1
+                WHEN 'HIGH' THEN 2
+                WHEN 'MEDIUM' THEN 3
+                WHEN 'LOW' THEN 4
+            END
+        """, nativeQuery = true)
+    List<Object[]> getApplicationRiskLevelDistribution(
+        @Param("arbName") String arbName,
+        @Param("statuses") List<String> statuses);
+
+    /**
+     * Get application risk level distribution (scoped by app IDs).
+     */
+    @Query(value = """
+        SELECT risk_level, COUNT(DISTINCT app_id)
+        FROM (
+            SELECT
+                dr.app_id,
+                CASE
+                    WHEN MAX(dr.priority_score) >= 90 THEN 'CRITICAL'
+                    WHEN MAX(dr.priority_score) >= 70 THEN 'HIGH'
+                    WHEN MAX(dr.priority_score) >= 40 THEN 'MEDIUM'
+                    ELSE 'LOW'
+                END as risk_level
+            FROM domain_risk dr
+            WHERE dr.app_id IN (:appIds)
+            AND dr.status IN (:statuses)
+            GROUP BY dr.app_id
+        ) subquery
+        GROUP BY risk_level
+        ORDER BY
+            CASE risk_level
+                WHEN 'CRITICAL' THEN 1
+                WHEN 'HIGH' THEN 2
+                WHEN 'MEDIUM' THEN 3
+                WHEN 'LOW' THEN 4
+            END
+        """, nativeQuery = true)
+    List<Object[]> getApplicationRiskLevelDistributionByAppIds(
+        @Param("appIds") List<String> appIds,
+        @Param("statuses") List<String> statuses);
 }
