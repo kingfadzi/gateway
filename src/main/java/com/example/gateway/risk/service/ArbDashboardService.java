@@ -306,7 +306,7 @@ public class ArbDashboardService {
         RiskBreakdown riskBreakdown = calculateRiskBreakdown(appId);
 
         List<String> domains = domainRisks.stream()
-                .map(DomainRisk::getDomain)
+                .map(DomainRisk::getRiskDimension)
                 .distinct()
                 .sorted()
                 .collect(Collectors.toList());
@@ -442,7 +442,7 @@ public class ArbDashboardService {
     private DomainRiskSummaryDto toDomainRiskSummaryDto(DomainRisk dr) {
         return new DomainRiskSummaryDto(
                 dr.getDomainRiskId(),
-                dr.getDomain(),
+                dr.getRiskDimension(),
                 dr.getStatus(),
                 dr.getPriorityScore(),
                 dr.getOpenItems(),

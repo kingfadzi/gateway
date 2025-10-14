@@ -310,7 +310,7 @@ public class EvidenceController {
                 request.setApplicationType(applicationType);
                 request.setArchitectureType(architectureType);
                 request.setInstallType(installType);
-                request.setDomain(domain);
+                request.setRiskDimension(domain);
                 request.setSearch(search);
                 request.setLimit(size);
                 request.setOffset(page * size);

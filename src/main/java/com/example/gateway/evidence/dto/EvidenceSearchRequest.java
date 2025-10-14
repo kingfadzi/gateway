@@ -10,7 +10,7 @@ public class EvidenceSearchRequest {
     private String architectureType;
     private String installType;
     private String search;
-    private String domain;
+    private String riskDimension;
     private String fieldKey;
     private String assignedReviewer;
     private String submittedBy;
@@ -83,12 +83,12 @@ public class EvidenceSearchRequest {
         this.search = search;
     }
 
-    public String getDomain() {
-        return domain;
+    public String getRiskDimension() {
+        return riskDimension;
     }
 
-    public void setDomain(String domain) {
-        this.domain = domain;
+    public void setRiskDimension(String riskDimension) {
+        this.riskDimension = riskDimension;
     }
 
     public String getFieldKey() {

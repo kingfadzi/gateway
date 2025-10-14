@@ -5,7 +5,7 @@ package com.example.gateway.risk.dto;
  * Shows aggregate statistics across domains.
  */
 public record DomainRiskSummaryResponse(
-        String domain,
+        String riskDimension,
         Long count,
         Long totalOpenItems,
         Double avgPriorityScore

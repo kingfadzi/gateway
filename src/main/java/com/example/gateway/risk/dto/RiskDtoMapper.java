@@ -20,7 +20,7 @@ public class RiskDtoMapper {
         return new DomainRiskResponse(
                 domainRisk.getDomainRiskId(),
                 domainRisk.getAppId(),
-                domainRisk.getDomain(),
+                domainRisk.getRiskDimension(),
                 domainRisk.getDerivedFrom(),
                 domainRisk.getArb(),
                 domainRisk.getTitle(),

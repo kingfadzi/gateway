@@ -38,7 +38,7 @@ public record ArbDashboardResponse(
     ) {}
 
     public record DomainBreakdown(
-            String domain,
+            String riskDimension,
             long riskCount,
             long openItems,
             long criticalItems,

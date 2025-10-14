@@ -9,8 +9,8 @@ import java.util.List;
 
 /**
  * Domain-level risk aggregation entity.
- * Groups individual risk items by domain (e.g., Security, Integrity) per application.
- * Routes to appropriate Architecture Review Board (ARB) based on domain.
+ * Groups individual risk items by risk dimension (CIA+R+S+Governance) per application.
+ * Routes to appropriate Architecture Review Board (ARB) based on risk dimension.
  */
 @Data
 @Entity
@@ -24,8 +24,8 @@ public class DomainRisk {
     @Column(name = "app_id", nullable = false)
     private String appId;
 
-    @Column(name = "domain", nullable = false, length = 100)
-    private String domain;
+    @Column(name = "risk_dimension", nullable = false, length = 100)
+    private String riskDimension;
 
     @Column(name = "derived_from", nullable = false, length = 100)
     private String derivedFrom;

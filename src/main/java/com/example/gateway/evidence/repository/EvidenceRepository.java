@@ -477,9 +477,9 @@ public class EvidenceRepository {
             sqlBuilder.append(" AND e.submitted_by = :submittedBy");
             params.addValue("submittedBy", request.getSubmittedBy());
         }
-        if (request.getDomain() != null) {
+        if (request.getRiskDimension() != null) {
             sqlBuilder.append(" AND pf.derived_from LIKE :domain || '_rating'");
-            params.addValue("domain", request.getDomain());
+            params.addValue("domain", request.getRiskDimension());
         }
         if (request.getSearch() != null && !request.getSearch().isBlank()) {
             sqlBuilder.append("""

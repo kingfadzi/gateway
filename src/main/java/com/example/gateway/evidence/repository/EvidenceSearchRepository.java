@@ -182,9 +182,9 @@ public class EvidenceSearchRepository {
         }
 
         // Domain filter (special pattern matching)
-        if (request.getDomain() != null) {
+        if (request.getRiskDimension() != null) {
             sqlBuilder.append(" AND pf.derived_from LIKE :domain || '_rating'");
-            params.put("domain", request.getDomain());
+            params.put("domain", request.getRiskDimension());
         }
 
         // Text search across multiple columns

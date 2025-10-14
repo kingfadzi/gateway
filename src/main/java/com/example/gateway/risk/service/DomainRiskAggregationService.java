@@ -55,7 +55,7 @@ public class DomainRiskAggregationService {
         String domain = arbRoutingService.calculateDomain(derivedFrom);
         String arb = arbRoutingService.getArbForDerivedFrom(derivedFrom);
 
-        return domainRiskRepository.findByAppIdAndDomain(appId, domain)
+        return domainRiskRepository.findByAppIdAndRiskDimension(appId, domain)
                 .orElseGet(() -> createNewDomainRisk(appId, domain, derivedFrom, arb));
     }
 
@@ -66,7 +66,7 @@ public class DomainRiskAggregationService {
         DomainRisk domainRisk = new DomainRisk();
         domainRisk.setDomainRiskId(UUID.randomUUID().toString());
         domainRisk.setAppId(appId);
-        domainRisk.setDomain(domain);
+        domainRisk.setRiskDimension(domain);
         domainRisk.setDerivedFrom(derivedFrom);
         domainRisk.setArb(arb);
         domainRisk.setAssignedArb(arb);  // Auto-assign to ARB

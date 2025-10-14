@@ -19,10 +19,10 @@ import java.util.Optional;
 public interface DomainRiskRepository extends JpaRepository<DomainRisk, String> {
 
     /**
-     * Find domain risk by application and domain.
-     * Used to get or create domain risk for a specific app+domain combination.
+     * Find domain risk by application and risk dimension.
+     * Used to get or create domain risk for a specific app+risk_dimension combination.
      */
-    Optional<DomainRisk> findByAppIdAndDomain(String appId, String domain);
+    Optional<DomainRisk> findByAppIdAndRiskDimension(String appId, String riskDimension);
 
     /**
      * Find all domain risks assigned to a specific ARB
@@ -49,16 +49,16 @@ public interface DomainRiskRepository extends JpaRepository<DomainRisk, String> 
         @Param("statuses") List<DomainRiskStatus> statuses);
 
     /**
-     * Get domain-level summary for an ARB.
-     * Returns: [domain, count, total_open_items, avg_priority_score]
+     * Get risk dimension summary for an ARB.
+     * Returns: [risk_dimension, count, total_open_items, avg_priority_score]
      * Used for ARB dashboard/overview.
      */
     @Query("""
-        SELECT dr.domain, COUNT(dr), SUM(dr.openItems), AVG(dr.priorityScore)
+        SELECT dr.riskDimension, COUNT(dr), SUM(dr.openItems), AVG(dr.priorityScore)
         FROM DomainRisk dr
         WHERE dr.assignedArb = :arb
         AND dr.status IN :statuses
-        GROUP BY dr.domain
+        GROUP BY dr.riskDimension
         ORDER BY AVG(dr.priorityScore) DESC
         """)
     List<Object[]> getDomainSummaryForArb(
@@ -107,17 +107,17 @@ public interface DomainRiskRepository extends JpaRepository<DomainRisk, String> 
         @Param("statuses") List<DomainRiskStatus> statuses);
 
     /**
-     * Find domain risks by domain (my-domain scope).
-     * Returns all domain risks in a specific domain with active statuses.
+     * Find domain risks by risk dimension (my-dimension scope).
+     * Returns all domain risks in a specific risk dimension with active statuses.
      */
     @Query("""
         SELECT dr FROM DomainRisk dr
-        WHERE dr.domain = :domain
+        WHERE dr.riskDimension = :riskDimension
         AND dr.status IN :statuses
         ORDER BY dr.priorityScore DESC, dr.openItems DESC
         """)
-    List<DomainRisk> findByDomainAndStatuses(
-        @Param("domain") String domain,
+    List<DomainRisk> findByRiskDimensionAndStatuses(
+        @Param("riskDimension") String riskDimension,
         @Param("statuses") List<DomainRiskStatus> statuses);
 
     /**

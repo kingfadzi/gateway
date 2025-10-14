@@ -10,7 +10,7 @@ import java.time.OffsetDateTime;
  */
 public record DomainRiskSummaryDto(
     String domainRiskId,
-    String domain,
+    String riskDimension,
     DomainRiskStatus status,
     Integer priorityScore,
     Integer openItems,
