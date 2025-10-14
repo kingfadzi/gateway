@@ -361,4 +361,57 @@ public class DomainRiskAggregationService {
                         "Review and remediate individual risk items to improve overall compliance posture.",
                 domain, derivedFrom);
     }
+
+    /**
+     * Bulk update multiple risk items with the same status change.
+     * Applies the update to each risk item and recalculates domain aggregations.
+     *
+     * @param riskItemIds List of risk item IDs to update
+     * @param newStatus New status to apply
+     * @param resolution Resolution type (if being resolved/closed)
+     * @param resolutionComment Comment explaining resolution
+     * @return Result containing successful IDs and failures
+     */
+    @Transactional
+    public BulkUpdateResult bulkUpdateRiskItemStatus(List<String> riskItemIds, RiskItemStatus newStatus,
+                                         String resolution, String resolutionComment) {
+        java.util.List<String> successfulIds = new java.util.ArrayList<>();
+        java.util.List<BulkUpdateFailure> failures = new java.util.ArrayList<>();
+
+        if (riskItemIds == null || riskItemIds.isEmpty()) {
+            return new BulkUpdateResult(successfulIds, failures);
+        }
+
+        for (String riskItemId : riskItemIds) {
+            try {
+                updateRiskItemStatus(riskItemId, newStatus, resolution, resolutionComment);
+                successfulIds.add(riskItemId);
+            } catch (IllegalArgumentException e) {
+                log.error("Risk item not found in bulk update: {}", riskItemId);
+                failures.add(new BulkUpdateFailure(riskItemId, "Risk item not found"));
+            } catch (Exception e) {
+                log.error("Failed to update risk item {} in bulk update: {}", riskItemId, e.getMessage());
+                failures.add(new BulkUpdateFailure(riskItemId, e.getMessage()));
+            }
+        }
+
+        log.info("Bulk updated {} of {} risk items to status: {}", successfulIds.size(), riskItemIds.size(), newStatus);
+        return new BulkUpdateResult(successfulIds, failures);
+    }
+
+    /**
+     * Result holder for bulk update operations.
+     */
+    public record BulkUpdateResult(
+            java.util.List<String> successfulIds,
+            java.util.List<BulkUpdateFailure> failures
+    ) {}
+
+    /**
+     * Individual failure details for bulk operations.
+     */
+    public record BulkUpdateFailure(
+            String riskItemId,
+            String reason
+    ) {}
 }

@@ -8,6 +8,8 @@ import com.example.gateway.risk.service.DomainRiskAggregationService;
 import com.example.gateway.risk.service.RiskAssignmentService;
 import com.example.gateway.profile.service.ProfileFieldRegistryService;
 import com.example.gateway.profile.dto.ProfileFieldTypeInfo;
+import com.example.gateway.risk.dto.BulkRiskItemUpdateRequest;
+import com.example.gateway.risk.dto.BulkRiskItemUpdateResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
@@ -145,6 +147,69 @@ public class RiskItemController {
         RiskItemResponse response = RiskDtoMapper.toRiskItemResponse(updated);
 
         log.info("Updated risk item {} to status: {}", riskItemId, request.status());
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Bulk update multiple risk items with the same status change.
+     * Useful for resolving/closing multiple related risks at once.
+     *
+     * POST /api/v1/risk-items/bulk-update
+     *
+     * Request body:
+     * {
+     *   "riskItemIds": ["item_uuid1", "item_uuid2", ...],
+     *   "status": "RESOLVED",
+     *   "resolution": "Fixed in release v2.3",
+     *   "resolutionComment": "All items addressed in latest deployment"
+     * }
+     *
+     * Response includes:
+     * - totalRequested: Number of IDs in request
+     * - successCount: Number successfully updated
+     * - failureCount: Number that failed
+     * - successfulIds: List of successfully updated IDs
+     * - failures: List of failures with reasons
+     */
+    @PostMapping("/bulk-update")
+    public ResponseEntity<BulkRiskItemUpdateResponse> bulkUpdateRiskItems(
+            @RequestBody BulkRiskItemUpdateRequest request) {
+
+        log.info("POST /api/v1/risk-items/bulk-update - Updating {} risk items to status: {}",
+                request.riskItemIds().size(), request.status());
+
+        // Validate request
+        if (!request.isValid()) {
+            log.warn("Invalid bulk update request: missing required fields");
+            return ResponseEntity.badRequest().build();
+        }
+
+        // Perform bulk update
+        DomainRiskAggregationService.BulkUpdateResult result =
+                aggregationService.bulkUpdateRiskItemStatus(
+                        request.riskItemIds(),
+                        request.status(),
+                        request.resolution(),
+                        request.resolutionComment()
+                );
+
+        // Convert service failures to DTO failures
+        List<BulkRiskItemUpdateResponse.BulkUpdateFailure> dtoFailures = result.failures().stream()
+                .map(f -> new BulkRiskItemUpdateResponse.BulkUpdateFailure(f.riskItemId(), f.reason()))
+                .collect(Collectors.toList());
+
+        // Build response
+        BulkRiskItemUpdateResponse response = new BulkRiskItemUpdateResponse(
+                request.riskItemIds().size(),
+                result.successfulIds().size(),
+                result.failures().size(),
+                result.successfulIds(),
+                dtoFailures
+        );
+
+        log.info("Bulk update completed: {} succeeded, {} failed out of {} requested",
+                response.successCount(), response.failureCount(), response.totalRequested());
+
         return ResponseEntity.ok(response);
     }
 
