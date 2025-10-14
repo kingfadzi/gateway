@@ -54,11 +54,11 @@ class ProfileFieldDomainTest {
         assertEquals("resilience", drField.domain());
         assertEquals("resilience_rating", drField.derivedFrom());
 
-        // Test artifact domain (special case without _rating suffix)
-        ProfileFieldTypeInfo artifactField = profileFieldRegistryService
+        // Test app_criticality_assessment domain (special case without _rating suffix)
+        ProfileFieldTypeInfo criticalityField = profileFieldRegistryService
                 .getFieldTypeInfo("product_vision")
                 .orElseThrow();
-        assertEquals("artifact", artifactField.domain());
-        assertEquals("artifact", artifactField.derivedFrom());
+        assertEquals("app_criticality_assessment", criticalityField.domain());
+        assertEquals("app_criticality_assessment", criticalityField.derivedFrom());
     }
 }

@@ -46,12 +46,14 @@ public class EvidenceSearchRepository {
                    efl.link_status, efl.linked_by, efl.linked_at,
                    efl.reviewed_by, efl.reviewed_at, efl.review_comment,
                    d.title as document_title, d.source_type as document_source_type,
-                   d.owners as document_owners, d.link_health as document_link_health
+                   d.owners as document_owners, d.link_health as document_link_health,
+                   dv.url_at_version
             FROM evidence e
             JOIN evidence_field_link efl ON e.evidence_id = efl.evidence_id
             JOIN profile_field pf ON e.profile_field_id = pf.id
             JOIN profile p ON pf.profile_id = p.profile_id
             LEFT JOIN document d ON e.document_id = d.document_id
+            LEFT JOIN document_version dv ON e.doc_version_id = dv.doc_version_id
             LEFT JOIN application app ON e.app_id = app.app_id
             WHERE 1=1
             """);
@@ -182,9 +184,9 @@ public class EvidenceSearchRepository {
         }
 
         // Domain filter (special pattern matching)
-        if (request.getDomain() != null) {
+        if (request.getRiskDimension() != null) {
             sqlBuilder.append(" AND pf.derived_from LIKE :domain || '_rating'");
-            params.put("domain", request.getDomain());
+            params.put("domain", request.getRiskDimension());
         }
 
         // Text search across multiple columns
@@ -245,7 +247,9 @@ public class EvidenceSearchRepository {
             rs.getString("document_title"),
             rs.getString("document_source_type"),
             rs.getString("document_owners"),
-            (Integer) rs.getObject("document_link_health")
+            (Integer) rs.getObject("document_link_health"),
+            // Document version information
+            rs.getString("url_at_version")
         );
     }
 }

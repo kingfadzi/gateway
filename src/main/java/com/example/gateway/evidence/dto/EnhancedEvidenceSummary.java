@@ -36,5 +36,8 @@ public record EnhancedEvidenceSummary(
         String documentTitle,       // Document title
         String documentSourceType,  // confluence, gitlab, platform, manual
         String documentOwners,      // Document owners/authors
-        Integer documentLinkHealth  // Document health status (HTTP code)
+        Integer documentLinkHealth, // Document health status (HTTP code)
+
+        // Document version information
+        String urlAtVersion         // Versioned URL from document_version (if doc_version_id present)
 ) {}

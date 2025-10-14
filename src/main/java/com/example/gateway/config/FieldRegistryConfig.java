@@ -43,13 +43,17 @@ public class FieldRegistryConfig {
     }
 
     // Inner classes for YAML mapping
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class ProfileFieldRegistry {
         @JsonProperty("version")
         public int version;
-        
+
         @JsonProperty("updated_at")
         public String updatedAt;
-        
+
+        @JsonProperty("arb_routing")
+        public Map<String, String> arbRouting;
+
         @JsonProperty("fields")
         public List<FieldDefinition> fields;
     }

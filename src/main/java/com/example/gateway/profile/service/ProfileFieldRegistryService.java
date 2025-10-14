@@ -44,7 +44,7 @@ public class ProfileFieldRegistryService {
     private void parseRegistry(Map<String, Object> registry) {
         profileFieldTypes = new ArrayList<>();
         fieldRiskConfigs = new HashMap<>();
-        
+
         // Extract the "fields" array from the registry
         Object fieldsObj = registry.get("fields");
         if (fieldsObj instanceof List) {
@@ -54,20 +54,22 @@ public class ProfileFieldRegistryService {
                 String fieldKey = getString(fieldMap, "key");
                 String label = getString(fieldMap, "label");
                 String derivedFrom = getString(fieldMap, "derived_from");
-                
+                String arb = getString(fieldMap, "arb");
+
                 if (fieldKey != null && label != null) {
                     // Parse compliance frameworks
                     List<ComplianceFramework> complianceFrameworks = parseComplianceFrameworks(fieldMap);
-                    
+
                     // Calculate domain from derived_from field
                     String domain = getDomainFromDerivedFrom(derivedFrom);
-                    
+
                     // Create ProfileFieldTypeInfo (existing functionality)
                     profileFieldTypes.add(new ProfileFieldTypeInfo(
                             fieldKey,
                             label,
                             domain,
                             derivedFrom,
+                            arb,
                             complianceFrameworks
                     ));
                     
@@ -103,10 +105,11 @@ public class ProfileFieldRegistryService {
                 String label = getString(rule, "label");
                 String ttl = getString(rule, "ttl");
                 Boolean requiresReview = getBoolean(rule, "requires_review");
-                
+                String priority = getString(rule, "priority");
+
                 if (value != null && label != null) {
                     riskRules.put(criticality, RiskCreationRule.fromRegistryRule(
-                            value, label, ttl, requiresReview
+                            value, label, ttl, requiresReview, priority
                     ));
                 }
             }
@@ -276,5 +279,50 @@ public class ProfileFieldRegistryService {
                 .filter(fieldType -> domain.equals(fieldType.derivedFrom()))
                 .map(ProfileFieldTypeInfo::fieldKey)
                 .collect(Collectors.toList());
+    }
+
+    // =====================
+    // ARB Routing Methods
+    // =====================
+
+    /**
+     * Get ARB name for a given derived_from field (e.g., "security_rating" -> "security")
+     * Finds the first field with this derived_from and returns its arb
+     */
+    public Optional<String> getArbForDerivedFrom(String derivedFrom) {
+        return profileFieldTypes.stream()
+                .filter(ft -> derivedFrom.equals(ft.derivedFrom()))
+                .map(ProfileFieldTypeInfo::arb)
+                .findFirst();
+    }
+
+    /**
+     * Get all ARB routing configurations (derived_from -> arb mapping)
+     * Builds map from unique derived_from values across all fields
+     */
+    public Map<String, String> getAllArbRouting() {
+        Map<String, String> routing = new HashMap<>();
+        for (ProfileFieldTypeInfo fieldType : profileFieldTypes) {
+            if (fieldType.derivedFrom() != null && fieldType.arb() != null) {
+                routing.putIfAbsent(fieldType.derivedFrom(), fieldType.arb());
+            }
+        }
+        return Map.copyOf(routing);
+    }
+
+    /**
+     * Get ARB name for a field directly from its arb property
+     */
+    public Optional<String> getArbForField(String fieldKey) {
+        return getFieldTypeInfo(fieldKey)
+                .map(ProfileFieldTypeInfo::arb);
+    }
+
+    /**
+     * Get derived_from value for a field
+     */
+    public Optional<String> getDerivedFromForField(String fieldKey) {
+        return getFieldTypeInfo(fieldKey)
+                .map(ProfileFieldTypeInfo::derivedFrom);
     }
 }
