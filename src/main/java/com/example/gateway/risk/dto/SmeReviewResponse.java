@@ -7,8 +7,15 @@ import java.time.OffsetDateTime;
  */
 public record SmeReviewResponse(
         String riskId,
-        String status,         // e.g., "SME_APPROVED", "SME_REJECTED", "INFO_REQUESTED", etc.
+        String status,         // e.g., "SME_APPROVED", "SME_REJECTED", "INFO_REQUESTED", "VALIDATION_ERROR", etc.
         String reviewedBy,
-        OffsetDateTime reviewedAt
+        OffsetDateTime reviewedAt,
+        String errorMessage    // Optional error message (null for successful operations)
 ) {
+    /**
+     * Constructor for successful operations (no error message).
+     */
+    public SmeReviewResponse(String riskId, String status, String reviewedBy, OffsetDateTime reviewedAt) {
+        this(riskId, status, reviewedBy, reviewedAt, null);
+    }
 }

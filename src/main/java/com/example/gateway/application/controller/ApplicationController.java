@@ -72,7 +72,9 @@ public class ApplicationController {
             @Parameter(description = "Filter by architecture type")
             @RequestParam(required = false) String architectureType,
             @Parameter(description = "Filter by installation type")
-            @RequestParam(required = false) String installType
+            @RequestParam(required = false) String installType,
+            @Parameter(description = "Include risk metrics (total, in progress, score, critical/high counts)")
+            @RequestParam(required = false, defaultValue = "false") boolean includeRiskMetrics
     ) {
         // Get total count (all apps)
         List<Application> allApps = applicationQueryService.search(Map.of());
@@ -104,13 +106,16 @@ public class ApplicationController {
         // Get filtered apps
         List<Application> filteredApps = applicationQueryService.search(params);
         int filteredCount = filteredApps.size();
-        
-        // Convert to DTOs
-        List<AppSummaryResponse> appSummaries = applicationQueryService.convertToSummaryResponse(filteredApps);
-        
+
+        // Convert to DTOs with optional risk metrics
+        List<AppSummaryResponse> appSummaries = applicationQueryService.convertToSummaryResponse(
+                filteredApps,
+                includeRiskMetrics
+        );
+
         // Calculate KPIs from filtered apps
         KpiSummary kpis = kpiService.calculateKpisFromApplications(filteredApps);
-        
+
         AppsResponse response = new AppsResponse(appSummaries, kpis, totalCount, filteredCount);
         return ResponseEntity.ok(response);
     }

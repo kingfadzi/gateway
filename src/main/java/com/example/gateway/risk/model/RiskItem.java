@@ -89,7 +89,7 @@ public class RiskItem {
     // Status
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 50)
-    private RiskItemStatus status = RiskItemStatus.OPEN;
+    private RiskItemStatus status = RiskItemStatus.PENDING_REVIEW;
 
     @Column(name = "resolution", length = 50)
     private String resolution;

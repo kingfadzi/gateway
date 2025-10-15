@@ -157,7 +157,7 @@ public class RiskAutoCreationServiceImpl implements RiskAutoCreationService {
         riskItem.setEvidenceStatus(evidenceStatus);
 
         // Status
-        riskItem.setStatus(RiskItemStatus.OPEN);
+        riskItem.setStatus(RiskItemStatus.PENDING_REVIEW);
 
         // Lifecycle
         riskItem.setCreationType(RiskCreationType.SYSTEM_AUTO_CREATION);

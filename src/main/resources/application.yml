@@ -24,7 +24,7 @@ spring:
     name: delivery-unit-backend
 
 server:
-  port: 8181
+  port: 8080
 
 logging:
   level:
