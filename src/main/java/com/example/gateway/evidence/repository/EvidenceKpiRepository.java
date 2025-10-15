@@ -249,15 +249,15 @@ public class EvidenceKpiRepository {
     public List<RiskBlockedItem> findRiskBlockedItems(
             String appId, String criticality, String domain, String fieldKey, String search, int limit, int offset) {
         StringBuilder sqlBuilder = new StringBuilder("""
-            SELECT DISTINCT r.risk_id, r.status as risk_status, r.assigned_sme,
+            SELECT DISTINCT r.risk_item_id as risk_id, r.status as risk_status, r.assigned_to as assigned_sme,
                    r.created_at, r.updated_at, r.triggering_evidence_id,
-                   r.risk_title as title, r.risk_description as hypothesis,
+                   r.title, r.hypothesis,
                    pf.field_key, pf.field_key as control_field, pf.derived_from,
                    app.app_id, app.name as app_name, app.product_owner, app.application_tier,
                    app.architecture_type, app.install_type, app.app_criticality_assessment,
                    app.security_rating, app.confidentiality_rating, app.integrity_rating,
                    app.availability_rating, app.resilience_rating
-            FROM risk_story r
+            FROM risk_item r
             JOIN profile_field pf ON r.profile_field_id = pf.id
             JOIN profile p ON pf.profile_id = p.profile_id
             LEFT JOIN application app ON p.app_id = app.app_id
@@ -275,7 +275,7 @@ public class EvidenceKpiRepository {
         SqlFilterBuilder.addCriticalityFilter(sqlBuilder, params, criticality, "app.app_criticality_assessment");
         SqlFilterBuilder.addDomainFilter(sqlBuilder, params, domain, "pf.derived_from");
         SqlFilterBuilder.addFieldKeyFilter(sqlBuilder, params, fieldKey, "pf.field_key");
-        SqlFilterBuilder.addSearchFilter(sqlBuilder, params, search, "r.risk_title", "pf.field_key");
+        SqlFilterBuilder.addSearchFilter(sqlBuilder, params, search, "r.title", "pf.field_key");
         SqlFilterBuilder.addOrderBy(sqlBuilder, "r.created_at DESC");
         SqlFilterBuilder.addPagination(sqlBuilder, params, limit, offset);
 
@@ -287,8 +287,8 @@ public class EvidenceKpiRepository {
      */
     public long countRiskBlockedItems(String appId, String criticality, String domain, String fieldKey, String search) {
         StringBuilder sqlBuilder = new StringBuilder("""
-            SELECT COUNT(DISTINCT r.risk_id)
-            FROM risk_story r
+            SELECT COUNT(DISTINCT r.risk_item_id)
+            FROM risk_item r
             JOIN profile_field pf ON r.profile_field_id = pf.id
             JOIN profile p ON pf.profile_id = p.profile_id
             LEFT JOIN application app ON p.app_id = app.app_id
@@ -306,7 +306,7 @@ public class EvidenceKpiRepository {
         SqlFilterBuilder.addCriticalityFilter(sqlBuilder, params, criticality, "app.app_criticality_assessment");
         SqlFilterBuilder.addDomainFilter(sqlBuilder, params, domain, "pf.derived_from");
         SqlFilterBuilder.addFieldKeyFilter(sqlBuilder, params, fieldKey, "pf.field_key");
-        SqlFilterBuilder.addSearchFilter(sqlBuilder, params, search, "r.risk_title", "pf.field_key");
+        SqlFilterBuilder.addSearchFilter(sqlBuilder, params, search, "r.title", "pf.field_key");
 
         Long count = jdbc.queryForObject(sqlBuilder.toString(), params, Long.class);
         return count != null ? count : 0L;

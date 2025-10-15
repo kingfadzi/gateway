@@ -809,4 +809,224 @@ public class RiskItemController {
         log.info("Found {} unassigned risk items", responses.size());
         return ResponseEntity.ok(responses);
     }
+
+    // ============================================
+    // SME Review Endpoint
+    // ============================================
+
+    /**
+     * SME review endpoint for risk items.
+     * Combines comment creation, status updates, and reassignment in one operation.
+     *
+     * PUT /api/v1/risk-items/{riskItemId}/sme-review
+     *
+     * Supported actions:
+     * - approve: Marks risk as SME_APPROVED
+     * - approve_with_mitigation: Marks risk as SME_APPROVED with mitigation plan
+     * - reject: Marks risk as AWAITING_REMEDIATION (requires remediation)
+     * - request_info: Marks risk as AWAITING_REMEDIATION (needs more information)
+     * - assign_other: Reassigns risk to another SME
+     * - escalate: Marks risk as ESCALATED
+     */
+    @PutMapping("/{riskItemId}/sme-review")
+    public ResponseEntity<SmeReviewResponse> smeReview(
+            @PathVariable String riskItemId,
+            @RequestBody SmeReviewRequest request) {
+
+        log.info("PUT /api/v1/risk-items/{}/sme-review - action: {}, smeId: {}",
+                riskItemId, request.action(), request.smeId());
+
+        // Validate request
+        if (!request.isValid()) {
+            String validationError = getValidationError(request);
+            log.warn("Invalid SME review request for riskItemId {}: {} - Request: {}",
+                    riskItemId, validationError, request);
+            return ResponseEntity.badRequest()
+                    .body(new SmeReviewResponse(
+                            riskItemId,
+                            "VALIDATION_ERROR",
+                            request.smeId(),
+                            OffsetDateTime.now(),
+                            validationError
+                    ));
+        }
+
+        // Verify risk item exists
+        if (!riskItemRepository.existsById(riskItemId)) {
+            log.warn("Risk item not found: {}", riskItemId);
+            return ResponseEntity.notFound().build();
+        }
+
+        // Add SME comment
+        String commentText = buildCommentText(request);
+        RiskComment comment = new RiskComment();
+        comment.setCommentId("comment_" + UUID.randomUUID());
+        comment.setRiskItemId(riskItemId);
+        comment.setCommentType(RiskCommentType.REVIEW);
+        comment.setCommentText(commentText);
+        comment.setCommentedBy(request.smeId());
+        comment.setIsInternal(false);
+        comment.setCommentedAt(OffsetDateTime.now());
+        riskCommentRepository.save(comment);
+
+        // Handle different actions
+        String status;
+        if (request.isApprove() || request.isApproveWithMitigation()) {
+            // Approve: SME accepts the risk
+            String resolutionComment = request.isApproveWithMitigation()
+                    ? "SME approved with mitigation plan: " + request.mitigationPlan()
+                    : "SME approved by " + request.smeId();
+            if (request.comments() != null) {
+                resolutionComment += " - " + request.comments();
+            }
+
+            aggregationService.updateRiskItemStatus(
+                    riskItemId,
+                    RiskItemStatus.SME_APPROVED,
+                    "SME_APPROVED",
+                    resolutionComment,
+                    request.smeId(),
+                    "SME"
+            );
+            status = "SME_APPROVED";
+            log.info("SME approved risk item: {} (mitigation: {})", riskItemId, request.isApproveWithMitigation());
+
+        } else if (request.isReject()) {
+            // Reject: SME requires remediation
+            aggregationService.updateRiskItemStatus(
+                    riskItemId,
+                    RiskItemStatus.AWAITING_REMEDIATION,
+                    "SME_REJECTED",
+                    "SME rejected by " + request.smeId() + ": " +
+                            (request.comments() != null ? request.comments() : "Requires remediation"),
+                    request.smeId(),
+                    "SME"
+            );
+            status = "SME_REJECTED";
+            log.info("SME rejected risk item: {}", riskItemId);
+
+        } else if (request.isRequestInfo()) {
+            // Request info: Send back to PO to provide additional information
+            aggregationService.updateRiskItemStatus(
+                    riskItemId,
+                    RiskItemStatus.AWAITING_REMEDIATION,
+                    "INFO_REQUESTED",
+                    "SME " + request.smeId() + " requested more information: " +
+                            (request.comments() != null ? request.comments() : "Additional information needed"),
+                    request.smeId(),
+                    "SME"
+            );
+            status = "INFO_REQUESTED";
+            log.info("SME requested info for risk item: {}", riskItemId);
+
+        } else if (request.isAssignOther()) {
+            // Reassign to another SME - use assignment service
+            try {
+                AssignRiskItemRequest assignRequest = new AssignRiskItemRequest(
+                        request.assignToSme(),
+                        "Reassigned by " + request.smeId() + ": " +
+                                (request.comments() != null ? request.comments() : "Reassignment")
+                );
+                assignmentService.assignToUser(riskItemId, assignRequest, request.smeId());
+                status = "REASSIGNED";
+                log.info("SME reassigned risk item: {} to {}", riskItemId, request.assignToSme());
+            } catch (Exception e) {
+                log.error("Failed to reassign risk item: {}", riskItemId, e);
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+            }
+
+        } else if (request.isEscalate()) {
+            // Escalate: Mark as ESCALATED (active state, awaiting resolution)
+            aggregationService.updateRiskItemStatus(
+                    riskItemId,
+                    RiskItemStatus.ESCALATED,
+                    "ESCALATED",
+                    "Risk escalated by " + request.smeId() + ": " +
+                            (request.comments() != null ? request.comments() : "Escalated for review"),
+                    request.smeId(),
+                    "SME"
+            );
+            status = "ESCALATED";
+            log.info("SME escalated risk item: {}", riskItemId);
+
+        } else {
+            log.warn("Unhandled action: {}", request.action());
+            return ResponseEntity.badRequest().build();
+        }
+
+        // Build response
+        OffsetDateTime reviewedAt = OffsetDateTime.now();
+        SmeReviewResponse response = new SmeReviewResponse(
+                riskItemId,
+                status,
+                request.smeId(),
+                reviewedAt
+        );
+
+        log.info("SME review completed for risk item: {} - status: {}", riskItemId, status);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Build comment text based on action and request data.
+     */
+    private String buildCommentText(SmeReviewRequest request) {
+        StringBuilder sb = new StringBuilder();
+
+        if (request.isApprove()) {
+            sb.append("✅ SME Approved");
+        } else if (request.isApproveWithMitigation()) {
+            sb.append("✅ SME Approved with Mitigation\n\n");
+            sb.append("**Mitigation Plan:**\n").append(request.mitigationPlan());
+        } else if (request.isReject()) {
+            sb.append("❌ SME Rejected");
+        } else if (request.isRequestInfo()) {
+            sb.append("ℹ️ SME Requested More Information");
+        } else if (request.isAssignOther()) {
+            sb.append("🔄 Reassigned to ").append(request.assignToSme());
+        } else if (request.isEscalate()) {
+            sb.append("⬆️ SME Escalated");
+        }
+
+        if (request.comments() != null && !request.comments().isBlank()) {
+            sb.append("\n\n**Comments:**\n").append(request.comments());
+        }
+
+        return sb.toString();
+    }
+
+    /**
+     * Get detailed validation error message for logging and response.
+     */
+    private String getValidationError(SmeReviewRequest request) {
+        if (request.action() == null || request.action().isBlank()) {
+            return "Missing required field: 'action' (must be one of: approve, approve_with_mitigation, reject, request_info, assign_other, escalate)";
+        }
+
+        if (request.smeId() == null || request.smeId().isBlank()) {
+            return "Missing required field: 'smeId'";
+        }
+
+        String lowerAction = request.action().toLowerCase();
+        boolean validAction = lowerAction.equals("approve")
+                || lowerAction.equals("approve_with_mitigation")
+                || lowerAction.equals("reject")
+                || lowerAction.equals("request_info")
+                || lowerAction.equals("assign_other")
+                || lowerAction.equals("escalate");
+
+        if (!validAction) {
+            return "Invalid action: '" + request.action() + "' (must be one of: approve, approve_with_mitigation, reject, request_info, assign_other, escalate)";
+        }
+
+        if (lowerAction.equals("approve_with_mitigation") && (request.mitigationPlan() == null || request.mitigationPlan().isBlank())) {
+            return "Missing required field: 'mitigationPlan' (required for action 'approve_with_mitigation')";
+        }
+
+        if (lowerAction.equals("assign_other") && (request.assignToSme() == null || request.assignToSme().isBlank())) {
+            return "Missing required field: 'assignToSme' (required for action 'assign_other')";
+        }
+
+        return "Invalid request";
+    }
 }

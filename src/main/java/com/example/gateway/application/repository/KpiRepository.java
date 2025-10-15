@@ -63,8 +63,9 @@ public class KpiRepository {
     /** Risk Blocked = all open risks (portfolio-wide) */
     public int riskBlocked() {
         final String sql = """
-            SELECT COUNT(*) FROM risk_story 
-            WHERE status IN ('PENDING_SME_REVIEW', 'UNDER_REVIEW', 'OPEN')
+            SELECT COUNT(*) FROM risk_item
+            WHERE status IN ('PENDING_REVIEW', 'UNDER_SME_REVIEW', 'AWAITING_REMEDIATION',
+                             'IN_REMEDIATION', 'PENDING_APPROVAL', 'ESCALATED')
             """;
         return jdbc.queryForObject(sql, Map.of(), Integer.class);
     }
@@ -139,9 +140,10 @@ public class KpiRepository {
     /** App-specific: Risk Blocked = count of open risks for this specific app */
     public int riskBlockedForApp(String appId) {
         final String sql = """
-            SELECT COUNT(*) FROM risk_story 
+            SELECT COUNT(*) FROM risk_item
             WHERE app_id = :appId
-            AND status IN ('PENDING_SME_REVIEW', 'UNDER_REVIEW', 'OPEN')
+            AND status IN ('PENDING_REVIEW', 'UNDER_SME_REVIEW', 'AWAITING_REMEDIATION',
+                           'IN_REMEDIATION', 'PENDING_APPROVAL', 'ESCALATED')
             """;
         return jdbc.queryForObject(sql, Map.of("appId", appId), Integer.class);
     }

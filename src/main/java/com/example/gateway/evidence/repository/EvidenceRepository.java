@@ -383,8 +383,8 @@ public class EvidenceRepository {
         }
         
         if (assignedSme != null && !assignedSme.trim().isEmpty()) {
-            // For SME assignment, join with risk_story table using proper profile version filtering
-            sqlBuilder.append(" AND EXISTS (SELECT 1 FROM risk_story rs WHERE rs.field_key = pf.field_key AND rs.app_id = p.app_id AND rs.assigned_sme = :assignedSme)");
+            // For SME assignment, join with risk_item table using proper profile version filtering
+            sqlBuilder.append(" AND EXISTS (SELECT 1 FROM risk_item ri WHERE ri.field_key = pf.field_key AND ri.app_id = p.app_id AND ri.assigned_to = :assignedSme)");
             params.put("assignedSme", assignedSme.trim());
         }
         
@@ -429,7 +429,7 @@ public class EvidenceRepository {
                 e.submitted_by,
                 e.valid_until,
                 e.uri,
-                (SELECT COUNT(*) FROM risk_story rs WHERE rs.triggering_evidence_id = e.evidence_id) AS risk_count
+                (SELECT COUNT(*) FROM risk_item ri WHERE ri.triggering_evidence_id = e.evidence_id) AS risk_count
             FROM
                 evidence e
                 JOIN evidence_field_link efl ON e.evidence_id = efl.evidence_id
@@ -756,29 +756,30 @@ public class EvidenceRepository {
     public List<RiskBlockedItem> findRiskBlockedItems(
             String appId, String criticality, String domain, String fieldKey, String search, int limit, int offset) {
         StringBuilder sqlBuilder = new StringBuilder("""
-            SELECT DISTINCT rs.risk_id, rs.app_id, rs.field_key, rs.status as risk_status,
-                   rs.assigned_sme, rs.created_at, rs.updated_at,
-                   rs.triggering_evidence_id, rs.title, rs.hypothesis,
+            SELECT DISTINCT ri.risk_item_id as risk_id, ri.app_id, ri.field_key, ri.status as risk_status,
+                   ri.assigned_to as assigned_sme, ri.created_at, ri.updated_at,
+                   ri.triggering_evidence_id, ri.title, ri.hypothesis,
                    app.name as app_name, app.product_owner,
                    app.application_tier, app.architecture_type,
                    app.install_type, app.app_criticality_assessment,
                    app.security_rating, app.confidentiality_rating, app.integrity_rating,
                    app.availability_rating, app.resilience_rating,
                    pf.field_key as control_field, pf.derived_from
-            FROM risk_story rs
-            LEFT JOIN application app ON rs.app_id = app.app_id
-            LEFT JOIN profile p ON rs.app_id = p.app_id
-                AND p.version = (SELECT MAX(version) FROM profile p2 WHERE p2.app_id = rs.app_id)
-            LEFT JOIN profile_field pf ON rs.field_key = pf.field_key
+            FROM risk_item ri
+            LEFT JOIN application app ON ri.app_id = app.app_id
+            LEFT JOIN profile p ON ri.app_id = p.app_id
+                AND p.version = (SELECT MAX(version) FROM profile p2 WHERE p2.app_id = ri.app_id)
+            LEFT JOIN profile_field pf ON ri.field_key = pf.field_key
                 AND pf.profile_id = p.profile_id
-            WHERE rs.status IN ('PENDING_SME_REVIEW', 'UNDER_REVIEW', 'OPEN')
+            WHERE ri.status IN ('PENDING_REVIEW', 'UNDER_SME_REVIEW', 'AWAITING_REMEDIATION',
+                                'IN_REMEDIATION', 'PENDING_APPROVAL', 'ESCALATED')
             """);
 
         java.util.Map<String, Object> params = new java.util.HashMap<>();
 
         // Add profile version filtering (KPI-style logic)
         if (appId != null && !appId.trim().isEmpty()) {
-            sqlBuilder.append(" AND rs.app_id = :appId");
+            sqlBuilder.append(" AND ri.app_id = :appId");
             sqlBuilder.append(" AND p.version = (SELECT MAX(version) FROM profile WHERE app_id = :appId)");
             params.put("appId", appId.trim());
         } else {
