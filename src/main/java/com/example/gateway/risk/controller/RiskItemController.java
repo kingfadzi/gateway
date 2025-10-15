@@ -8,8 +8,6 @@ import com.example.gateway.risk.service.DomainRiskAggregationService;
 import com.example.gateway.risk.service.RiskAssignmentService;
 import com.example.gateway.profile.service.ProfileFieldRegistryService;
 import com.example.gateway.profile.dto.ProfileFieldTypeInfo;
-import com.example.gateway.risk.dto.BulkRiskItemUpdateRequest;
-import com.example.gateway.risk.dto.BulkRiskItemUpdateResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
