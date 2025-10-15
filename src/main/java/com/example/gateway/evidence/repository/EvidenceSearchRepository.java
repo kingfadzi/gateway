@@ -77,7 +77,7 @@ public class EvidenceSearchRepository {
 
         // SME assignment filter
         if (assignedSme != null && !assignedSme.trim().isEmpty()) {
-            sqlBuilder.append(" AND EXISTS (SELECT 1 FROM risk_story rs WHERE rs.field_key = pf.field_key AND rs.app_id = p.app_id AND rs.assigned_sme = :assignedSme)");
+            sqlBuilder.append(" AND EXISTS (SELECT 1 FROM risk_item ri WHERE ri.field_key = pf.field_key AND ri.app_id = p.app_id AND ri.assigned_to = :assignedSme)");
             params.put("assignedSme", assignedSme.trim());
         }
 
@@ -125,7 +125,7 @@ public class EvidenceSearchRepository {
                 e.submitted_by,
                 e.valid_until,
                 e.uri,
-                (SELECT COUNT(*) FROM risk_story rs WHERE rs.triggering_evidence_id = e.evidence_id) AS risk_count
+                (SELECT COUNT(*) FROM risk_item ri WHERE ri.triggering_evidence_id = e.evidence_id) AS risk_count
             FROM
                 evidence e
                 JOIN evidence_field_link efl ON e.evidence_id = efl.evidence_id

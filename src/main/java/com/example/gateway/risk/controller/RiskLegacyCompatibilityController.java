@@ -1,13 +1,11 @@
 package com.example.gateway.risk.controller;
 
-import com.example.gateway.application.dto.PageResponse;
 import com.example.gateway.risk.dto.*;
 import com.example.gateway.risk.model.*;
 import com.example.gateway.risk.repository.RiskItemRepository;
 import com.example.gateway.risk.repository.RiskCommentRepository;
 import com.example.gateway.risk.service.DomainRiskAggregationService;
 import com.example.gateway.risk.service.RiskAssignmentService;
-import com.example.gateway.risk.service.RiskStoryService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -15,202 +13,51 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.OffsetDateTime;
-import java.util.Map;
 import java.util.UUID;
 
 /**
- * DEPRECATED: This controller is deprecated as of V7 migration.
- * All risk_story data has been migrated to the new risk_item architecture.
+ * Backward compatibility controller for legacy /api/risks/* endpoints.
+ * Proxies requests to the new /api/v1/risk-items/* endpoints.
  *
- * Use the new endpoints instead:
- * - GET /api/v1/risk-items/app/{appId} - Get risks for an application
- * - GET /api/v1/domain-risks/app/{appId} - Get domain-level risk aggregations
- * - POST /api/v1/risk-items - Create manual risk items
- *
- * Migration completed: 383 risk_story records migrated to risk_item.
- * Mapping table available: risk_story_to_item_mapping
+ * This controller provides a transition period for frontend migration.
+ * Can be removed once frontend is fully migrated to new endpoints.
  */
-@Deprecated(since = "V7", forRemoval = true)
 @RestController
-@RequestMapping("/api")
-public class RiskStoryController {
+@RequestMapping("/api/risks")
+public class RiskLegacyCompatibilityController {
 
-    private static final Logger log = LoggerFactory.getLogger(RiskStoryController.class);
+    private static final Logger log = LoggerFactory.getLogger(RiskLegacyCompatibilityController.class);
 
-    private final RiskStoryService riskStoryService;
     private final RiskItemRepository riskItemRepository;
     private final RiskCommentRepository riskCommentRepository;
     private final DomainRiskAggregationService aggregationService;
     private final RiskAssignmentService assignmentService;
 
-    public RiskStoryController(
-            RiskStoryService riskStoryService,
+    public RiskLegacyCompatibilityController(
             RiskItemRepository riskItemRepository,
             RiskCommentRepository riskCommentRepository,
             DomainRiskAggregationService aggregationService,
             RiskAssignmentService assignmentService) {
-        this.riskStoryService = riskStoryService;
         this.riskItemRepository = riskItemRepository;
         this.riskCommentRepository = riskCommentRepository;
         this.aggregationService = aggregationService;
         this.assignmentService = assignmentService;
     }
 
-    @Deprecated(since = "V7", forRemoval = true)
-    @PostMapping("/apps/{appId}/fields/{fieldKey}/risks")
-    public ResponseEntity<Map<String, Object>> createRiskStory(
-            @PathVariable String appId,
-            @PathVariable String fieldKey,
-            @RequestBody CreateRiskStoryRequest request) {
-        return ResponseEntity.status(HttpStatus.GONE).body(Map.of(
-            "error", "ENDPOINT_DEPRECATED",
-            "message", "This endpoint has been deprecated. Risk stories have been migrated to risk items.",
-            "migration_date", "V7",
-            "replacement_endpoint", "POST /api/v1/risk-items",
-            "documentation", "See DomainRiskController and RiskItemController for new API",
-            "note", "All 383 risk_story records have been migrated to risk_item. Check risk_story_to_item_mapping for ID mappings."
-        ));
-    }
-
-    @Deprecated(since = "V7", forRemoval = true)
-    @PostMapping("/risks/{riskId}/evidence")
-    public ResponseEntity<Map<String, Object>> attachEvidence(
-            @PathVariable String riskId,
-            @RequestBody AttachEvidenceRequest request) {
-        return ResponseEntity.status(HttpStatus.GONE).body(Map.of(
-            "error", "ENDPOINT_DEPRECATED",
-            "message", "This endpoint has been deprecated. Risk stories have been migrated to risk items.",
-            "migration_date", "V7",
-            "replacement_endpoint", "Evidence is now linked directly when creating risk items via POST /api/v1/risk-items",
-            "documentation", "See RiskItemController for new API",
-            "note", "All 383 risk_story records have been migrated to risk_item. Check risk_story_to_item_mapping for ID mappings."
-        ));
-    }
-
-    @Deprecated(since = "V7", forRemoval = true)
-    @DeleteMapping("/risks/{riskId}/evidence/{evidenceId}")
-    public ResponseEntity<Map<String, Object>> detachEvidence(
-            @PathVariable String riskId,
-            @PathVariable String evidenceId) {
-        return ResponseEntity.status(HttpStatus.GONE).body(Map.of(
-            "error", "ENDPOINT_DEPRECATED",
-            "message", "This endpoint has been deprecated. Risk stories have been migrated to risk items.",
-            "migration_date", "V7",
-            "replacement_endpoint", "Evidence management is now handled through risk_item relationships",
-            "documentation", "See RiskItemController for new API",
-            "note", "All 383 risk_story records have been migrated to risk_item. Check risk_story_to_item_mapping for ID mappings."
-        ));
-    }
-
-    @Deprecated(since = "V7", forRemoval = true)
-    @GetMapping("/apps/{appId}/risks")
-    public ResponseEntity<Map<String, Object>> getAppRisks(
-            @PathVariable String appId,
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "10") int pageSize) {
-        return ResponseEntity.status(HttpStatus.GONE).body(Map.of(
-            "error", "ENDPOINT_DEPRECATED",
-            "message", "This endpoint has been deprecated. Risk stories have been migrated to risk items.",
-            "migration_date", "V7",
-            "replacement_endpoint", "GET /api/v1/risk-items/app/" + appId,
-            "documentation", "See RiskItemController for new API",
-            "note", "All 383 risk_story records have been migrated to risk_item. Check risk_story_to_item_mapping for ID mappings."
-        ));
-    }
-
-    @Deprecated(since = "V7", forRemoval = true)
-    @GetMapping("/risks/{riskId}")
-    public ResponseEntity<Map<String, Object>> getRiskById(@PathVariable String riskId) {
-        return ResponseEntity.status(HttpStatus.GONE).body(Map.of(
-            "error", "ENDPOINT_DEPRECATED",
-            "message", "This endpoint has been deprecated. Risk stories have been migrated to risk items.",
-            "migration_date", "V7",
-            "replacement_endpoint", "GET /api/v1/risk-items/{riskItemId}",
-            "documentation", "See RiskItemController for new API",
-            "note", "All 383 risk_story records have been migrated to risk_item. Check risk_story_to_item_mapping for old_risk_id → new_risk_item_id mappings.",
-            "lookup_query", "SELECT new_risk_item_id FROM risk_story_to_item_mapping WHERE old_risk_id = '" + riskId + "'"
-        ));
-    }
-
-    @Deprecated(since = "V7", forRemoval = true)
-    @GetMapping("/apps/{appId}/fields/{fieldKey}/risks")
-    public ResponseEntity<Map<String, Object>> getRisksByFieldKey(
-            @PathVariable String appId,
-            @PathVariable String fieldKey) {
-        return ResponseEntity.status(HttpStatus.GONE).body(Map.of(
-            "error", "ENDPOINT_DEPRECATED",
-            "message", "This endpoint has been deprecated. Risk stories have been migrated to risk items.",
-            "migration_date", "V7",
-            "replacement_endpoint", "GET /api/v1/risk-items/field/" + fieldKey,
-            "documentation", "See RiskItemController for new API",
-            "note", "All 383 risk_story records have been migrated to risk_item. Filter by appId on the client side if needed."
-        ));
-    }
-
-    @Deprecated(since = "V7", forRemoval = true)
-    @GetMapping("/profile-fields/{profileFieldId}/risks")
-    public ResponseEntity<Map<String, Object>> getRisksByProfileFieldId(@PathVariable String profileFieldId) {
-        return ResponseEntity.status(HttpStatus.GONE).body(Map.of(
-            "error", "ENDPOINT_DEPRECATED",
-            "message", "This endpoint has been deprecated. Risk stories have been migrated to risk items.",
-            "migration_date", "V7",
-            "replacement_endpoint", "GET /api/v1/risk-items/app/{appId} (filter by profileFieldId on client side)",
-            "documentation", "See RiskItemController for new API",
-            "note", "All 383 risk_story records have been migrated to risk_item. Profile field filtering available via app-based queries."
-        ));
-    }
-
-    @Deprecated(since = "V7", forRemoval = true)
-    @GetMapping("/risks/search")
-    public ResponseEntity<Map<String, Object>> searchRisks(
-            @RequestParam(required = false) String appId,
-            @RequestParam(required = false) String assignedSme,
-            @RequestParam(required = false) String status,
-            @RequestParam(required = false) String domain,
-            @RequestParam(required = false) String derivedFrom,
-            @RequestParam(required = false) String fieldKey,
-            @RequestParam(required = false) String severity,
-            @RequestParam(required = false) String creationType,
-            @RequestParam(required = false) String triggeringEvidenceId,
-            @RequestParam(defaultValue = "assignedAt") String sortBy,
-            @RequestParam(defaultValue = "desc") String sortOrder,
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "10") int size) {
-
-        return ResponseEntity.status(HttpStatus.GONE).body(Map.of(
-            "error", "ENDPOINT_DEPRECATED",
-            "message", "This endpoint has been deprecated. Risk stories have been migrated to risk items.",
-            "migration_date", "V7",
-            "replacement_endpoints", Map.of(
-                "by_app", "GET /api/v1/risk-items/app/{appId}",
-                "by_field", "GET /api/v1/risk-items/field/{fieldKey}",
-                "by_evidence", "GET /api/v1/risk-items/evidence/{evidenceId}",
-                "by_status", "GET /api/v1/risk-items/app/{appId}/status/{status}",
-                "domain_view", "GET /api/v1/domain-risks/arb/{arbName}"
-            ),
-            "documentation", "See RiskItemController and DomainRiskController for new API",
-            "note", "All 383 risk_story records have been migrated to risk_item. The assignedSme field is now replaced by ARB assignment at the domain level."
-        ));
-    }
-
     /**
-     * SME review endpoint for risk items.
-     * Provides backward compatibility for frontend calling PUT /api/risks/{riskId}/sme-review
+     * Legacy SME review endpoint - proxies to new RiskItemController.
      *
      * PUT /api/risks/{riskId}/sme-review
      *
-     * Supported actions:
-     * - approve: Marks risk as WAIVED (SME accepts the risk)
-     * - approve_with_mitigation: Marks risk as WAIVED with mitigation plan
-     * - reject: Keeps risk OPEN (SME requires remediation)
-     * - request_info: Marks risk as IN_PROGRESS (needs more information)
-     * - assign_other: Reassign to another SME
-     * - escalate: Escalate the risk (special handling)
+     * ⚠️ DEPRECATED: Use PUT /api/v1/risk-items/{riskItemId}/sme-review instead
      */
-    @PutMapping("/risks/{riskId}/sme-review")
+    @PutMapping("/{riskId}/sme-review")
     public ResponseEntity<SmeReviewResponse> smeReview(
             @PathVariable String riskId,
             @RequestBody SmeReviewRequest request) {
+
+        log.warn("Legacy endpoint called: PUT /api/risks/{}/sme-review - Frontend should migrate to /api/v1/risk-items/{}/sme-review",
+                 riskId, riskId);
 
         log.info("PUT /api/risks/{}/sme-review - action: {}, smeId: {}",
                 riskId, request.action(), request.smeId());
