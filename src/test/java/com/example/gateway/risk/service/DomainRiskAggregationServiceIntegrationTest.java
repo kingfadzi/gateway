@@ -151,13 +151,13 @@ class DomainRiskAggregationServiceIntegrationTest {
         // Act - Close all items
         aggregationService.updateRiskItemStatus(
             item1.getRiskItemId(),
-            RiskItemStatus.RESOLVED,
+            RiskItemStatus.REMEDIATED,
             "evidence_provided",
             "Evidence uploaded"
         );
         aggregationService.updateRiskItemStatus(
             item2.getRiskItemId(),
-            RiskItemStatus.RESOLVED,
+            RiskItemStatus.REMEDIATED,
             "evidence_provided",
             "Evidence uploaded"
         );
@@ -178,7 +178,7 @@ class DomainRiskAggregationServiceIntegrationTest {
         // Close item
         aggregationService.updateRiskItemStatus(
             item1.getRiskItemId(),
-            RiskItemStatus.RESOLVED,
+            RiskItemStatus.REMEDIATED,
             "evidence_provided",
             null
         );
@@ -242,7 +242,7 @@ class DomainRiskAggregationServiceIntegrationTest {
         assertThat(manualRisk.getTitle()).isEqualTo("Manual Risk Title");
         assertThat(manualRisk.getCreationType()).isEqualTo(RiskCreationType.MANUAL_CREATION);
         assertThat(manualRisk.getRaisedBy()).isEqualTo("test_user");
-        assertThat(manualRisk.getStatus()).isEqualTo(RiskItemStatus.OPEN);
+        assertThat(manualRisk.getStatus()).isEqualTo(RiskItemStatus.PENDING_REVIEW);
 
         // Assert - Domain risk created and linked
         assertThat(manualRisk.getDomainRiskId()).isNotNull();
@@ -346,14 +346,14 @@ class DomainRiskAggregationServiceIntegrationTest {
         assertThat(afterAdd.getPriorityScore()).isGreaterThanOrEqualTo(100); // Max + bonuses
 
         // 4. Resolve some items
-        aggregationService.updateRiskItemStatus(item3.getRiskItemId(), RiskItemStatus.RESOLVED, null, null);
+        aggregationService.updateRiskItemStatus(item3.getRiskItemId(), RiskItemStatus.REMEDIATED, null, null);
 
         DomainRisk afterResolve = domainRiskRepository.findById(domainRisk.getDomainRiskId()).orElseThrow();
         assertThat(afterResolve.getOpenItems()).isEqualTo(2);
 
         // 5. Resolve all remaining items
-        aggregationService.updateRiskItemStatus(item1.getRiskItemId(), RiskItemStatus.RESOLVED, null, null);
-        aggregationService.updateRiskItemStatus(item2.getRiskItemId(), RiskItemStatus.WAIVED, "accepted_risk", null);
+        aggregationService.updateRiskItemStatus(item1.getRiskItemId(), RiskItemStatus.REMEDIATED, null, null);
+        aggregationService.updateRiskItemStatus(item2.getRiskItemId(), RiskItemStatus.SME_APPROVED, "accepted_risk", null);
 
         // 6. Verify auto-transition to RESOLVED
         DomainRisk finalDomainRisk = domainRiskRepository.findById(domainRisk.getDomainRiskId()).orElseThrow();
@@ -390,7 +390,7 @@ class DomainRiskAggregationServiceIntegrationTest {
         item.setEvidenceStatus(evidenceStatus);
         item.setPriorityScore(priorityScore);
         item.setSeverity(priorityCalculator.getSeverityLabel(priorityScore));
-        item.setStatus(RiskItemStatus.OPEN);
+        item.setStatus(RiskItemStatus.PENDING_REVIEW);
         item.setCreationType(RiskCreationType.SYSTEM_AUTO_CREATION);
         item.setOpenedAt(OffsetDateTime.now());
         return item;

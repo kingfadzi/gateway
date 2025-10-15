@@ -9,8 +9,8 @@ import java.time.OffsetDateTime;
 public record MyQueueAppSummary(
         String appId,
         int totalRisks,           // Total risk items assigned to user for this app
-        long openRisks,           // Risks with status = OPEN
-        long inProgressRisks,     // Risks with status = IN_PROGRESS
+        long openRisks,           // Risks with status = PENDING_REVIEW
+        long inProgressRisks,     // Risks with active status (UNDER_SME_REVIEW, IN_REMEDIATION, etc.)
         int highestPriority,      // Highest priority score among assigned risks
         OffsetDateTime lastAssignedAt  // Most recent assignment timestamp
 ) {}

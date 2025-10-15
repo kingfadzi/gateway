@@ -51,9 +51,8 @@ public class RiskAssignmentService {
             );
         }
 
-        // Validation: Can't assign closed/resolved risks
-        if (riskItem.getStatus() == RiskItemStatus.RESOLVED ||
-            riskItem.getStatus() == RiskItemStatus.CLOSED) {
+        // Validation: Can't assign terminal state risks
+        if (riskItem.getStatus().isTerminal()) {
             throw new IllegalStateException("Cannot assign closed/resolved risk items");
         }
 
@@ -64,9 +63,9 @@ public class RiskAssignmentService {
         riskItem.setAssignedBy(currentUser);
         riskItem.setAssignedAt(OffsetDateTime.now());
 
-        // Auto-transition to IN_PROGRESS if still OPEN
-        if (riskItem.getStatus() == RiskItemStatus.OPEN) {
-            riskItem.setStatus(RiskItemStatus.IN_PROGRESS);
+        // Auto-transition to UNDER_SME_REVIEW if still PENDING_REVIEW
+        if (riskItem.getStatus() == RiskItemStatus.PENDING_REVIEW) {
+            riskItem.setStatus(RiskItemStatus.UNDER_SME_REVIEW);
         }
 
         riskItemRepository.save(riskItem);
@@ -98,9 +97,8 @@ public class RiskAssignmentService {
         RiskItem riskItem = riskItemRepository.findById(riskItemId)
                 .orElseThrow(() -> new IllegalArgumentException("Risk item not found: " + riskItemId));
 
-        // Validation: Can't assign closed/resolved risks
-        if (riskItem.getStatus() == RiskItemStatus.RESOLVED ||
-            riskItem.getStatus() == RiskItemStatus.CLOSED) {
+        // Validation: Can't assign terminal state risks
+        if (riskItem.getStatus().isTerminal()) {
             throw new IllegalStateException("Cannot assign closed/resolved risk items");
         }
 
@@ -111,9 +109,9 @@ public class RiskAssignmentService {
         riskItem.setAssignedBy(currentUser);
         riskItem.setAssignedAt(OffsetDateTime.now());
 
-        // Auto-transition to IN_PROGRESS if still OPEN
-        if (riskItem.getStatus() == RiskItemStatus.OPEN) {
-            riskItem.setStatus(RiskItemStatus.IN_PROGRESS);
+        // Auto-transition to UNDER_SME_REVIEW if still PENDING_REVIEW
+        if (riskItem.getStatus() == RiskItemStatus.PENDING_REVIEW) {
+            riskItem.setStatus(RiskItemStatus.UNDER_SME_REVIEW);
         }
 
         riskItemRepository.save(riskItem);
@@ -156,9 +154,9 @@ public class RiskAssignmentService {
         riskItem.setAssignedBy(null);
         riskItem.setAssignedAt(null);
 
-        // Transition back to OPEN if it was IN_PROGRESS
-        if (riskItem.getStatus() == RiskItemStatus.IN_PROGRESS) {
-            riskItem.setStatus(RiskItemStatus.OPEN);
+        // Transition back to PENDING_REVIEW if it was UNDER_SME_REVIEW
+        if (riskItem.getStatus() == RiskItemStatus.UNDER_SME_REVIEW) {
+            riskItem.setStatus(RiskItemStatus.PENDING_REVIEW);
         }
 
         riskItemRepository.save(riskItem);

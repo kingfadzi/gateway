@@ -6,6 +6,7 @@ import com.example.gateway.risk.repository.RiskItemRepository;
 import com.example.gateway.risk.repository.RiskCommentRepository;
 import com.example.gateway.risk.service.DomainRiskAggregationService;
 import com.example.gateway.risk.service.RiskAssignmentService;
+import com.example.gateway.risk.service.StatusHistoryService;
 import com.example.gateway.profile.service.ProfileFieldRegistryService;
 import com.example.gateway.profile.dto.ProfileFieldTypeInfo;
 import org.slf4j.Logger;
@@ -40,18 +41,21 @@ public class RiskItemController {
     private final DomainRiskAggregationService aggregationService;
     private final RiskAssignmentService assignmentService;
     private final ProfileFieldRegistryService profileFieldRegistryService;
+    private final StatusHistoryService statusHistoryService;
 
     public RiskItemController(
             RiskItemRepository riskItemRepository,
             RiskCommentRepository riskCommentRepository,
             DomainRiskAggregationService aggregationService,
             RiskAssignmentService assignmentService,
-            ProfileFieldRegistryService profileFieldRegistryService) {
+            ProfileFieldRegistryService profileFieldRegistryService,
+            StatusHistoryService statusHistoryService) {
         this.riskItemRepository = riskItemRepository;
         this.riskCommentRepository = riskCommentRepository;
         this.aggregationService = aggregationService;
         this.assignmentService = assignmentService;
         this.profileFieldRegistryService = profileFieldRegistryService;
+        this.statusHistoryService = statusHistoryService;
     }
 
     /**
@@ -627,6 +631,29 @@ public class RiskItemController {
 
         log.info("Found {} comments for risk item: {}", responses.size(), riskItemId);
         return ResponseEntity.ok(responses);
+    }
+
+    /**
+     * Get complete status history for a risk item.
+     * Returns all status transitions in chronological order.
+     *
+     * GET /api/v1/risk-items/{riskItemId}/status-history
+     */
+    @GetMapping("/{riskItemId}/status-history")
+    public ResponseEntity<List<RiskItemStatusHistory>> getStatusHistory(@PathVariable String riskItemId) {
+        log.info("GET /api/v1/risk-items/{}/status-history", riskItemId);
+
+        // Verify risk item exists
+        if (!riskItemRepository.existsById(riskItemId)) {
+            log.warn("Risk item not found: {}", riskItemId);
+            return ResponseEntity.notFound().build();
+        }
+
+        // Get status history
+        List<RiskItemStatusHistory> history = statusHistoryService.getHistory(riskItemId);
+
+        log.info("Found {} status history records for risk item: {}", history.size(), riskItemId);
+        return ResponseEntity.ok(history);
     }
 
     // ============================================

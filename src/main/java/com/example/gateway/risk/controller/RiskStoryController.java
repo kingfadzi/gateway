@@ -217,8 +217,17 @@ public class RiskStoryController {
 
         // Validate request
         if (!request.isValid()) {
-            log.warn("Invalid SME review request: {}", request);
-            return ResponseEntity.badRequest().build();
+            String validationError = getValidationError(request);
+            log.warn("Invalid SME review request for riskId {}: {} - Request: {}",
+                    riskId, validationError, request);
+            return ResponseEntity.badRequest()
+                    .body(new SmeReviewResponse(
+                            riskId,
+                            "VALIDATION_ERROR",
+                            request.smeId(),
+                            OffsetDateTime.now(),
+                            validationError
+                    ));
         }
 
         // Verify risk item exists
@@ -242,7 +251,7 @@ public class RiskStoryController {
         // Handle different actions
         String status;
         if (request.isApprove() || request.isApproveWithMitigation()) {
-            // Approve: Waive the risk (SME accepts it)
+            // Approve: SME accepts the risk
             String resolutionComment = request.isApproveWithMitigation()
                     ? "SME approved with mitigation plan: " + request.mitigationPlan()
                     : "SME approved by " + request.smeId();
@@ -252,33 +261,39 @@ public class RiskStoryController {
 
             aggregationService.updateRiskItemStatus(
                     riskId,
-                    RiskItemStatus.WAIVED,
+                    RiskItemStatus.SME_APPROVED,
                     "SME_APPROVED",
-                    resolutionComment
+                    resolutionComment,
+                    request.smeId(),
+                    "SME"
             );
             status = "SME_APPROVED";
             log.info("SME approved risk item: {} (mitigation: {})", riskId, request.isApproveWithMitigation());
 
         } else if (request.isReject()) {
-            // Reject: Keep risk OPEN (requires remediation)
+            // Reject: SME requires remediation
             aggregationService.updateRiskItemStatus(
                     riskId,
-                    RiskItemStatus.OPEN,
+                    RiskItemStatus.AWAITING_REMEDIATION,
                     "SME_REJECTED",
                     "SME rejected by " + request.smeId() + ": " +
-                            (request.comments() != null ? request.comments() : "Requires remediation")
+                            (request.comments() != null ? request.comments() : "Requires remediation"),
+                    request.smeId(),
+                    "SME"
             );
             status = "SME_REJECTED";
             log.info("SME rejected risk item: {}", riskId);
 
         } else if (request.isRequestInfo()) {
-            // Request info: Mark as IN_PROGRESS
+            // Request info: Send back to PO to provide additional information
             aggregationService.updateRiskItemStatus(
                     riskId,
-                    RiskItemStatus.IN_PROGRESS,
+                    RiskItemStatus.AWAITING_REMEDIATION,
                     "INFO_REQUESTED",
                     "SME " + request.smeId() + " requested more information: " +
-                            (request.comments() != null ? request.comments() : "Additional information needed")
+                            (request.comments() != null ? request.comments() : "Additional information needed"),
+                    request.smeId(),
+                    "SME"
             );
             status = "INFO_REQUESTED";
             log.info("SME requested info for risk item: {}", riskId);
@@ -300,13 +315,15 @@ public class RiskStoryController {
             }
 
         } else if (request.isEscalate()) {
-            // Escalate: Mark as IN_PROGRESS with escalation flag
+            // Escalate: Mark as ESCALATED (active state, awaiting resolution)
             aggregationService.updateRiskItemStatus(
                     riskId,
-                    RiskItemStatus.IN_PROGRESS,
+                    RiskItemStatus.ESCALATED,
                     "ESCALATED",
                     "Risk escalated by " + request.smeId() + ": " +
-                            (request.comments() != null ? request.comments() : "Escalated for review")
+                            (request.comments() != null ? request.comments() : "Escalated for review"),
+                    request.smeId(),
+                    "SME"
             );
             status = "ESCALATED";
             log.info("SME escalated risk item: {}", riskId);
@@ -355,5 +372,40 @@ public class RiskStoryController {
         }
 
         return sb.toString();
+    }
+
+    /**
+     * Get detailed validation error message for logging and response.
+     */
+    private String getValidationError(SmeReviewRequest request) {
+        if (request.action() == null || request.action().isBlank()) {
+            return "Missing required field: 'action' (must be one of: approve, approve_with_mitigation, reject, request_info, assign_other, escalate)";
+        }
+
+        if (request.smeId() == null || request.smeId().isBlank()) {
+            return "Missing required field: 'smeId'";
+        }
+
+        String lowerAction = request.action().toLowerCase();
+        boolean validAction = lowerAction.equals("approve")
+                || lowerAction.equals("approve_with_mitigation")
+                || lowerAction.equals("reject")
+                || lowerAction.equals("request_info")
+                || lowerAction.equals("assign_other")
+                || lowerAction.equals("escalate");
+
+        if (!validAction) {
+            return "Invalid action: '" + request.action() + "' (must be one of: approve, approve_with_mitigation, reject, request_info, assign_other, escalate)";
+        }
+
+        if (lowerAction.equals("approve_with_mitigation") && (request.mitigationPlan() == null || request.mitigationPlan().isBlank())) {
+            return "Missing required field: 'mitigationPlan' (required for action 'approve_with_mitigation')";
+        }
+
+        if (lowerAction.equals("assign_other") && (request.assignToSme() == null || request.assignToSme().isBlank())) {
+            return "Missing required field: 'assignToSme' (required for action 'assign_other')";
+        }
+
+        return "Invalid request";
     }
 }

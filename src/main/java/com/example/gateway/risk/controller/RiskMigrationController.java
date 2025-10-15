@@ -61,6 +61,39 @@ public class RiskMigrationController {
     }
 
     /**
+     * Backfill status history for already-migrated risk items that are missing history records.
+     * Safe to run multiple times - will only create records for items that have no history.
+     *
+     * POST /api/admin/risk-migration/backfill-status-history
+     */
+    @PostMapping("/backfill-status-history")
+    public ResponseEntity<BackfillResult> backfillStatusHistory() {
+        log.info("Starting status history backfill");
+
+        try {
+            int backfilledCount = migrationService.backfillStatusHistory();
+
+            BackfillResult result = new BackfillResult();
+            result.setSuccess(true);
+            result.setBackfilledCount(backfilledCount);
+            result.setMessage(String.format("Successfully backfilled status history for %d risk items", backfilledCount));
+
+            log.info("Status history backfill completed: {} records created", backfilledCount);
+            return ResponseEntity.ok(result);
+
+        } catch (Exception e) {
+            log.error("Status history backfill failed: {}", e.getMessage(), e);
+
+            BackfillResult result = new BackfillResult();
+            result.setSuccess(false);
+            result.setBackfilledCount(0);
+            result.setMessage("Backfill failed: " + e.getMessage());
+
+            return ResponseEntity.status(500).body(result);
+        }
+    }
+
+    /**
      * Get database statistics (record counts).
      *
      * GET /api/admin/risk-migration/stats
@@ -113,6 +146,39 @@ public class RiskMigrationController {
 
         public void setStatus(String status) {
             this.status = status;
+        }
+    }
+
+    /**
+     * Result of backfill operation
+     */
+    public static class BackfillResult {
+        private boolean success;
+        private int backfilledCount;
+        private String message;
+
+        public boolean isSuccess() {
+            return success;
+        }
+
+        public void setSuccess(boolean success) {
+            this.success = success;
+        }
+
+        public int getBackfilledCount() {
+            return backfilledCount;
+        }
+
+        public void setBackfilledCount(int backfilledCount) {
+            this.backfilledCount = backfilledCount;
+        }
+
+        public String getMessage() {
+            return message;
+        }
+
+        public void setMessage(String message) {
+            this.message = message;
         }
     }
 }

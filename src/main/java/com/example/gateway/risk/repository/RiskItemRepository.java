@@ -76,59 +76,80 @@ public interface RiskItemRepository extends JpaRepository<RiskItem, String> {
     long countByDomainRiskIdAndStatus(String domainRiskId, RiskItemStatus status);
 
     /**
-     * Count open risk items for a domain risk
+     * Count open risk items for a domain risk (all active states)
      */
     @Query("""
         SELECT COUNT(ri) FROM RiskItem ri
         WHERE ri.domainRiskId = :domainRiskId
-        AND ri.status IN ('OPEN', 'IN_PROGRESS')
+        AND ri.status IN ('PENDING_REVIEW', 'UNDER_SME_REVIEW', 'AWAITING_REMEDIATION',
+                          'IN_REMEDIATION', 'PENDING_APPROVAL', 'ESCALATED')
         """)
     long countOpenItems(@Param("domainRiskId") String domainRiskId);
 
     /**
-     * Count high priority risk items for a domain risk
+     * Count high priority risk items for a domain risk (all active states)
      */
     @Query("""
         SELECT COUNT(ri) FROM RiskItem ri
         WHERE ri.domainRiskId = :domainRiskId
         AND ri.priority IN ('CRITICAL', 'HIGH')
-        AND ri.status IN ('OPEN', 'IN_PROGRESS')
+        AND ri.status IN ('PENDING_REVIEW', 'UNDER_SME_REVIEW', 'AWAITING_REMEDIATION',
+                          'IN_REMEDIATION', 'PENDING_APPROVAL', 'ESCALATED')
         """)
     long countHighPriorityItems(@Param("domainRiskId") String domainRiskId);
 
     /**
-     * Get highest priority score for a domain risk (for aggregation)
+     * Get highest priority score for a domain risk (for aggregation, all active states)
      */
     @Query("""
         SELECT MAX(ri.priorityScore) FROM RiskItem ri
         WHERE ri.domainRiskId = :domainRiskId
-        AND ri.status IN ('OPEN', 'IN_PROGRESS')
+        AND ri.status IN ('PENDING_REVIEW', 'UNDER_SME_REVIEW', 'AWAITING_REMEDIATION',
+                          'IN_REMEDIATION', 'PENDING_APPROVAL', 'ESCALATED')
         """)
     Integer getMaxPriorityScore(@Param("domainRiskId") String domainRiskId);
 
     /**
      * Get risk breakdown by priority for an application.
-     * Returns: [priority, count] for OPEN and IN_PROGRESS items only.
-     * Used for ARB dashboard application watchlist.
+     * Returns: [priority, count] for all active states (including PENDING_REVIEW).
+     * Used for total risks count in ARB dashboard and PO view.
      */
     @Query("""
         SELECT ri.priority, COUNT(ri)
         FROM RiskItem ri
         WHERE ri.appId = :appId
-        AND ri.status IN ('OPEN', 'IN_PROGRESS')
+        AND ri.status IN ('PENDING_REVIEW', 'UNDER_SME_REVIEW', 'AWAITING_REMEDIATION',
+                          'IN_REMEDIATION', 'PENDING_APPROVAL', 'ESCALATED')
         GROUP BY ri.priority
         """)
     List<Object[]> getRiskBreakdownByApp(@Param("appId") String appId);
 
     /**
-     * Count risk items by app IDs and status.
+     * Get in-progress risk breakdown by priority for an application.
+     * Returns: [priority, count] for in-progress states (excludes PENDING_REVIEW).
+     * PENDING_REVIEW is excluded because risks are waiting/not yet being worked on.
+     * Used for inProgress breakdown in PO view.
+     */
+    @Query("""
+        SELECT ri.priority, COUNT(ri)
+        FROM RiskItem ri
+        WHERE ri.appId = :appId
+        AND ri.status IN ('UNDER_SME_REVIEW', 'AWAITING_REMEDIATION',
+                          'IN_REMEDIATION', 'PENDING_APPROVAL', 'ESCALATED')
+        GROUP BY ri.priority
+        """)
+    List<Object[]> getInProgressBreakdownByApp(@Param("appId") String appId);
+
+    /**
+     * Count active risk items by app IDs.
      * Used for batch loading to avoid N+1 queries.
      */
     @Query("""
         SELECT ri.appId, COUNT(ri)
         FROM RiskItem ri
         WHERE ri.appId IN :appIds
-        AND ri.status IN ('OPEN', 'IN_PROGRESS')
+        AND ri.status IN ('PENDING_REVIEW', 'UNDER_SME_REVIEW', 'AWAITING_REMEDIATION',
+                          'IN_REMEDIATION', 'PENDING_APPROVAL', 'ESCALATED')
         GROUP BY ri.appId
         """)
     List<Object[]> countOpenItemsByAppIds(@Param("appIds") List<String> appIds);
@@ -150,40 +171,55 @@ public interface RiskItemRepository extends JpaRepository<RiskItem, String> {
     @Query("""
         SELECT COUNT(ri) FROM RiskItem ri
         WHERE ri.resolvedAt >= :since
-        AND ri.status IN ('RESOLVED', 'CLOSED')
+        AND ri.status IN ('SME_APPROVED', 'SELF_ATTESTED', 'REMEDIATED', 'CLOSED')
         """)
     long countResolvedAfter(@Param("since") java.time.OffsetDateTime since);
 
     /**
-     * Count CRITICAL priority risk items with OPEN or IN_PROGRESS status.
+     * Count CRITICAL priority risk items with active status.
      * Used for dashboard metrics critical count.
      */
     @Query("""
         SELECT COUNT(ri) FROM RiskItem ri
         WHERE ri.priority = 'CRITICAL'
-        AND ri.status IN ('OPEN', 'IN_PROGRESS')
+        AND ri.status IN ('PENDING_REVIEW', 'UNDER_SME_REVIEW', 'AWAITING_REMEDIATION',
+                          'IN_REMEDIATION', 'PENDING_APPROVAL', 'ESCALATED')
         """)
     long countCriticalItems();
 
     /**
-     * Count risk items with OPEN status.
+     * Count risk items with PENDING_REVIEW status (awaiting triage).
      * Used for dashboard metrics open items count.
      */
     @Query("""
         SELECT COUNT(ri) FROM RiskItem ri
-        WHERE ri.status = 'OPEN'
+        WHERE ri.status = 'PENDING_REVIEW'
         """)
     long countOpenItems();
 
     /**
-     * Calculate average priority score for OPEN and IN_PROGRESS items.
+     * Calculate average priority score for active items.
      * Used for dashboard metrics health grade calculation.
      */
     @Query("""
         SELECT AVG(ri.priorityScore) FROM RiskItem ri
-        WHERE ri.status IN ('OPEN', 'IN_PROGRESS')
+        WHERE ri.status IN ('PENDING_REVIEW', 'UNDER_SME_REVIEW', 'AWAITING_REMEDIATION',
+                            'IN_REMEDIATION', 'PENDING_APPROVAL', 'ESCALATED')
         """)
     Double getAveragePriorityScore();
+
+    /**
+     * Calculate total priority score (sum) for an application.
+     * Used for application-level risk metrics aggregation.
+     * Returns the sum of all priority scores for active risk items.
+     */
+    @Query("""
+        SELECT COALESCE(SUM(ri.priorityScore), 0) FROM RiskItem ri
+        WHERE ri.appId = :appId
+        AND ri.status IN ('PENDING_REVIEW', 'UNDER_SME_REVIEW', 'AWAITING_REMEDIATION',
+                          'IN_REMEDIATION', 'PENDING_APPROVAL', 'ESCALATED')
+        """)
+    Integer getTotalPriorityScoreByApp(@Param("appId") String appId);
 
     // ============================================
     // Scoped Metrics Queries (filtered by app IDs)
@@ -197,42 +233,44 @@ public interface RiskItemRepository extends JpaRepository<RiskItem, String> {
         SELECT COUNT(ri) FROM RiskItem ri
         WHERE ri.appId IN :appIds
         AND ri.priority = 'CRITICAL'
-        AND ri.status IN ('OPEN', 'IN_PROGRESS')
+        AND ri.status IN ('PENDING_REVIEW', 'UNDER_SME_REVIEW', 'AWAITING_REMEDIATION',
+                          'IN_REMEDIATION', 'PENDING_APPROVAL', 'ESCALATED')
         """)
     long countCriticalItemsByAppIds(@Param("appIds") List<String> appIds);
 
     /**
-     * Count OPEN and IN_PROGRESS risk items across specific apps (total count, not grouped).
+     * Count active risk items across specific apps (total count, not grouped).
      * Scoped version for dashboard metrics (my-queue, my-domain, all-domains).
-     * Renamed from countTotalOpenItemsByAppIds to reflect both statuses.
      */
     @Query("""
         SELECT COUNT(ri) FROM RiskItem ri
         WHERE ri.appId IN :appIds
-        AND ri.status IN ('OPEN', 'IN_PROGRESS')
+        AND ri.status IN ('PENDING_REVIEW', 'UNDER_SME_REVIEW', 'AWAITING_REMEDIATION',
+                          'IN_REMEDIATION', 'PENDING_APPROVAL', 'ESCALATED')
         """)
     long countTotalOpenItemsByAppIds(@Param("appIds") List<String> appIds);
 
     /**
-     * Count OPEN risk items (awaiting triage) across specific apps.
-     * OPEN = needs attention but not yet assigned/being worked on.
+     * Count PENDING_REVIEW risk items (awaiting triage) across specific apps.
+     * PENDING_REVIEW = needs attention but not yet assigned/being worked on.
      * Used for "Awaiting Triage" metric on dashboard.
      */
     @Query("""
         SELECT COUNT(ri) FROM RiskItem ri
         WHERE ri.appId IN :appIds
-        AND ri.status = 'OPEN'
+        AND ri.status = 'PENDING_REVIEW'
         """)
     long countAwaitingTriageByAppIds(@Param("appIds") List<String> appIds);
 
     /**
-     * Calculate average priority score for OPEN and IN_PROGRESS items in specific apps.
+     * Calculate average priority score for active items in specific apps.
      * Scoped version for dashboard metrics (my-queue, my-domain, all-domains).
      */
     @Query("""
         SELECT AVG(ri.priorityScore) FROM RiskItem ri
         WHERE ri.appId IN :appIds
-        AND ri.status IN ('OPEN', 'IN_PROGRESS')
+        AND ri.status IN ('PENDING_REVIEW', 'UNDER_SME_REVIEW', 'AWAITING_REMEDIATION',
+                          'IN_REMEDIATION', 'PENDING_APPROVAL', 'ESCALATED')
         """)
     Double getAveragePriorityScoreByAppIds(@Param("appIds") List<String> appIds);
 
@@ -255,7 +293,7 @@ public interface RiskItemRepository extends JpaRepository<RiskItem, String> {
         SELECT COUNT(ri) FROM RiskItem ri
         WHERE ri.appId IN :appIds
         AND ri.resolvedAt >= :since
-        AND ri.status IN ('RESOLVED', 'CLOSED')
+        AND ri.status IN ('SME_APPROVED', 'SELF_ATTESTED', 'REMEDIATED', 'CLOSED')
         """)
     long countResolvedAfterByAppIds(@Param("appIds") List<String> appIds, @Param("since") java.time.OffsetDateTime since);
 
@@ -271,29 +309,32 @@ public interface RiskItemRepository extends JpaRepository<RiskItem, String> {
         SELECT COUNT(ri) FROM RiskItem ri
         WHERE ri.assignedTo = :userId
         AND ri.priority = 'CRITICAL'
-        AND ri.status IN ('OPEN', 'IN_PROGRESS')
+        AND ri.status IN ('PENDING_REVIEW', 'UNDER_SME_REVIEW', 'AWAITING_REMEDIATION',
+                          'IN_REMEDIATION', 'PENDING_APPROVAL', 'ESCALATED')
         """)
     long countCriticalItemsByUser(@Param("userId") String userId);
 
     /**
-     * Count OPEN and IN_PROGRESS risk items assigned to a specific user.
+     * Count active risk items assigned to a specific user.
      * User-specific version for "my-queue" scope.
      */
     @Query("""
         SELECT COUNT(ri) FROM RiskItem ri
         WHERE ri.assignedTo = :userId
-        AND ri.status IN ('OPEN', 'IN_PROGRESS')
+        AND ri.status IN ('PENDING_REVIEW', 'UNDER_SME_REVIEW', 'AWAITING_REMEDIATION',
+                          'IN_REMEDIATION', 'PENDING_APPROVAL', 'ESCALATED')
         """)
     long countOpenItemsByUser(@Param("userId") String userId);
 
     /**
-     * Calculate average priority score for OPEN and IN_PROGRESS items assigned to a specific user.
+     * Calculate average priority score for active items assigned to a specific user.
      * User-specific version for "my-queue" scope.
      */
     @Query("""
         SELECT AVG(ri.priorityScore) FROM RiskItem ri
         WHERE ri.assignedTo = :userId
-        AND ri.status IN ('OPEN', 'IN_PROGRESS')
+        AND ri.status IN ('PENDING_REVIEW', 'UNDER_SME_REVIEW', 'AWAITING_REMEDIATION',
+                          'IN_REMEDIATION', 'PENDING_APPROVAL', 'ESCALATED')
         """)
     Double getAveragePriorityScoreByUser(@Param("userId") String userId);
 
@@ -316,19 +357,19 @@ public interface RiskItemRepository extends JpaRepository<RiskItem, String> {
         SELECT COUNT(ri) FROM RiskItem ri
         WHERE ri.assignedTo = :userId
         AND ri.resolvedAt >= :since
-        AND ri.status IN ('RESOLVED', 'CLOSED')
+        AND ri.status IN ('SME_APPROVED', 'SELF_ATTESTED', 'REMEDIATED', 'CLOSED')
         """)
     long countResolvedAfterByUser(@Param("userId") String userId, @Param("since") java.time.OffsetDateTime since);
 
     /**
-     * Count OPEN risk items (awaiting triage) assigned to a specific user.
-     * OPEN = needs attention but not yet being actively worked on.
+     * Count PENDING_REVIEW risk items (awaiting triage) assigned to a specific user.
+     * PENDING_REVIEW = needs attention but not yet being actively worked on.
      * User-specific version for "my-queue" awaiting triage metric.
      */
     @Query("""
         SELECT COUNT(ri) FROM RiskItem ri
         WHERE ri.assignedTo = :userId
-        AND ri.status = 'OPEN'
+        AND ri.status = 'PENDING_REVIEW'
         """)
     long countAwaitingTriageByUser(@Param("userId") String userId);
 
@@ -355,7 +396,8 @@ public interface RiskItemRepository extends JpaRepository<RiskItem, String> {
     @Query("""
         SELECT ri FROM RiskItem ri
         WHERE ri.assignedTo = :userId
-        AND ri.status IN ('OPEN', 'IN_PROGRESS')
+        AND ri.status IN ('PENDING_REVIEW', 'UNDER_SME_REVIEW', 'AWAITING_REMEDIATION',
+                          'IN_REMEDIATION', 'PENDING_APPROVAL', 'ESCALATED')
         ORDER BY ri.priorityScore DESC, ri.openedAt ASC
         """)
     List<RiskItem> findMyAssignedRisks(@Param("userId") String userId);
@@ -368,7 +410,8 @@ public interface RiskItemRepository extends JpaRepository<RiskItem, String> {
     @Query("""
         SELECT ri FROM RiskItem ri
         WHERE ri.assignedTo IS NULL
-        AND ri.status IN ('OPEN', 'IN_PROGRESS')
+        AND ri.status IN ('PENDING_REVIEW', 'UNDER_SME_REVIEW', 'AWAITING_REMEDIATION',
+                          'IN_REMEDIATION', 'PENDING_APPROVAL', 'ESCALATED')
         ORDER BY ri.priorityScore DESC, ri.openedAt ASC
         """)
     List<RiskItem> findUnassignedRisks();
@@ -381,13 +424,14 @@ public interface RiskItemRepository extends JpaRepository<RiskItem, String> {
         SELECT DISTINCT ri.appId
         FROM RiskItem ri
         WHERE ri.assignedTo = :userId
-        AND ri.status IN ('OPEN', 'IN_PROGRESS')
+        AND ri.status IN ('PENDING_REVIEW', 'UNDER_SME_REVIEW', 'AWAITING_REMEDIATION',
+                          'IN_REMEDIATION', 'PENDING_APPROVAL', 'ESCALATED')
         """)
     List<String> findAppsWithAssignedRisks(@Param("userId") String userId);
 
     /**
      * Get "assigned to me" risk breakdown by apps for a specific user.
-     * Returns: [appId, priority, count] for OPEN and IN_PROGRESS items only.
+     * Returns: [appId, priority, count] for active items only.
      * Used for per-app "Assigned to Me" breakdown in watchlist.
      * Batch query to avoid N+1 problem.
      */
@@ -396,7 +440,8 @@ public interface RiskItemRepository extends JpaRepository<RiskItem, String> {
         FROM RiskItem ri
         WHERE ri.appId IN :appIds
         AND ri.assignedTo = :userId
-        AND ri.status IN ('OPEN', 'IN_PROGRESS')
+        AND ri.status IN ('PENDING_REVIEW', 'UNDER_SME_REVIEW', 'AWAITING_REMEDIATION',
+                          'IN_REMEDIATION', 'PENDING_APPROVAL', 'ESCALATED')
         GROUP BY ri.appId, ri.priority
         """)
     List<Object[]> getAssignedToMeBreakdownByApps(
@@ -426,7 +471,8 @@ public interface RiskItemRepository extends JpaRepository<RiskItem, String> {
         SELECT ri.assignedTo, COUNT(ri)
         FROM RiskItem ri
         WHERE ri.assignedTo IS NOT NULL
-        AND ri.status IN ('OPEN', 'IN_PROGRESS')
+        AND ri.status IN ('PENDING_REVIEW', 'UNDER_SME_REVIEW', 'AWAITING_REMEDIATION',
+                          'IN_REMEDIATION', 'PENDING_APPROVAL', 'ESCALATED')
         GROUP BY ri.assignedTo
         """)
     List<Object[]> countAssignedRisksByUser();
@@ -510,7 +556,8 @@ public interface RiskItemRepository extends JpaRepository<RiskItem, String> {
         SELECT COUNT(DISTINCT ri.appId) FROM RiskItem ri
         WHERE ri.appId IN :appIds
         AND ri.priority = 'CRITICAL'
-        AND ri.status IN ('OPEN', 'IN_PROGRESS')
+        AND ri.status IN ('PENDING_REVIEW', 'UNDER_SME_REVIEW', 'AWAITING_REMEDIATION',
+                          'IN_REMEDIATION', 'PENDING_APPROVAL', 'ESCALATED')
         """)
     long countApplicationsWithCriticalItems(@Param("appIds") List<String> appIds);
 
@@ -521,28 +568,29 @@ public interface RiskItemRepository extends JpaRepository<RiskItem, String> {
         SELECT COUNT(DISTINCT ri.appId) FROM RiskItem ri
         WHERE ri.assignedTo = :userId
         AND ri.priority = 'CRITICAL'
-        AND ri.status IN ('OPEN', 'IN_PROGRESS')
+        AND ri.status IN ('PENDING_REVIEW', 'UNDER_SME_REVIEW', 'AWAITING_REMEDIATION',
+                          'IN_REMEDIATION', 'PENDING_APPROVAL', 'ESCALATED')
         """)
     long countApplicationsWithCriticalItemsByUser(@Param("userId") String userId);
 
     /**
-     * Count unique applications with OPEN status items (awaiting triage).
+     * Count unique applications with PENDING_REVIEW status items (awaiting triage).
      * Used for "Applications Awaiting Triage" app-centric metric.
      */
     @Query("""
         SELECT COUNT(DISTINCT ri.appId) FROM RiskItem ri
         WHERE ri.appId IN :appIds
-        AND ri.status = 'OPEN'
+        AND ri.status = 'PENDING_REVIEW'
         """)
     long countApplicationsAwaitingTriage(@Param("appIds") List<String> appIds);
 
     /**
-     * Count unique applications with OPEN status items (user-scoped for my-queue).
+     * Count unique applications with PENDING_REVIEW status items (user-scoped for my-queue).
      */
     @Query("""
         SELECT COUNT(DISTINCT ri.appId) FROM RiskItem ri
         WHERE ri.assignedTo = :userId
-        AND ri.status = 'OPEN'
+        AND ri.status = 'PENDING_REVIEW'
         """)
     long countApplicationsAwaitingTriageByUser(@Param("userId") String userId);
 
@@ -579,7 +627,7 @@ public interface RiskItemRepository extends JpaRepository<RiskItem, String> {
         SELECT COUNT(DISTINCT ri.appId) FROM RiskItem ri
         WHERE ri.appId IN :appIds
         AND ri.resolvedAt >= :since
-        AND ri.status IN ('RESOLVED', 'CLOSED')
+        AND ri.status IN ('SME_APPROVED', 'SELF_ATTESTED', 'REMEDIATED', 'CLOSED')
         """)
     long countApplicationsWithResolutions(
         @Param("appIds") List<String> appIds,
@@ -592,7 +640,7 @@ public interface RiskItemRepository extends JpaRepository<RiskItem, String> {
         SELECT COUNT(DISTINCT ri.appId) FROM RiskItem ri
         WHERE ri.assignedTo = :userId
         AND ri.resolvedAt >= :since
-        AND ri.status IN ('RESOLVED', 'CLOSED')
+        AND ri.status IN ('SME_APPROVED', 'SELF_ATTESTED', 'REMEDIATED', 'CLOSED')
         """)
     long countApplicationsWithResolutionsByUser(
         @Param("userId") String userId,

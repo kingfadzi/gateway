@@ -448,11 +448,100 @@ public class ArbDashboardService {
         );
     }
 
+    // =====================
+    // Public API for Risk Metrics (used by PO views)
+    // =====================
+
     /**
-     * Calculate risk breakdown by priority for an application.
+     * Calculate risk metrics for multiple applications.
+     * Uses the SAME calculation logic as SME dashboard to ensure consistency.
+     *
+     * @param appIds List of application IDs
+     * @return Map of appId to RiskMetrics
+     */
+    public Map<String, com.example.gateway.application.dto.RiskMetrics> calculateRiskMetricsForApps(List<String> appIds) {
+        if (appIds == null || appIds.isEmpty()) {
+            return Map.of();
+        }
+
+        log.debug("Calculating risk metrics for {} applications", appIds.size());
+
+        // Batch fetch domain risks for all apps (same as line 95)
+        List<DomainRisk> domainRisks = domainRiskRepository.findByAppIdsAndStatuses(appIds, ACTIVE_STATUSES);
+
+        // Group domain risks by appId
+        Map<String, List<DomainRisk>> domainRisksByApp = domainRisks.stream()
+                .collect(Collectors.groupingBy(DomainRisk::getAppId));
+
+        // Calculate metrics for each app
+        Map<String, com.example.gateway.application.dto.RiskMetrics> metricsMap = new HashMap<>();
+
+        for (String appId : appIds) {
+            List<DomainRisk> appDomainRisks = domainRisksByApp.getOrDefault(appId, List.of());
+
+            // Calculate risk score (same as buildApplicationWithRisks:393-397)
+            Integer riskScore = appDomainRisks.stream()
+                    .map(DomainRisk::getPriorityScore)
+                    .filter(Objects::nonNull)
+                    .max(Integer::compareTo)
+                    .orElse(0);
+
+            // Get total risks breakdown (includes PENDING_REVIEW)
+            RiskBreakdown totalRisksBreakdown = calculateRiskBreakdown(appId);
+
+            // Get in-progress breakdown (excludes PENDING_REVIEW - waiting/not yet started)
+            RiskBreakdown inProgressBreakdown = calculateInProgressBreakdown(appId);
+
+            // Frontend can sum the breakdown values if needed
+            com.example.gateway.application.dto.RiskMetrics metrics =
+                new com.example.gateway.application.dto.RiskMetrics(
+                    totalRisksBreakdown,   // All active risks (including PENDING_REVIEW)
+                    inProgressBreakdown,   // Only risks being worked on (excludes PENDING_REVIEW)
+                    riskScore              // MAX priority score (0-100)
+                );
+
+            metricsMap.put(appId, metrics);
+        }
+
+        // Fill in empty metrics for apps with no risks
+        for (String appId : appIds) {
+            if (!metricsMap.containsKey(appId)) {
+                metricsMap.put(appId, com.example.gateway.application.dto.RiskMetrics.empty());
+            }
+        }
+
+        log.debug("Calculated risk metrics for {} applications", appIds.size());
+
+        return metricsMap;
+    }
+
+    /**
+     * Calculate total risks breakdown by priority for an application.
+     * Includes all active statuses (including PENDING_REVIEW).
      */
     private RiskBreakdown calculateRiskBreakdown(String appId) {
         List<Object[]> breakdownData = riskItemRepository.getRiskBreakdownByApp(appId);
+
+        Map<RiskPriority, Integer> countsByPriority = breakdownData.stream()
+                .collect(Collectors.toMap(
+                        row -> (RiskPriority) row[0],
+                        row -> ((Long) row[1]).intValue()
+                ));
+
+        return new RiskBreakdown(
+                countsByPriority.getOrDefault(RiskPriority.CRITICAL, 0),
+                countsByPriority.getOrDefault(RiskPriority.HIGH, 0),
+                countsByPriority.getOrDefault(RiskPriority.MEDIUM, 0),
+                countsByPriority.getOrDefault(RiskPriority.LOW, 0)
+        );
+    }
+
+    /**
+     * Calculate in-progress risks breakdown by priority for an application.
+     * Excludes PENDING_REVIEW (risks that are waiting/not yet being worked on).
+     */
+    private RiskBreakdown calculateInProgressBreakdown(String appId) {
+        List<Object[]> breakdownData = riskItemRepository.getInProgressBreakdownByApp(appId);
 
         Map<RiskPriority, Integer> countsByPriority = breakdownData.stream()
                 .collect(Collectors.toMap(

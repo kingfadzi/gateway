@@ -36,6 +36,7 @@ public class RiskMigrationService {
     private final ArbRoutingService arbRoutingService;
     private final RiskPriorityCalculator priorityCalculator;
     private final DomainRiskAggregationService aggregationService;
+    private final StatusHistoryService statusHistoryService;
 
     public RiskMigrationService(
             RiskStoryRepository riskStoryRepository,
@@ -44,7 +45,8 @@ public class RiskMigrationService {
             ProfileFieldRegistryService registryService,
             ArbRoutingService arbRoutingService,
             RiskPriorityCalculator priorityCalculator,
-            DomainRiskAggregationService aggregationService) {
+            DomainRiskAggregationService aggregationService,
+            StatusHistoryService statusHistoryService) {
         this.riskStoryRepository = riskStoryRepository;
         this.domainRiskRepository = domainRiskRepository;
         this.riskItemRepository = riskItemRepository;
@@ -52,6 +54,7 @@ public class RiskMigrationService {
         this.arbRoutingService = arbRoutingService;
         this.priorityCalculator = priorityCalculator;
         this.aggregationService = aggregationService;
+        this.statusHistoryService = statusHistoryService;
     }
 
     /**
@@ -175,7 +178,13 @@ public class RiskMigrationService {
                         riskItem.getTriggeringEvidenceId());
 
                 if (!exists) {
-                    riskItemRepository.save(riskItem);
+                    RiskItem saved = riskItemRepository.save(riskItem);
+
+                    // Log initial status to history
+                    String triggerReason = String.format("Migrated from risk_story %s (original status: %s)",
+                            story.getRiskId(), story.getStatus());
+                    statusHistoryService.logSystemCreation(saved.getRiskItemId(), triggerReason);
+
                     migratedCount++;
                     result.setCreatedRiskItems(result.getCreatedRiskItems() + 1);
                 } else {
@@ -328,16 +337,16 @@ public class RiskMigrationService {
      */
     private RiskItemStatus mapStatus(RiskStatus oldStatus) {
         if (oldStatus == null) {
-            return RiskItemStatus.OPEN;
+            return RiskItemStatus.PENDING_REVIEW;
         }
 
         return switch (oldStatus) {
-            case PENDING_SME_REVIEW, UNDER_REVIEW -> RiskItemStatus.OPEN;
-            case AWAITING_EVIDENCE -> RiskItemStatus.IN_PROGRESS;
-            case APPROVED -> RiskItemStatus.RESOLVED;
-            case WAIVED -> RiskItemStatus.WAIVED;
+            case PENDING_SME_REVIEW, UNDER_REVIEW -> RiskItemStatus.PENDING_REVIEW;
+            case AWAITING_EVIDENCE -> RiskItemStatus.IN_REMEDIATION;
+            case APPROVED -> RiskItemStatus.REMEDIATED;
+            case WAIVED -> RiskItemStatus.SME_APPROVED;
             case REJECTED, CLOSED -> RiskItemStatus.CLOSED;
-            default -> RiskItemStatus.OPEN;
+            default -> RiskItemStatus.PENDING_REVIEW;
         };
     }
 
@@ -362,6 +371,60 @@ public class RiskMigrationService {
         }
 
         return desc.length() > 0 ? desc.toString() : "Migrated from risk_story";
+    }
+
+    /**
+     * Backfill status history for already-migrated risk items that are missing history records.
+     * This creates an initial status history entry for each risk item that doesn't have one.
+     *
+     * @return Number of status history records created
+     */
+    @Transactional
+    public int backfillStatusHistory() {
+        log.info("Starting status history backfill for migrated risk items");
+
+        // Find all migrated risk items (those with IDs starting with "migrated_")
+        List<RiskItem> migratedItems = riskItemRepository.findAll().stream()
+                .filter(item -> item.getRiskItemId().startsWith("migrated_"))
+                .toList();
+
+        log.info("Found {} migrated risk items", migratedItems.size());
+
+        int backfilledCount = 0;
+        for (RiskItem item : migratedItems) {
+            try {
+                // Check if this item already has status history
+                long historyCount = statusHistoryService.countTransitions(item.getRiskItemId());
+
+                if (historyCount == 0) {
+                    // No history exists, create initial record
+                    String triggerReason = String.format(
+                            "Backfilled from migration (current status: %s, opened: %s)",
+                            item.getStatus(),
+                            item.getOpenedAt()
+                    );
+
+                    statusHistoryService.logStatusChange(
+                            item.getRiskItemId(),
+                            null,  // No previous status
+                            item.getStatus(),
+                            "MIGRATION_BACKFILL",
+                            triggerReason,
+                            "SYSTEM",
+                            "SYSTEM"
+                    );
+
+                    backfilledCount++;
+                    log.debug("Backfilled status history for risk item: {}", item.getRiskItemId());
+                }
+            } catch (Exception e) {
+                log.error("Failed to backfill status history for risk item {}: {}",
+                        item.getRiskItemId(), e.getMessage());
+            }
+        }
+
+        log.info("Backfilled status history for {} risk items", backfilledCount);
+        return backfilledCount;
     }
 
     /**

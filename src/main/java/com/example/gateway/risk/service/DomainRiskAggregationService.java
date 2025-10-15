@@ -30,16 +30,19 @@ public class DomainRiskAggregationService {
     private final RiskItemRepository riskItemRepository;
     private final RiskPriorityCalculator priorityCalculator;
     private final ArbRoutingService arbRoutingService;
+    private final StatusHistoryService statusHistoryService;
 
     public DomainRiskAggregationService(
             DomainRiskRepository domainRiskRepository,
             RiskItemRepository riskItemRepository,
             RiskPriorityCalculator priorityCalculator,
-            ArbRoutingService arbRoutingService) {
+            ArbRoutingService arbRoutingService,
+            StatusHistoryService statusHistoryService) {
         this.domainRiskRepository = domainRiskRepository;
         this.riskItemRepository = riskItemRepository;
         this.priorityCalculator = priorityCalculator;
         this.arbRoutingService = arbRoutingService;
+        this.statusHistoryService = statusHistoryService;
     }
 
     /**
@@ -93,6 +96,7 @@ public class DomainRiskAggregationService {
 
     /**
      * Add a risk item to a domain risk and recalculate aggregations.
+     * Automatically logs initial status to history.
      *
      * @param domainRisk The domain risk to add to
      * @param riskItem The risk item to add
@@ -107,7 +111,14 @@ public class DomainRiskAggregationService {
         riskItem.setArb(domainRisk.getArb());
 
         // Save risk item
-        riskItemRepository.save(riskItem);
+        RiskItem saved = riskItemRepository.save(riskItem);
+
+        // Log initial status to history
+        String triggerReason = riskItem.getCreationType() == RiskCreationType.SYSTEM_AUTO_CREATION
+                ? "Auto-created from evidence submission"
+                : "Manually created by " + (riskItem.getRaisedBy() != null ? riskItem.getRaisedBy() : "SYSTEM");
+
+        statusHistoryService.logSystemCreation(saved.getRiskItemId(), triggerReason);
 
         // Update domain risk timestamp
         domainRisk.setLastItemAddedAt(OffsetDateTime.now());
@@ -133,10 +144,13 @@ public class DomainRiskAggregationService {
 
         // Calculate counts
         int totalItems = allItems.size();
-        long openItems = riskItemRepository.countByDomainRiskIdAndStatus(
-                domainRiskId, RiskItemStatus.OPEN) +
-                riskItemRepository.countByDomainRiskIdAndStatus(
-                        domainRiskId, RiskItemStatus.IN_PROGRESS);
+
+        // Count open items = all active (non-terminal) states
+        // Active states: PENDING_REVIEW, UNDER_SME_REVIEW, AWAITING_REMEDIATION,
+        //                IN_REMEDIATION, PENDING_APPROVAL, ESCALATED
+        long openItems = allItems.stream()
+                .filter(item -> item.getStatus().isActive())
+                .count();
 
         long highPriorityItems = riskItemRepository.countHighPriorityItems(domainRiskId);
 
@@ -188,6 +202,7 @@ public class DomainRiskAggregationService {
 
     /**
      * Update status of a risk item and recalculate domain aggregations.
+     * Automatically logs status change to status history.
      *
      * @param riskItemId Risk item ID
      * @param newStatus New status
@@ -197,13 +212,39 @@ public class DomainRiskAggregationService {
     @Transactional
     public void updateRiskItemStatus(String riskItemId, RiskItemStatus newStatus,
                                       String resolution, String resolutionComment) {
+        updateRiskItemStatus(riskItemId, newStatus, resolution, resolutionComment, "SYSTEM", "SYSTEM");
+    }
+
+    /**
+     * Update status of a risk item with actor information.
+     * Automatically logs status change to status history.
+     *
+     * @param riskItemId Risk item ID
+     * @param newStatus New status
+     * @param resolution Resolution type
+     * @param resolutionComment Comment explaining resolution
+     * @param changedBy User making the change
+     * @param actorRole Role of user (SME, PO, SYSTEM, ADMIN)
+     */
+    @Transactional
+    public void updateRiskItemStatus(String riskItemId, RiskItemStatus newStatus,
+                                      String resolution, String resolutionComment,
+                                      String changedBy, String actorRole) {
         RiskItem riskItem = riskItemRepository.findById(riskItemId)
                 .orElseThrow(() -> new IllegalArgumentException("Risk item not found: " + riskItemId));
 
         RiskItemStatus oldStatus = riskItem.getStatus();
+
+        // Only update if status actually changed
+        if (oldStatus == newStatus) {
+            log.debug("Risk item {} already in status {}, skipping update", riskItemId, newStatus);
+            return;
+        }
+
         riskItem.setStatus(newStatus);
 
-        if (newStatus == RiskItemStatus.RESOLVED || newStatus == RiskItemStatus.CLOSED) {
+        // Set resolved timestamp and resolution for terminal states
+        if (newStatus.isTerminal()) {
             riskItem.setResolvedAt(OffsetDateTime.now());
             riskItem.setResolution(resolution);
             riskItem.setResolutionComment(resolutionComment);
@@ -211,16 +252,26 @@ public class DomainRiskAggregationService {
 
         riskItemRepository.save(riskItem);
 
-        // Recalculate domain risk if status changed
-        if (oldStatus != newStatus) {
-            String domainRiskId = riskItem.getDomainRiskId();
-            DomainRisk domainRisk = domainRiskRepository.findById(domainRiskId)
-                    .orElseThrow(() -> new IllegalStateException("Domain risk not found: " + domainRiskId));
+        // Log status change to history
+        statusHistoryService.logStatusChange(
+                riskItemId,
+                oldStatus,
+                newStatus,
+                resolution,
+                resolutionComment,
+                changedBy,
+                actorRole
+        );
 
-            recalculateAggregations(domainRisk);
+        // Recalculate domain risk aggregations
+        String domainRiskId = riskItem.getDomainRiskId();
+        DomainRisk domainRisk = domainRiskRepository.findById(domainRiskId)
+                .orElseThrow(() -> new IllegalStateException("Domain risk not found: " + domainRiskId));
 
-            log.info("Updated risk item {} status from {} to {}", riskItemId, oldStatus, newStatus);
-        }
+        recalculateAggregations(domainRisk);
+
+        log.info("Updated risk item {} status from {} to {} by {} ({})",
+                 riskItemId, oldStatus, newStatus, changedBy, actorRole);
     }
 
     /**
@@ -309,7 +360,7 @@ public class DomainRiskAggregationService {
         riskItem.setPriorityScore(priorityScore);
         riskItem.setEvidenceStatus("approved");  // Default for manual creation
 
-        riskItem.setStatus(RiskItemStatus.OPEN);
+        riskItem.setStatus(RiskItemStatus.PENDING_REVIEW);
         riskItem.setCreationType(RiskCreationType.MANUAL_CREATION);
         riskItem.setRaisedBy(createdBy);
         riskItem.setOpenedAt(OffsetDateTime.now());
